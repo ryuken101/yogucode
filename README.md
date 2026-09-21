@@ -214,3 +214,67 @@ Checks: `npm run typecheck`, `npm run test`, `npm run build`.
 The §8 palette lives in `src/theme.css` as Tailwind theme tokens. One rule from the
 spec is load-bearing: **never red for a student's incorrect answer** — amber means "not
 yet", sage means correct, and rust is only for system errors.
+
+### Database access
+
+Homebrew's Postgres listens on a local unix socket and trusts the macOS account, so
+there is no host, port, user or password to supply. This is also why `.env` carries a
+bare `postgresql+asyncpg://localhost/coding_tool_dev` with no credentials in it.
+
+```bash
+psql -d coding_tool_dev       # develop against this one
+psql -d coding_tool_test      # dropped and re-migrated by every pytest run — keep nothing here
+```
+
+Inside `psql`:
+
+| | |
+|---|---|
+| `\dt` | list tables |
+| `\d students` | one table — columns, indexes, CHECK constraints, foreign keys |
+| `\di` | indexes |
+| `\x` | toggle expanded rows, which makes wide rows readable |
+| `\q` | quit |
+
+`\d <table>` is the one that earns its keep: it is how you confirm a migration actually
+created the constraint you meant, rather than trusting that autogenerate noticed.
+
+Without opening the shell:
+
+```bash
+psql -d coding_tool_dev -c "select * from centres;"
+psql -d coding_tool_dev -f script.sql
+psql -d coding_tool_dev -tAc "select relname, n_live_tup from pg_stat_user_tables order by relname;"
+```
+
+A GUI is worth it once there is real data — TablePlus, Postico and DBeaver all connect
+on `localhost:5432`, database `coding_tool_dev`, user is your macOS account, no
+password. **Postman is not one of these**: it is an HTTP client and does not speak the
+Postgres wire protocol. It is the right tool for the API from step 3 onward, and the
+wrong tool for the database.
+
+If the server stops answering:
+
+```bash
+brew services list                  # postgresql@16 should read "started"
+brew services restart postgresql@16
+```
+
+#### On committing this
+
+Documenting local access is not a disclosure. There is nothing secret in it: the
+database is a socket on one laptop, reachable only by whoever is already logged into
+that laptop, and it holds no data.
+
+Three lines to hold as that stops being true:
+
+- **Credentials never enter the repo.** The Supabase connection string, its password and
+  the `service_role` key belong in `apps/api/.env` (gitignored) and in Fly.io and Vercel
+  secrets. `.env.example` carries names and empty values only — keep it that way.
+- **Direct psql against production bypasses `audit_log`.** That table exists because
+  teacher actions on children's records are worth being able to reconstruct. A manual
+  `UPDATE` leaves no trace of who did it or why. Prefer reading through the app, and
+  when a manual fix is genuinely needed, write down what was run.
+- **Production holds children's records.** Under the Privacy Act, a `select *` on
+  `students` is a different act from one on `centres`. Pull what a task needs, not the
+  table, and do not take extracts off the machine.
