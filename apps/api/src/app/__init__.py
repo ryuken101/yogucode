@@ -1,0 +1,1 @@
+"""Coding-teaching-tool API."""

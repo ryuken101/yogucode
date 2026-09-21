@@ -1,0 +1,27 @@
+/*
+ * Palette — product-spec.md §8, "soft sky and cream".
+ *
+ * Rules that are not negotiable:
+ *   - Never red for a student's incorrect answer. Amber means "not yet", sage means
+ *     correct. Rust is reserved for system errors.
+ *   - Cream page background, not white.
+ *   - Serif headings, sans UI and body, monospace code.
+ */
+@theme {
+  --color-sky: #7b96d4;
+  --color-sky-deep: #5a77b8;
+  --color-sky-pale: #c4d3ee;
+  --color-cream: #f7f4ed;
+  --color-paper: #fffdf8;
+  --color-ink: #2c2a26;
+  --color-ink-soft: #6b665e;
+  --color-terracotta: #c1633f;
+  --color-sage: #7d9471;
+  --color-amber: #d9a441;
+  --color-rust: #a8503a;
+
+  --font-serif: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
