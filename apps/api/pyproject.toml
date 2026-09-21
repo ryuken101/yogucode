@@ -9,6 +9,7 @@ authors = [
 dependencies = [
     "fastapi>=0.115",
     "sqlmodel>=0.0.22",
+    "sqlalchemy[asyncio]>=2.0",  # the asyncio extra pulls in greenlet
     "alembic>=1.14",
     "pydantic-settings>=2.6",
     "asyncpg>=0.30",
