@@ -1,0 +1,152 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What this is
+
+A classroom platform for after-school coding academies — hosted Python editors, problem
+sets, quizzes, per-concept mastery tracking. First customer is Magikid Castle Hill's
+Year 4–6 Python class.
+
+Two documents drive the work and both are worth reading before a substantial change:
+
+- `docs/product-spec.md` — the product, in the repo.
+- `~/Documents/Ken Nguyen/Startup/phase-1-plan.md` — **outside the repo**, by the owner's
+  preference. Specs and phase plans live in `~/Documents/Ken Nguyen/Startup/`, not in
+  `docs/`. `docs/product-spec.md` is a copy kept versioned with the code.
+
+The build is phased (spec §7). Each phase is usable on its own. The plan documents say
+*why* a decision was made far more often than the code can; when the two disagree, ask
+rather than assume the code is right.
+
+## Commands
+
+Local Postgres 16 via Homebrew — `coding_tool_dev` and `coding_tool_test` must both
+exist. There is no Docker on this machine.
+
+### API (`apps/api`)
+
+```bash
+uv sync
+uv run alembic upgrade head
+uv run uvicorn app.main:app --reload
+
+uv run ruff check . && uv run ruff format --check .
+uv run pytest
+uv run pytest tests/test_schema.py::test_roster_round_trip   # a single test
+uv run pytest -k "pin or session"                            # by keyword
+
+uv run alembic revision --autogenerate -m "what changed"
+uv run alembic downgrade base && uv run alembic upgrade head  # prove it both ways
+```
+
+### Web (`apps/web`)
+
+```bash
+npm install
+npm run dev
+npm run typecheck && npm run test && npm run build
+npx vitest run src/App.test.tsx        # a single test file
+```
+
+## Architecture
+
+### Two identity models, one authorisation seam
+
+This is the part that is expensive to get wrong, and it spans several files once built.
+
+**Teachers** authenticate through Supabase Auth (magic link); the API verifies the JWT
+against the project's JWKS endpoint. **Students** never touch Supabase. They get an
+app-issued opaque session token — `secrets.token_urlsafe(32)`, only its SHA-256 hash
+stored in `student_sessions`, delivered as an httpOnly/Secure/SameSite=Lax cookie.
+Opaque rather than JWT **because it must be revocable**: a teacher kicking a session
+(wrong child logged in, laptop left signed in) has to take effect on the next request.
+
+Both resolve through one FastAPI dependency into a common `Principal` carrying
+`centre_id`, `kind` (`teacher` | `student`) and subject id. **Every route authorises
+against `Principal.centre_id`.** That is the tenancy boundary, and a leak there is a leak
+of children's data — the authorisation tests matter more than any other tests in this
+repo.
+
+Deliberately *not* putting students in Supabase Auth: it would need synthetic email
+identities plus server-held passwords driven by the `service_role` key — more moving
+parts and a larger blast radius than an opaque cookie. The spec's "don't roll your own
+session management" warning targets password reset, email verification and OAuth, none
+of which exist for a student here.
+
+### Data model conventions
+
+All in `apps/api/src/app/models/`. `base.py` explains each; the short version:
+
+- **UUIDv7 primary keys, generated in Python** (`uuid_utils.compat.uuid7`), stored as
+  native Postgres `uuid`. Generation stays application-side because Phase 6's offline
+  event buffer needs a disconnected laptop to mint non-colliding ids. Do not move this to
+  a database default.
+- **Status columns are `text` + `CHECK`, never Postgres `ENUM`** — these vocabularies
+  will grow and `ALTER TYPE ... ADD VALUE` is awkward inside a migration. Python sees
+  them as `StrEnum`; the field needs `sa_type=String` or SQLModel creates a native enum.
+- **Timestamps are set in Python, not `func.now()`.** In Postgres `now()` is transaction
+  start time, so a row inserted and updated in one transaction would show an unchanged
+  `updated_at`. `server_default` is kept only for rows inserted by hand.
+- **Archive, never delete.** `status` columns throughout, no cascading deletes. A student
+  leaving mid-term must not vaporise a term of history.
+- `metadata.naming_convention` is set in `base.py` before any table is defined. Explicit
+  `CheckConstraint(name=...)` values are therefore *short* (`"status"`, not
+  `"ck_students_status"`) — the convention adds the prefix.
+- **A table not imported in `models/__init__.py` is invisible to Alembic.**
+
+Two structural choices that look like duplication and are not: `students` is a separate
+table from `users` (no email, no Supabase identity, different PII posture), and students
+belong to a **centre**, not a class — enrolments are per-term, which is what lets mastery
+follow a child across terms in Phase 8.
+
+`centre_id` exists on nearly everything even though there is one centre today. Adding
+tenancy later means backfilling every table and re-auditing every query.
+
+### Migrations
+
+`migrations/env.py` takes the URL from `DATABASE_URL`, or `ALEMBIC_DATABASE_URL` when
+set — the test fixtures use the latter to point migrations at the test database.
+`alembic.ini` carries no URL. Post-write hooks run `ruff check --fix` and `ruff format`
+over each generated revision, so migrations are never a lint exception. Autogenerate
+misses things (CHECK constraints, partial indexes) — read the generated file.
+
+### Tests
+
+`tests/conftest.py` migrates `coding_tool_test` from empty once per session, so a broken
+migration fails the test run. Each test gets a session bound to a connection-level
+transaction with `join_transaction_mode="create_savepoint"`, so a test's own rollback
+(after an expected `IntegrityError`) does not tear down the fixture's transaction. Tests
+roll back; they never commit.
+
+`test_models_match_the_migrations` runs `alembic check` — a model changed without a
+revision fails CI.
+
+Use `sqlmodel.ext.asyncio.session.AsyncSession`, not SQLAlchemy's; only the former has
+`.exec()`.
+
+### Connection pooling
+
+`db.py` uses `poolclass=NullPool`. Staging and production run through Supabase's
+Supavisor pooler in transaction mode, which does its own pooling; a second pool on top
+exhausts connections under trivial load. This is a known one-time setup cost, not
+something to discover from intermittent failures.
+
+### Frontend
+
+`src/theme.css` holds the product-spec §8 palette as Tailwind v4 theme tokens (v4 was
+chosen for its CSS-first config). One rule is load-bearing and easy to violate by habit:
+**never red for a student's incorrect answer** — amber means "not yet", sage means
+correct, rust is reserved for system errors. Cream background, not white. Serif headings,
+sans UI, mono code.
+
+Students never talk to Supabase directly; `@supabase/supabase-js` is for teacher auth
+only.
+
+## Keeping the README current
+
+`README.md` has a **System architecture** section with a diagram and a
+"Where development is now" subsection. It is the project's reference point for how the
+pieces fit and what exists yet. Update it when a phase completes or when the shape of
+the system changes — new service, new boundary, a component moving between layers. It
+does not need updating for an ordinary feature within a phase.
