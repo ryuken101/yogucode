@@ -60,9 +60,24 @@ A Year 4 student has no email address and cannot be relied on to remember a pass
 teachers and students authenticate by different routes that converge on one object.
 
 **Teachers** sign in through Supabase Auth by magic link. The browser holds the JWT; the
-API verifies it against the project's JWKS endpoint. Sign-in is gated by an email
-allowlist in config — without it, anyone who can request a magic link on a public staging
-URL would provision a tenant.
+API verifies it against the project's JWKS endpoint. Only asymmetric algorithms are
+accepted — the legacy HS256 shared secret is deliberately not implemented, because
+accepting both families is where JWT algorithm-confusion bugs live. The key cache
+refreshes on an unknown `kid` as well as on a timer, which is how a key rotation is
+picked up without a redeploy, and those refreshes are rate-limited so a forged `kid`
+cannot be used to drive traffic at Supabase.
+
+Sign-in is gated by an email allowlist in config — without it, anyone who can request a
+magic link on a public staging URL would provision a tenant. The allowlist is checked on
+every request rather than only at signup, so removing an address actually revokes access.
+
+**One academy is one centre.** The centre named in config is created by whoever signs in
+first, who becomes its owner; every allowlisted teacher after that joins the same centre
+as a teacher. A second teacher signing in must never produce a second tenant — they would
+silently be unable to see each other's classes, and merging afterwards means moving rows
+across the very boundary this design exists to keep intact. Provisioning happens only in
+`POST /auth/teacher/session`, called once by the web app after the magic-link callback;
+the auth dependency itself never writes.
 
 **Students** never touch Supabase. A teacher builds the roster, sets each student's PIN
 and hands out slips; the student picks their name behind a class join code and enters the
@@ -141,8 +156,8 @@ eleven steps. Backend is steps 1–8, frontend is 9, and 10–11 ship it.
 |---|---|---|
 | 1 | Scaffold + CI | **Done** |
 | 2 | Database, models, first migration | **Done** |
-| 3 | Teacher auth — JWKS verification, `Principal`, first-sign-in provisioning | Next |
-| 4 | Centre + class CRUD | Not started |
+| 3 | Teacher auth — JWKS verification, `Principal`, first-sign-in provisioning | **Done** |
+| 4 | Centre + class CRUD | Next |
 | 5 | Roster management, bulk name entry | Not started |
 | 6 | Join codes — 6 chars, unambiguous alphabet, rotate and revoke | Not started |
 | 7 | Student PIN login — Argon2id, lockout, rate limiting | Not started |
@@ -151,11 +166,19 @@ eleven steps. Backend is steps 1–8, frontend is 9, and 10–11 ship it.
 | 10 | Deploy — Supabase `ap-southeast-2`, Fly.io `syd`, Vercel | Not started |
 | 11 | Verify the join flow on a real centre laptop | Not started |
 
-**What exists today:** the monorepo, CI, and the eleven tables above as one Alembic
-revision that migrates clean from empty and downgrades back. The API serves a health
-check and nothing else — there are no routers, no auth code and no screens yet. The
-diagram above is therefore the *designed* system; the parts past step 2 are specified but
+**What exists today:** the monorepo, CI, the eleven tables as one Alembic revision that
+migrates clean from empty and downgrades back, and teacher authentication — JWKS
+verification with key caching, the `Principal` seam, and `POST /auth/teacher/session` /
+`GET /auth/me`.
+
+The teacher half of the seam is real; the student half is a branch that refuses until
+step 7. There is still no class, roster or join-code route, and no screens. The diagram
+above is therefore partly the *designed* system: everything past step 3 is specified but
 unbuilt.
+
+Teacher auth is tested against a locally generated EC keypair and a stubbed JWKS
+endpoint, so the cryptography is real but the issuer is not. Pointing it at the real
+project at step 10 is a `SUPABASE_URL` change.
 
 **Nothing is deployed.** No Supabase project, Fly app or Vercel project exists. Both
 databases are local Postgres 16.

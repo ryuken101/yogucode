@@ -1,11 +1,12 @@
-"""FastAPI application entrypoint.
-
-Phase 1 step 1: a health check and nothing else. Routers land in steps 3–8.
-"""
+"""FastAPI application entrypoint."""
 
 from fastapi import FastAPI
 
+from app.routers import auth
+
 app = FastAPI(title="Coding-teaching-tool API")
+
+app.include_router(auth.router)
 
 
 @app.get("/health")

@@ -8,17 +8,26 @@ Each test then gets a session inside a transaction that is rolled back afterward
 tests never see each other's rows.
 """
 
+import base64
 import os
 import subprocess
+import uuid
 from collections.abc import AsyncGenerator
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import httpx
+import jwt
 import pytest
+from cryptography.hazmat.primitives.asymmetric import ec
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.config import get_settings
+from app.auth.supabase_jwt import SupabaseJWKSVerifier, get_verifier
+from app.config import Settings, get_settings
+from app.db import get_session
+from app.main import app as fastapi_app
 
 API_ROOT = Path(__file__).resolve().parents[1]
 
@@ -55,7 +64,8 @@ async def session(database_url: str) -> AsyncGenerator[AsyncSession, None]:
     connection = await engine.connect()
     transaction = await connection.begin()
     # create_savepoint keeps a test's own rollback — after an expected IntegrityError,
-    # say — from tearing down the outer transaction this fixture owns.
+    # say — from tearing down the outer transaction this fixture owns. It also means a
+    # route under test can call session.commit() without escaping the test's rollback.
     factory = async_sessionmaker(
         bind=connection,
         class_=AsyncSession,
@@ -67,3 +77,158 @@ async def session(database_url: str) -> AsyncGenerator[AsyncSession, None]:
     await transaction.rollback()
     await connection.close()
     await engine.dispose()
+
+
+# --- Supabase token fixtures -------------------------------------------------------
+#
+# There is no Supabase project yet (step 10), and CI must not depend on one existing.
+# These generate a real EC P-256 keypair, serve it as a JWKS document the verifier
+# fetches through a stubbed transport, and mint genuinely signed tokens. The crypto is
+# real; only the issuer is local.
+
+SUPABASE_URL = "https://testproject.supabase.co"
+TEST_KID = "test-key-1"
+
+
+@pytest.fixture(scope="session")
+def supabase_url() -> str:
+    return SUPABASE_URL
+
+
+@pytest.fixture(scope="session")
+def test_kid() -> str:
+    return TEST_KID
+
+
+def jwk_from_public_key(key: ec.EllipticCurvePublicKey, kid: str) -> dict:
+    """An EC public key in the JWK shape Supabase's JWKS endpoint publishes."""
+    numbers = key.public_numbers()
+
+    def b64(value: int) -> str:
+        return base64.urlsafe_b64encode(value.to_bytes(32, "big")).rstrip(b"=").decode()
+
+    return {
+        "kty": "EC",
+        "crv": "P-256",
+        "kid": kid,
+        "use": "sig",
+        "alg": "ES256",
+        "x": b64(numbers.x),
+        "y": b64(numbers.y),
+    }
+
+
+@pytest.fixture(scope="session")
+def make_jwk():
+    """Expose the JWK builder to tests that need to publish a rotated key."""
+    return jwk_from_public_key
+
+
+@pytest.fixture(scope="session")
+def signing_key() -> ec.EllipticCurvePrivateKey:
+    return ec.generate_private_key(ec.SECP256R1())
+
+
+@pytest.fixture(scope="session")
+def jwks_document(signing_key: ec.EllipticCurvePrivateKey) -> dict:
+    """The public half, in the shape Supabase's JWKS endpoint returns."""
+    return {"keys": [jwk_from_public_key(signing_key.public_key(), TEST_KID)]}
+
+
+@pytest.fixture
+def make_token(signing_key: ec.EllipticCurvePrivateKey):
+    """Mint a signed Supabase-shaped access token, with overridable claims."""
+
+    def _make(
+        *,
+        sub: str | None = None,
+        email: str = "teacher@example.com",
+        full_name: str | None = "Ken Nguyen",
+        audience: str = "authenticated",
+        issuer: str | None = None,
+        expires_in: int = 3600,
+        kid: str = TEST_KID,
+        algorithm: str = "ES256",
+        key=None,
+        **extra,
+    ) -> str:
+        now = datetime.now(UTC)
+        payload = {
+            "sub": sub if sub is not None else str(uuid.uuid4()),
+            "email": email,
+            "aud": audience,
+            "iss": issuer if issuer is not None else f"{SUPABASE_URL}/auth/v1",
+            "iat": now,
+            "exp": now + timedelta(seconds=expires_in),
+            "role": "authenticated",
+            "user_metadata": {"full_name": full_name} if full_name else {},
+            **extra,
+        }
+        return jwt.encode(
+            payload,
+            key if key is not None else signing_key,
+            algorithm=algorithm,
+            headers={"kid": kid},
+        )
+
+    return _make
+
+
+@pytest.fixture
+def jwks_server(jwks_document: dict):
+    """A stub for the JWKS endpoint that counts how often it is fetched."""
+
+    class Server:
+        def __init__(self) -> None:
+            self.document = jwks_document
+            self.fetch_count = 0
+            self.fail = False
+
+        def handler(self, request: httpx.Request) -> httpx.Response:
+            self.fetch_count += 1
+            if self.fail:
+                raise httpx.ConnectError("jwks unreachable", request=request)
+            return httpx.Response(200, json=self.document)
+
+    return Server()
+
+
+@pytest.fixture
+def test_settings() -> Settings:
+    return Settings(
+        supabase_url=SUPABASE_URL,
+        teacher_email_allowlist="@example.com",
+        centre_slug="castle-hill",
+        centre_name="Magikid Castle Hill",
+    )
+
+
+@pytest.fixture
+def verifier(test_settings: Settings, jwks_server) -> SupabaseJWKSVerifier:
+    """A verifier pointed at the JWKS stub, with a fresh cache per test."""
+    return SupabaseJWKSVerifier(test_settings, transport=httpx.MockTransport(jwks_server.handler))
+
+
+@pytest.fixture
+async def client(
+    session: AsyncSession,
+    test_settings: Settings,
+    verifier: SupabaseJWKSVerifier,
+) -> AsyncGenerator[httpx.AsyncClient, None]:
+    """An HTTP client bound to the app, sharing the test's transaction.
+
+    Settings, the verifier and the database session are all FastAPI dependencies
+    precisely so they can be swapped here rather than monkeypatched into place.
+    """
+
+    async def override_session() -> AsyncGenerator[AsyncSession, None]:
+        yield session
+
+    fastapi_app.dependency_overrides[get_session] = override_session
+    fastapi_app.dependency_overrides[get_settings] = lambda: test_settings
+    fastapi_app.dependency_overrides[get_verifier] = lambda: verifier
+
+    transport = httpx.ASGITransport(app=fastapi_app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as http_client:
+        yield http_client
+    fastapi_app.dependency_overrides.clear()
