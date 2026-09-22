@@ -22,7 +22,7 @@ code execution — student Python runs in the browser under Pyodide from Phase 2
 removes sandboxing, resource limits and per-execution cost from the problem entirely.
 
 Everything is hosted in or near Sydney. The data is Australian children's records, and
-region is far easier to choose now than to migrate later.
+region is far easier to choose now than to migrate later down the line.
 
 ```mermaid
 flowchart TB
