@@ -23,14 +23,9 @@ from app.auth.principal import (
 from app.auth.provisioning import provision_teacher
 from app.db import get_session
 from app.models import Centre, User, UserRole
+from app.schemas import CentreOut
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-
-class CentreOut(BaseModel):
-    id: uuid.UUID
-    name: str
-    slug: str
 
 
 class TeacherProfileOut(BaseModel):
@@ -47,7 +42,7 @@ class TeacherProfileOut(BaseModel):
             email=user.email,
             display_name=user.display_name,
             role=user.role,
-            centre=CentreOut(id=centre.id, name=centre.name, slug=centre.slug),
+            centre=CentreOut.build(centre),
         )
 
 

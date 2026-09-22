@@ -28,6 +28,7 @@ from app.auth.supabase_jwt import SupabaseJWKSVerifier, get_verifier
 from app.config import Settings, get_settings
 from app.db import get_session
 from app.main import app as fastapi_app
+from app.models import Centre, Class
 
 API_ROOT = Path(__file__).resolve().parents[1]
 
@@ -232,3 +233,38 @@ async def client(
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as http_client:
         yield http_client
     fastapi_app.dependency_overrides.clear()
+
+
+@pytest.fixture
+async def signed_in(client: httpx.AsyncClient, make_token):
+    """Provision a teacher and return their auth headers.
+
+    Takes an email so a test can sign in a second teacher at the same centre.
+    """
+
+    async def _sign_in(email: str = "ken@example.com", **token_kwargs) -> dict[str, str]:
+        token = make_token(email=email, **token_kwargs)
+        response = await client.post(
+            "/auth/teacher/session", headers={"Authorization": f"Bearer {token}"}
+        )
+        assert response.status_code == 200, response.text
+        return {"Authorization": f"Bearer {token}"}
+
+    return _sign_in
+
+
+@pytest.fixture
+async def foreign_centre(session: AsyncSession) -> dict:
+    """Another centre with a class in it, inserted directly.
+
+    There is no way to reach this through the API — one deployment has one centre — which
+    is the point: it exists so the tenancy tests have something to fail to reach.
+    """
+    centre = Centre(name="Magikid Parramatta", slug="parramatta")
+    session.add(centre)
+    await session.flush()
+
+    klass = Class(centre_id=centre.id, name="Someone else's class", term_label="2026 T4")
+    session.add(klass)
+    await session.flush()
+    return {"centre": centre, "class": klass}

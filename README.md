@@ -157,8 +157,8 @@ eleven steps. Backend is steps 1–8, frontend is 9, and 10–11 ship it.
 | 1 | Scaffold + CI | **Done** |
 | 2 | Database, models, first migration | **Done** |
 | 3 | Teacher auth — JWKS verification, `Principal`, first-sign-in provisioning | **Done** |
-| 4 | Centre + class CRUD | Next |
-| 5 | Roster management, bulk name entry | Not started |
+| 4 | Centre + class CRUD | **Done** |
+| 5 | Roster management, bulk name entry | Next |
 | 6 | Join codes — 6 chars, unambiguous alphabet, rotate and revoke | Not started |
 | 7 | Student PIN login — Argon2id, lockout, rate limiting | Not started |
 | 8 | Concepts table + YAML seed loader | Not started |
@@ -167,13 +167,19 @@ eleven steps. Backend is steps 1–8, frontend is 9, and 10–11 ship it.
 | 11 | Verify the join flow on a real centre laptop | Not started |
 
 **What exists today:** the monorepo, CI, the eleven tables as one Alembic revision that
-migrates clean from empty and downgrades back, and teacher authentication — JWKS
-verification with key caching, the `Principal` seam, and `POST /auth/teacher/session` /
-`GET /auth/me`.
+migrates clean from empty and downgrades back, teacher authentication (JWKS verification
+with key caching, the `Principal` seam, `POST /auth/teacher/session`, `GET /auth/me`),
+and class CRUD scoped to the centre — `GET /centre` plus create, list, read, rename,
+archive and unarchive under `/classes`.
 
-The teacher half of the seam is real; the student half is a branch that refuses until
-step 7. There is still no class, roster or join-code route, and no screens. The diagram
-above is therefore partly the *designed* system: everything past step 3 is specified but
+The tenancy boundary is now enforced rather than merely asserted. Every centre-owned
+lookup goes through `src/app/scoping.py`; a router that wrote its own `select(Class)`
+would be a bug. Deleting the filter fails three tests and only those, which is how we
+know they have teeth.
+
+The teacher half of the auth seam is real; the student half is a branch that refuses
+until step 7. There is still no roster or join-code route, and no screens. The diagram
+above is therefore partly the *designed* system: everything past step 4 is specified but
 unbuilt.
 
 Teacher auth is tested against a locally generated EC keypair and a stubbed JWKS
