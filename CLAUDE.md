@@ -19,35 +19,13 @@ The build is phased (spec §7). Each phase is usable on its own. The plan docume
 *why* a decision was made far more often than the code can; when the two disagree, ask
 rather than assume the code is right.
 
-## Commands
+## Environment
 
-Local Postgres 16 via Homebrew — `coding_tool_dev` and `coding_tool_test` must both
-exist. There is no Docker on this machine.
-
-### API (`apps/api`)
-
-```bash
-uv sync
-uv run alembic upgrade head
-uv run uvicorn app.main:app --reload
-
-uv run ruff check . && uv run ruff format --check .
-uv run pytest
-uv run pytest tests/test_schema.py::test_roster_round_trip   # a single test
-uv run pytest -k "pin or session"                            # by keyword
-
-uv run alembic revision --autogenerate -m "what changed"
-uv run alembic downgrade base && uv run alembic upgrade head  # prove it both ways
-```
-
-### Web (`apps/web`)
-
-```bash
-npm install
-npm run dev
-npm run typecheck && npm run test && npm run build
-npx vitest run src/App.test.tsx        # a single test file
-```
+Local Postgres 16 via Homebrew — **both** `coding_tool_dev` and `coding_tool_test` must
+exist or the test suite fails at the migration fixture. There is no Docker on this
+machine. Ordinary `uv run` / `npm run` invocations are in `README.md` and the manifests;
+the one worth knowing is `uv run alembic downgrade base && uv run alembic upgrade head`,
+which proves a migration both ways rather than only forwards.
 
 ## Architecture
 
@@ -134,14 +112,9 @@ something to discover from intermittent failures.
 
 ### Frontend
 
-`src/theme.css` holds the product-spec §8 palette as Tailwind v4 theme tokens (v4 was
-chosen for its CSS-first config). One rule is load-bearing and easy to violate by habit:
-**never red for a student's incorrect answer** — amber means "not yet", sage means
-correct, rust is reserved for system errors. Cream background, not white. Serif headings,
-sans UI, mono code.
-
-Students never talk to Supabase directly; `@supabase/supabase-js` is for teacher auth
-only.
+**Never red for a student's incorrect answer** — amber means "not yet", sage means
+correct, rust is reserved for system errors. The rest of the frontend conventions live
+in `apps/web/CLAUDE.md`, which loads when working under that directory.
 
 ## Keeping the README current
 
