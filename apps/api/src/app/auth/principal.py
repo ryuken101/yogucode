@@ -10,6 +10,7 @@ explicit call to `POST /auth/teacher/session` — an auth dependency that silent
 rows is surprising to debug, and it would put a write in the path of every GET.
 """
 
+import logging
 import uuid
 from dataclasses import dataclass
 from typing import Annotated, Literal
@@ -29,6 +30,8 @@ from app.auth.supabase_jwt import (
 from app.config import Settings, get_settings
 from app.db import get_session
 from app.models import User, UserRole, UserStatus
+
+logger = logging.getLogger(__name__)
 
 STUDENT_SESSION_COOKIE = "student_session"
 
@@ -86,8 +89,13 @@ async def verify_teacher_token(
     try:
         claims = await verifier.verify(token)
     except TokenError as exc:
+        # The caller gets "invalid token" and nothing more — a 401 that explains which
+        # claim failed is a 401 that helps someone forge the next one. The reason belongs
+        # here, where whoever is debugging a sign-in can actually read it.
+        logger.warning("teacher token rejected: %s", exc)
         raise unauthorised("invalid token") from exc
     except JWKSUnavailable as exc:
+        logger.error("could not verify a teacher token: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="cannot verify sign-in right now",

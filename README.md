@@ -163,8 +163,8 @@ eleven steps. Backend is steps 1–8, frontend is 9, and 10–11 ship it.
 | 6 | Join codes — 6 chars, unambiguous alphabet, rotate | **Done** |
 | 7 | Student PIN login — Argon2id, lockout | **Done** |
 | 8 | Concepts table + YAML seed loader | **Done** |
-| 9 | Frontend — four screens in the §8 palette | Next |
-| 10 | Deploy — Supabase `ap-southeast-2`, Fly.io `syd`, Vercel | Not started |
+| 9 | Frontend — four screens in the §8 palette | **Done** |
+| 10 | Deploy — Supabase `ap-southeast-2`, Fly.io `syd`, Vercel | Next |
 | 11 | Verify the join flow on a real centre laptop | Not started |
 
 **What exists today:** the whole backend of Phase 1. The monorepo and CI; the eleven
@@ -235,7 +235,26 @@ hand-writes a cross-centre enrolment no route can create, the other calls a scop
 directly with a principal from the wrong centre — because a guard no test notices is a
 guard a later refactor deletes.
 
-There are no screens. Step 9 builds the four in the §8 palette.
+**The screens exist.** Teacher sign-in by magic link, a class list, a class detail with
+roster, bulk paste, join code and PINs, and the student `/join` flow. React Router,
+TanStack Query and `@supabase/supabase-js` — the last for teacher auth only, since
+students authenticate against our own API.
+
+**The frontend knows the API's shapes rather than guessing them.** `apps/api/openapi.json`
+is generated from the Pydantic models by `uv run python -m app.openapi_dump`, committed,
+and turned into TypeScript by `npm run api:types`. CI regenerates the JSON and fails on a
+diff, so a changed response model breaks the build rather than a screen. None of it
+reaches the browser — types are erased at compile time.
+
+**The §8 colour rule is enforced, not remembered.** `Badge` and `Notice` take semantic
+tones, `Button` has no danger variant, and tests fail if a wrong PIN ever renders rust.
+Every other product on the market colours a wrong password red, so this is the convention
+most likely to be broken by reflex.
+
+**Local development runs two servers behind a proxy.** Vite maps `/api` to
+`localhost:8000`, so the browser sees one origin and the API needs no CORS middleware —
+which keeps CORS a genuine step 10 concern, for when the web app and the API really are
+on different domains.
 
 **Nothing is deployed.** No Supabase project, Fly app or Vercel project exists. Both
 databases are local Postgres 16.
@@ -285,11 +304,22 @@ autogenerate does not always get constraints right.
 
 ```bash
 cd apps/web
+cp .env.example .env.local     # fill in the Supabase values
 npm install
-npm run dev
+npm run dev                    # proxies /api to localhost:8000, so run the API too
 ```
 
-Checks: `npm run typecheck`, `npm run test`, `npm run build`.
+Checks: `npm run lint`, `npm run typecheck`, `npm run test`, `npm run build`.
+
+After changing any API request or response model:
+
+```bash
+cd apps/api && uv run python -m app.openapi_dump   # commit the result
+cd ../web && npm run api:types                     # commit the result
+```
+
+CI fails if either is stale, which is how a backend change that breaks the frontend is
+caught by the build rather than by a teacher.
 
 The §8 palette lives in `src/theme.css` as Tailwind theme tokens. One rule from the
 spec is load-bearing: **never red for a student's incorrect answer** — amber means "not

@@ -36,6 +36,12 @@ jobs:
       - run: uv sync --locked
       - run: uv run ruff check .
       - run: uv run ruff format --check .
+      # The frontend generates its TypeScript from this file, so a changed response model
+      # that nobody regenerated breaks the build here rather than breaking a screen.
+      - name: openapi.json is current
+        run: |
+          uv run python -m app.openapi_dump
+          git diff --exit-code openapi.json
       # Migrations are applied from empty by the pytest session fixture, so a broken
       # migration fails the test run rather than needing its own step.
       - run: uv run pytest
@@ -53,6 +59,7 @@ jobs:
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
       - run: npm ci
+      - run: npm run lint
       - run: npm run typecheck
       - run: npm run test
       - run: npm run build

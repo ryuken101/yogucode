@@ -14,9 +14,13 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
-parts/
+# Anchored to the repo root. These are Python build artefacts, but the stock template
+# leaves them unanchored, so a bare `lib/` also matches apps/web/src/lib/ — which holds
+# the API client and the generated types, and which was silently untracked until this
+# was noticed. Anything added here that could name a source directory wants the slash.
+/lib/
+/lib64/
+/parts/
 sdist/
 var/
 wheels/
