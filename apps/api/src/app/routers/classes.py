@@ -17,10 +17,10 @@ from pydantic import BaseModel, Field
 from sqlmodel import select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.audit import audit_entry
 from app.auth.principal import CurrentTeacher, Principal
 from app.db import get_session
 from app.models import (
-    ActorType,
     AuditLog,
     Class,
     ClassJoinCode,
@@ -69,15 +69,7 @@ class ClassOut(BaseModel):
 
 
 def _audit(principal: Principal, action: str, class_id: uuid.UUID, **payload: object) -> AuditLog:
-    return AuditLog(
-        centre_id=principal.centre_id,
-        actor_type=ActorType.USER,
-        actor_id=principal.subject_id,
-        action=action,
-        target_type="class",
-        target_id=class_id,
-        payload=dict(payload),
-    )
+    return audit_entry(principal, action, "class", class_id, **payload)
 
 
 @router.post("", response_model=ClassOut, status_code=status.HTTP_201_CREATED)

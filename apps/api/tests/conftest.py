@@ -28,7 +28,7 @@ from app.auth.supabase_jwt import SupabaseJWKSVerifier, get_verifier
 from app.config import Settings, get_settings
 from app.db import get_session
 from app.main import app as fastapi_app
-from app.models import Centre, Class
+from app.models import Centre, Class, Enrolment, Student
 
 API_ROOT = Path(__file__).resolve().parents[1]
 
@@ -255,16 +255,22 @@ async def signed_in(client: httpx.AsyncClient, make_token):
 
 @pytest.fixture
 async def foreign_centre(session: AsyncSession) -> dict:
-    """Another centre with a class in it, inserted directly.
+    """Another centre with a class, a student and an enrolment in it, inserted directly.
 
     There is no way to reach this through the API — one deployment has one centre — which
-    is the point: it exists so the tenancy tests have something to fail to reach.
+    is the point: it exists so the tenancy tests have something to fail to reach. The
+    student is here because a leak of a child's record is the failure that matters most.
     """
     centre = Centre(name="Magikid Parramatta", slug="parramatta")
     session.add(centre)
     await session.flush()
 
     klass = Class(centre_id=centre.id, name="Someone else's class", term_label="2026 T4")
-    session.add(klass)
+    student = Student(centre_id=centre.id, display_name="Someone else's child")
+    session.add_all([klass, student])
     await session.flush()
-    return {"centre": centre, "class": klass}
+
+    enrolment = Enrolment(class_id=klass.id, student_id=student.id)
+    session.add(enrolment)
+    await session.flush()
+    return {"centre": centre, "class": klass, "student": student, "enrolment": enrolment}

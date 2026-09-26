@@ -158,8 +158,8 @@ eleven steps. Backend is steps 1–8, frontend is 9, and 10–11 ship it.
 | 2 | Database, models, first migration | **Done** |
 | 3 | Teacher auth — JWKS verification, `Principal`, first-sign-in provisioning | **Done** |
 | 4 | Centre + class CRUD | **Done** |
-| 5 | Roster management, bulk name entry | Next |
-| 6 | Join codes — 6 chars, unambiguous alphabet, rotate and revoke | Not started |
+| 5 | Roster management, bulk name entry | **Done** |
+| 6 | Join codes — 6 chars, unambiguous alphabet, rotate and revoke | Next |
 | 7 | Student PIN login — Argon2id, lockout, rate limiting | Not started |
 | 8 | Concepts table + YAML seed loader | Not started |
 | 9 | Frontend — four screens in the §8 palette | Not started |
@@ -169,18 +169,40 @@ eleven steps. Backend is steps 1–8, frontend is 9, and 10–11 ship it.
 **What exists today:** the monorepo, CI, the eleven tables as one Alembic revision that
 migrates clean from empty and downgrades back, teacher authentication (JWKS verification
 with key caching, the `Principal` seam, `POST /auth/teacher/session`, `GET /auth/me`),
-and class CRUD scoped to the centre — `GET /centre` plus create, list, read, rename,
-archive and unarchive under `/classes`.
+class CRUD scoped to the centre — `GET /centre` plus create, list, read, rename, archive
+and unarchive under `/classes` — and the roster: student CRUD under `/students`,
+enrolment under `/classes/{id}/enrolments`, and the bulk paste at
+`/classes/{id}/roster/preview` and `/roster/bulk`. Steps 2–5 needed exactly one
+migration between them, because step 2 built every table the phase uses.
 
-The tenancy boundary is now enforced rather than merely asserted. Every centre-owned
-lookup goes through `src/app/scoping.py`; a router that wrote its own `select(Class)`
-would be a bug. Deleting the filter fails three tests and only those, which is how we
-know they have teeth.
+**The roster's shape is a decision worth knowing before reading it.** Bulk entry is two
+requests, not one: `preview` parses the pasted text and returns a per-line verdict —
+create this child, enrol one the centre already has, already enrolled, ambiguous,
+duplicate, unusable — and writes nothing; `bulk` commits the entries the teacher accepted,
+all or nothing. The split exists because a pasted name is ambiguous evidence. Treating
+"Bella N" as a new child when the centre already knows her is what would quietly break
+Phase 8's promise that mastery follows a child across terms, and treating two genuinely
+different children as one merges their records. So the commit re-resolves names rather
+than trusting what the preview said, and an unambiguous name match enrols the existing
+child instead of duplicating her.
 
-The teacher half of the auth seam is real; the student half is a branch that refuses
-until step 7. There is still no roster or join-code route, and no screens. The diagram
-above is therefore partly the *designed* system: everything past step 4 is specified but
-unbuilt.
+Two identically-named children in one class are refused with a 409 — the teacher
+disambiguates to "Aiden C" / "Aiden W" while they are typing, rather than a nine-year-old
+facing two identical buttons in step 7's name picker. There is deliberately no unique
+index behind it: two distinct children called Aiden C at one *centre*, in different
+classes, is legitimate.
+
+The tenancy boundary is enforced rather than merely asserted. Every centre-owned lookup
+goes through `src/app/scoping.py`; a router that wrote its own `select(Student)` would be
+a bug. Stripping the `centre_id` filters out of the roster helpers fails seven tests and
+nothing else; the class helpers account for three more. That is how we know they have
+teeth, and it is why one of the seven hand-writes a cross-centre enrolment no route can
+create — otherwise the second half of `list_class_roster`'s filter would be untested, and
+an untested filter is one a later refactor deletes as redundant.
+
+The teacher half of the auth seam is real; the student half is a branch that refuses until
+step 7. There are no join-code routes and no screens. The diagram above is therefore
+partly the *designed* system: everything past step 5 is specified but unbuilt.
 
 Teacher auth is tested against a locally generated EC keypair and a stubbed JWKS
 endpoint, so the cryptography is real but the issuer is not. Pointing it at the real
