@@ -1,0 +1,76 @@
+# The concept taxonomy — product-spec §3.7.
+#
+# PROVISIONAL. These are the 18 tags from the spec, lifted verbatim as labels. Next
+# term's scope and sequence is not confirmed (spec §7, Phase 0: "Get Magikid's scope and
+# sequence if one exists → concept taxonomy" is still unticked), so the *content* here is
+# a placeholder and every row is seeded with status: provisional to say so out loud.
+#
+# The mechanism is not provisional. Swapping this file and re-running `uv run
+# seed-concepts` must be enough to re-point the product at a different course — that is
+# spec §10's test: "can you configure the product for Magikid's VEX IQ course without
+# changing code?" If something here ever needs a migration instead, the bias has moved
+# into the code, which is exactly what that test exists to catch.
+#
+# The list is flat because §3.7's list is flat. Grouping these into strands would be
+# inventing curriculum content that Phase 0 deferred. The loader supports `children:` for
+# when a real scope and sequence arrives with a hierarchy in it; see test_seed_concepts.py,
+# which proves nesting works against a synthetic taxonomy rather than bending this one.
+#
+# sort_order is spaced by ten so a tag can be inserted between two others without
+# renumbering the file.
+
+concepts:
+  - key: variables
+    label: Variables
+    sort_order: 10
+  - key: input_output
+    label: Input/output
+    sort_order: 20
+  - key: type_casting
+    label: Type casting
+    sort_order: 30
+  - key: arithmetic
+    label: Arithmetic
+    sort_order: 40
+  - key: strings
+    label: Strings
+    sort_order: 50
+  - key: indexing
+    label: Indexing
+    sort_order: 60
+  - key: comparison_and_boolean_logic
+    label: Comparison & boolean logic
+    sort_order: 70
+  - key: conditionals
+    label: Conditionals
+    sort_order: 80
+  - key: nesting
+    label: Nesting
+    sort_order: 90
+  - key: while_loops
+    label: While loops
+    sort_order: 100
+  - key: for_loops
+    label: For loops
+    sort_order: 110
+  - key: range
+    label: Range
+    sort_order: 120
+  - key: lists
+    label: Lists
+    sort_order: 130
+  - key: list_methods
+    label: List methods
+    sort_order: 140
+  - key: functions
+    label: Functions
+    sort_order: 150
+  - key: parameters
+    label: Parameters
+    sort_order: 160
+  - key: return
+    label: Return
+    sort_order: 170
+  - key: turtle_basics
+    label: Turtle basics
+    sort_order: 180

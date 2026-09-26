@@ -98,8 +98,9 @@ data.
 
 Four digits is a weak secret against the internet and an adequate one against the actual
 adversary, a classmate — who also needs a valid class code and a roster entry. Lockout
-after five failed attempts, per-IP rate limiting, and rejection of `0000`/`1234`/`1111`/
-`1212` carry the rest.
+after five failed attempts carries the rest, along with never *generating* an obvious PIN:
+`0000`, `1234`, `1111`, `1212`, any run and any repeated pair are excluded from the draw
+rather than validated on input, since no human ever types a PIN here.
 
 ### Data model
 
@@ -159,54 +160,82 @@ eleven steps. Backend is steps 1–8, frontend is 9, and 10–11 ship it.
 | 3 | Teacher auth — JWKS verification, `Principal`, first-sign-in provisioning | **Done** |
 | 4 | Centre + class CRUD | **Done** |
 | 5 | Roster management, bulk name entry | **Done** |
-| 6 | Join codes — 6 chars, unambiguous alphabet, rotate and revoke | Next |
-| 7 | Student PIN login — Argon2id, lockout, rate limiting | Not started |
-| 8 | Concepts table + YAML seed loader | Not started |
-| 9 | Frontend — four screens in the §8 palette | Not started |
+| 6 | Join codes — 6 chars, unambiguous alphabet, rotate | **Done** |
+| 7 | Student PIN login — Argon2id, lockout | **Done** |
+| 8 | Concepts table + YAML seed loader | **Done** |
+| 9 | Frontend — four screens in the §8 palette | Next |
 | 10 | Deploy — Supabase `ap-southeast-2`, Fly.io `syd`, Vercel | Not started |
 | 11 | Verify the join flow on a real centre laptop | Not started |
 
-**What exists today:** the monorepo, CI, the eleven tables as one Alembic revision that
-migrates clean from empty and downgrades back, teacher authentication (JWKS verification
-with key caching, the `Principal` seam, `POST /auth/teacher/session`, `GET /auth/me`),
-class CRUD scoped to the centre — `GET /centre` plus create, list, read, rename, archive
-and unarchive under `/classes` — and the roster: student CRUD under `/students`,
-enrolment under `/classes/{id}/enrolments`, and the bulk paste at
-`/classes/{id}/roster/preview` and `/roster/bulk`. Steps 2–5 needed exactly one
+**What exists today:** the whole backend of Phase 1. The monorepo and CI; the eleven
+tables as one Alembic revision that migrates clean from empty and downgrades back; teacher
+authentication; class CRUD; the roster including bulk paste; join codes; student PIN
+sign-in; and the concept taxonomy with its YAML loader. Steps 2–8 needed exactly one
 migration between them, because step 2 built every table the phase uses.
 
-**The roster's shape is a decision worth knowing before reading it.** Bulk entry is two
-requests, not one: `preview` parses the pasted text and returns a per-line verdict —
-create this child, enrol one the centre already has, already enrolled, ambiguous,
-duplicate, unusable — and writes nothing; `bulk` commits the entries the teacher accepted,
-all or nothing. The split exists because a pasted name is ambiguous evidence. Treating
-"Bella N" as a new child when the centre already knows her is what would quietly break
-Phase 8's promise that mastery follows a child across terms, and treating two genuinely
-different children as one merges their records. So the commit re-resolves names rather
-than trusting what the preview said, and an unambiguous name match enrols the existing
-child instead of duplicating her.
+**A join code is an attribute of a class, not something a teacher generates.** Creating a
+class mints one in the same transaction, so a class can always be joined; it is returned
+on the class itself. Rotating replaces it and revokes the old one atomically, and
+archiving the class revokes it. There is deliberately no standalone revoke — a class with
+children on its roster and no way in is not a state worth being one click away. The
+alphabet excludes vowels as well as `0 O 1 I L`: no vowels means a generated code cannot
+spell a word, and the rest means it survives being read aloud to a room.
 
-Two identically-named children in one class are refused with a 409 — the teacher
-disambiguates to "Aiden C" / "Aiden W" while they are typing, rather than a nine-year-old
-facing two identical buttons in step 7's name picker. There is deliberately no unique
-index behind it: two distinct children called Aiden C at one *centre*, in different
-classes, is legitimate.
+**Teachers issue PINs; students never choose one.** The API generates a PIN, returns it in
+plaintext exactly once so it can be printed on a slip, and stores only an Argon2id hash.
+A child claiming an unclaimed name on first login would let whoever reaches a laptop first
+claim someone else's, and from Phase 8 that means another child's mastery record. One
+consequence is worth stating plainly: **a forgotten PIN can only be replaced, never
+recovered**, because nobody can read the hash back. That is why issuing PINs across a
+class and resetting one child's are both single requests — a Year 4 student forgets theirs
+roughly weekly, and a reset flow with friction in it is a reason the tool gets abandoned.
 
-The tenancy boundary is enforced rather than merely asserted. Every centre-owned lookup
-goes through `src/app/scoping.py`; a router that wrote its own `select(Student)` would be
-a bug. Stripping the `centre_id` filters out of the roster helpers fails seven tests and
-nothing else; the class helpers account for three more. That is how we know they have
-teeth, and it is why one of the seven hand-writes a cross-centre enrolment no route can
-create — otherwise the second half of `list_class_roster`'s filter would be untested, and
-an untested filter is one a later refactor deletes as redundant.
+`must_change_pin` exists in the schema and is deliberately never set. Forcing a child to
+pick a new PIN after a reset protects a secret from an admin who should not know it, but
+here the teacher is *meant* to know it — so it would add a step for a nine-year-old who is
+already stuck, and leave the teacher unable to tell them their PIN next time, making the
+following reset harder rather than easier.
 
-The teacher half of the auth seam is real; the student half is a branch that refuses until
-step 7. There are no join-code routes and no screens. The diagram above is therefore
-partly the *designed* system: everything past step 5 is specified but unbuilt.
+**One live session per student.** Signing in revokes the others, so an abandoned laptop
+stops working the moment that child signs in somewhere else, without a teacher having to
+notice. Two clocks bound a session — 12 hours absolute, 90 minutes idle — and it survives
+a browser restart mid-lesson.
 
-Teacher auth is tested against a locally generated EC keypair and a stubbed JWKS
-endpoint, so the cryptography is real but the issuer is not. Pointing it at the real
-project at step 10 is a `SUPABASE_URL` change.
+**There is no per-IP rate limiting, on purpose.** A classroom is twelve children behind one
+NAT, several of whom will fumble a PIN in the same minute; a limit tight enough to stop an
+attacker is tight enough to lock out the class during a lesson. The per-student lockout —
+five attempts, fifteen minutes, in Postgres and therefore correct across processes —
+covers the actual threat model, which is a classmate. This gets revisited at step 10, when
+whether Fly.io forwards the real client IP is a fact rather than a guess.
+
+Also worth being honest about: against someone holding the database, a 4-digit PIN is
+10,000 guesses and Argon2id does not change that. What hashing buys is that a child's
+credential never sits in plaintext in a table, a log or a backup. That is the Privacy Act
+point, and it is reason enough.
+
+**The concept taxonomy is seeded, and provisional.** `uv run seed-concepts` loads
+`src/app/seed/concepts.yaml` — the 18 tags from spec §3.7 — as global concepts with status
+`provisional`, because next term's scope and sequence is not confirmed. The loader is
+idempotent, only writes rows that actually changed, and archives a key that disappears
+from the file rather than deleting it. The shipped list is flat; the loader supports
+nesting, which is what makes spec §10's test ("can you configure the product for the VEX
+IQ course without changing code?") answerable with a file edit.
+
+**The auth seam is now real on both sides.** A teacher arrives with a Supabase JWT, a
+student with an opaque session cookie, and both resolve to a `Principal` carrying
+`centre_id`. `/join/lookup` and `/auth/student/session` are the only unauthenticated routes
+in the API; what stands in for the tenancy filter there is the join code, and the lookup
+returns display names and nothing else.
+
+Every centre-owned lookup still goes through `src/app/scoping.py`; a router that wrote its
+own `select(Student)` would be a bug. Stripping the `centre_id` filters out of the roster
+helpers fails seven tests and nothing else, and the class and join-code helpers account for
+more. Two of those tests exist only to give otherwise-redundant filters teeth — one
+hand-writes a cross-centre enrolment no route can create, the other calls a scoping helper
+directly with a principal from the wrong centre — because a guard no test notices is a
+guard a later refactor deletes.
+
+There are no screens. Step 9 builds the four in the §8 palette.
 
 **Nothing is deployed.** No Supabase project, Fly app or Vercel project exists. Both
 databases are local Postgres 16.

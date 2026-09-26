@@ -339,6 +339,8 @@ async def test_the_archive_audit_records_how_many_codes_it_revoked(
         await client.post("/classes", json={"name": "Year 4-6 Python"}, headers=headers)
     ).json()
     teacher = (await session.exec(select(User))).one()
+    # Two live codes: the one create_class minted, plus a hand-written second so the
+    # count is proving a count rather than a constant.
     session.add(
         ClassJoinCode(class_id=uuid.UUID(created["id"]), code="HMTKQR", created_by=teacher.id)
     )
@@ -347,7 +349,7 @@ async def test_the_archive_audit_records_how_many_codes_it_revoked(
     await client.post(f"/classes/{created['id']}/archive", headers=headers)
 
     entry = (await session.exec(select(AuditLog).where(AuditLog.action == "class.archived"))).one()
-    assert entry.payload["join_codes_revoked"] == 1
+    assert entry.payload["join_codes_revoked"] == 2
 
 
 async def test_classes_are_scoped_by_the_principals_centre(

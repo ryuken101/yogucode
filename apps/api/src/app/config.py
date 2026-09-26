@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     pin_max_failed_attempts: int = 5
     pin_lockout_minutes: int = 15
 
+    # The student session cookie's Secure flag. True everywhere real; false only for
+    # local http development and tests, where a browser (and httpx) will silently refuse
+    # to store a Secure cookie served over plain http — a failure that looks like a
+    # session bug and is not one.
+    cookie_secure: bool = True
+
     # The single centre every allowlisted teacher joins. The first teacher to sign in
     # creates it; everyone after joins it. One academy, one tenant — a second centre
     # means a second deployment or a real invite flow, not a second teacher signing in.

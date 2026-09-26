@@ -17,6 +17,12 @@ dependencies = [
     "uvicorn[standard]>=0.32",
     "pyjwt[crypto]>=2.10",
     "httpx>=0.28",
+    # Student PIN hashing (step 7). Parameters are set explicitly in app/auth/pin.py,
+    # not left at the library default — see the comment there for the memory arithmetic.
+    "argon2-cffi>=23.1",
+    # The concept taxonomy loader (step 8). Present transitively via uvicorn[standard],
+    # but relying on an unrelated package's extra is how an import breaks on an upgrade.
+    "pyyaml>=6.0",
 ]
 
 [dependency-groups]
@@ -25,6 +31,11 @@ dev = [
     "pytest-asyncio>=0.24",
     "ruff>=0.8",
 ]
+
+[project.scripts]
+# Idempotent taxonomy seed: `uv run seed-concepts`. Run it twice; the second run should
+# report everything unchanged.
+seed-concepts = "app.seed.concepts:main"
 
 [build-system]
 requires = ["uv_build>=0.12.13,<0.13.0"]

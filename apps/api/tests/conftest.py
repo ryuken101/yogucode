@@ -201,6 +201,10 @@ def test_settings() -> Settings:
         teacher_email_allowlist="@example.com",
         centre_slug="castle-hill",
         centre_name="Magikid Castle Hill",
+        # The test client's base_url is http://test, and httpx drops a Secure cookie
+        # served over plain http — silently, so a round-trip sign-in test would fail
+        # looking like a session bug. Off here; on everywhere real.
+        cookie_secure=False,
     )
 
 
@@ -274,3 +278,60 @@ async def foreign_centre(session: AsyncSession) -> dict:
     session.add(enrolment)
     await session.flush()
     return {"centre": centre, "class": klass, "student": student, "enrolment": enrolment}
+
+
+@pytest.fixture
+async def student_on_roster(client: httpx.AsyncClient, signed_in):
+    """A class with a join code, one enrolled student, and that student's PIN.
+
+    Everything a child needs at /join, built the way a teacher would build it: create the
+    class, add the name, issue the PINs, read the slip.
+    """
+
+    async def _build(display_name: str = "Aria K", class_name: str = "Year 4-6 Python") -> dict:
+        headers = await signed_in()
+        created = (await client.post("/classes", json={"name": class_name}, headers=headers)).json()
+        student = (
+            await client.post("/students", json={"display_name": display_name}, headers=headers)
+        ).json()
+        await client.post(
+            f"/classes/{created['id']}/enrolments",
+            json={"student_id": student["id"]},
+            headers=headers,
+        )
+        slips = (
+            await client.post(
+                f"/classes/{created['id']}/pins", json={"reset_existing": False}, headers=headers
+            )
+        ).json()
+        slip = next(s for s in slips if s["student_id"] == student["id"])
+        return {
+            "headers": headers,
+            "class_id": created["id"],
+            "code": created["join_code"],
+            "student_id": student["id"],
+            "display_name": display_name,
+            "pin": slip["pin"],
+        }
+
+    return _build
+
+
+@pytest.fixture
+async def signed_in_student(client: httpx.AsyncClient, student_on_roster):
+    """Sign a student in and leave the session cookie on the client."""
+
+    async def _sign_in(display_name: str = "Aria K") -> dict:
+        roster = await student_on_roster(display_name)
+        response = await client.post(
+            "/auth/student/session",
+            json={
+                "code": roster["code"],
+                "student_id": roster["student_id"],
+                "pin": roster["pin"],
+            },
+        )
+        assert response.status_code == 200, response.text
+        return roster
+
+    return _sign_in

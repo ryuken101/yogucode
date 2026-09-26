@@ -20,6 +20,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.audit import audit_entry
 from app.auth.principal import CurrentTeacher, Principal
 from app.db import get_session
+from app.join_codes import mint_code, rotate_code
 from app.models import (
     AuditLog,
     Class,
@@ -29,7 +30,7 @@ from app.models import (
     ClassTeacherRole,
 )
 from app.models.base import utcnow
-from app.scoping import get_owned_class, list_owned_classes
+from app.scoping import get_live_join_code, get_owned_class, list_owned_classes
 
 router = APIRouter(prefix="/classes", tags=["classes"])
 
@@ -68,12 +69,38 @@ class ClassOut(BaseModel):
         )
 
 
+class ClassDetailOut(ClassOut):
+    """A class plus its join code.
+
+    Separate from `ClassOut` so the list route does not have to fetch a code per class.
+    A teacher reads the code off the class itself, not off a list of twelve of them.
+    Mirrors the StudentOut / StudentDetailOut split in the roster router.
+    """
+
+    join_code: str | None
+
+    @classmethod
+    def build_detail(cls, record: Class, code: ClassJoinCode | None) -> "ClassDetailOut":
+        return cls(
+            **ClassOut.build(record).model_dump(),
+            join_code=code.code if code else None,
+        )
+
+
 def _audit(principal: Principal, action: str, class_id: uuid.UUID, **payload: object) -> AuditLog:
     return audit_entry(principal, action, "class", class_id, **payload)
 
 
-@router.post("", response_model=ClassOut, status_code=status.HTTP_201_CREATED)
-async def create_class(body: ClassIn, principal: CurrentTeacher, session: SessionDep) -> ClassOut:
+@router.post("", response_model=ClassDetailOut, status_code=status.HTTP_201_CREATED)
+async def create_class(
+    body: ClassIn, principal: CurrentTeacher, session: SessionDep
+) -> ClassDetailOut:
+    """Create a class, with the join code it will keep for its whole life.
+
+    The code is minted here rather than by a separate 'generate a code' action,
+    because a class that exists but cannot be joined is not a state worth being able
+    to reach. It is an attribute of the class, like its name.
+    """
     record = Class(
         centre_id=principal.centre_id,
         name=body.name.strip(),
@@ -87,10 +114,13 @@ async def create_class(body: ClassIn, principal: CurrentTeacher, session: Sessio
     session.add(
         ClassTeacher(class_id=record.id, user_id=principal.subject_id, role=ClassTeacherRole.LEAD)
     )
-    session.add(_audit(principal, "class.created", record.id, name=record.name))
+    code = await mint_code(session, principal, record.id)
+    session.add(
+        _audit(principal, "class.created", record.id, name=record.name, join_code=code.code)
+    )
     await session.commit()
     await session.refresh(record)
-    return ClassOut.build(record)
+    return ClassDetailOut.build_detail(record, code)
 
 
 @router.get("", response_model=list[ClassOut])
@@ -101,11 +131,13 @@ async def list_classes(
     return [ClassOut.build(record) for record in records]
 
 
-@router.get("/{class_id}", response_model=ClassOut)
+@router.get("/{class_id}", response_model=ClassDetailOut)
 async def read_class(
     class_id: uuid.UUID, principal: CurrentTeacher, session: SessionDep
-) -> ClassOut:
-    return ClassOut.build(await get_owned_class(session, principal, class_id))
+) -> ClassDetailOut:
+    record = await get_owned_class(session, principal, class_id)
+    code = await get_live_join_code(session, principal, class_id)
+    return ClassDetailOut.build_detail(record, code)
 
 
 @router.patch("/{class_id}", response_model=ClassOut)
@@ -171,6 +203,34 @@ async def archive_class(
     await session.commit()
     await session.refresh(record)
     return ClassOut.build(record)
+
+
+@router.post("/{class_id}/join-code/rotate", response_model=ClassDetailOut)
+async def rotate_join_code(
+    class_id: uuid.UUID, principal: CurrentTeacher, session: SessionDep
+) -> ClassDetailOut:
+    """Replace the class's join code, invalidating the old one immediately.
+
+    The remedy for a code that has got out — read out to the wrong room, photographed off
+    a whiteboard. There is no standalone revoke to pair with this: rotating leaves the
+    class joinable, whereas revoking alone would leave a class with children on its roster
+    and no way in, which is not a state worth being one click away.
+    """
+    await get_owned_class(session, principal, class_id)
+    previous = await get_live_join_code(session, principal, class_id)
+    code = await rotate_code(session, principal, class_id)
+    session.add(
+        _audit(
+            principal,
+            "class.join_code_rotated",
+            class_id,
+            code=code.code,
+            replaced=previous.code if previous else None,
+        )
+    )
+    await session.commit()
+    record = await get_owned_class(session, principal, class_id)
+    return ClassDetailOut.build_detail(record, code)
 
 
 @router.post("/{class_id}/unarchive", response_model=ClassOut)

@@ -1,7 +1,7 @@
 """The authorisation seam: one dependency, two verifiers, one Principal.
 
 Teachers arrive with a Supabase JWT in an Authorization header. Students arrive with an
-opaque session cookie this service issued (step 7). Both resolve to a `Principal`
+opaque session cookie this service issued. Both resolve to a `Principal`
 carrying `centre_id`, and **every route authorises against `Principal.centre_id`**. That
 is the tenancy boundary, and a leak across it is a leak of children's records.
 
@@ -18,6 +18,7 @@ from fastapi import Depends, Header, HTTPException, Request, status
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.auth.student_session import resolve_session
 from app.auth.supabase_jwt import (
     JWKSUnavailable,
     SupabaseJWKSVerifier,
@@ -141,12 +142,16 @@ async def get_current_principal(
             role=user.role,
         )
 
-    if request.cookies.get(STUDENT_SESSION_COOKIE):
-        # Step 7 resolves this cookie against student_sessions: hash it, check it is
-        # neither revoked nor past either expiry clock, then build a student Principal.
-        # Until then a cookie is not a way in, so this must refuse rather than fall
-        # through to the 401 below with a misleading message.
-        raise unauthorised("student sign-in is not available yet")
+    cookie = request.cookies.get(STUDENT_SESSION_COOKIE)
+    if cookie:
+        resolved = await resolve_session(session, cookie, settings)
+        if resolved is None:
+            # Revoked, expired, idle, archived or simply unknown — all the same 401. The
+            # child's remedy is identical in every case (sign in again), and
+            # distinguishing them would tell an attacker which tokens once existed.
+            raise unauthorised("session is no longer valid")
+        _record, student = resolved
+        return Principal(kind="student", subject_id=student.id, centre_id=student.centre_id)
 
     raise unauthorised("not signed in")
 
@@ -162,3 +167,13 @@ async def require_teacher(principal: CurrentPrincipal) -> Principal:
 
 
 CurrentTeacher = Annotated[Principal, Depends(require_teacher)]
+
+
+async def require_student(principal: CurrentPrincipal) -> Principal:
+    """For the handful of routes a student reaches — their own class, their own work."""
+    if not principal.is_student:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="student access required")
+    return principal
+
+
+CurrentStudent = Annotated[Principal, Depends(require_student)]

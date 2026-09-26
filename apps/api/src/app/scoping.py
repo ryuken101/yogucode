@@ -27,6 +27,7 @@ from app.auth.principal import Principal
 from app.models import (
     Centre,
     Class,
+    ClassJoinCode,
     ClassStatus,
     Enrolment,
     EnrolmentStatus,
@@ -178,6 +179,31 @@ async def list_student_enrolments(
         .order_by(Enrolment.id.desc())  # type: ignore[attr-defined]
     )
     return (await session.exec(statement)).all()
+
+
+async def get_live_join_code(
+    session: AsyncSession, principal: Principal, class_id: uuid.UUID
+) -> ClassJoinCode | None:
+    """The class's current join code, or None if it has never had one.
+
+    A class minted after step 6 always has one; a class created before it does not, and a
+    rotate mints the first. None is therefore a real state rather than an error.
+
+    Tenancy is applied by joining to `classes` — `class_join_codes` carries no `centre_id`
+    of its own, so the filter has to come from the class it belongs to.
+    """
+    return (
+        await session.exec(
+            select(ClassJoinCode)
+            .join(Class, ClassJoinCode.class_id == Class.id)  # type: ignore[arg-type]
+            .where(
+                ClassJoinCode.class_id == class_id,
+                ClassJoinCode.revoked_at.is_(None),  # type: ignore[union-attr]
+                Class.centre_id == principal.centre_id,
+            )
+            .order_by(ClassJoinCode.id.desc())  # type: ignore[attr-defined]
+        )
+    ).first()
 
 
 async def get_enrolment(

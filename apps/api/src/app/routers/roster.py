@@ -25,7 +25,9 @@ from sqlmodel import select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.audit import audit_entry
+from app.auth.pin import generate_pin, hash_pin
 from app.auth.principal import CurrentTeacher, Principal
+from app.auth.student_session import revoke_live_sessions
 from app.db import get_session
 from app.models import (
     AuditLog,
@@ -33,7 +35,7 @@ from app.models import (
     Enrolment,
     EnrolmentStatus,
     Student,
-    StudentSession,
+    StudentCredential,
     StudentStatus,
 )
 from app.models.base import new_uuid, utcnow
@@ -226,6 +228,33 @@ class BulkEntryIn(BaseModel):
 
 class BulkEnrolIn(BaseModel):
     entries: list[BulkEntryIn] = Field(min_length=1, max_length=MAX_ENTRIES)
+
+
+class IssuePinsIn(BaseModel):
+    reset_existing: bool = Field(
+        default=False,
+        description=(
+            "False issues a PIN only to students who have none. True regenerates for "
+            "everyone on the roster, which is the answer to 'the slips got lost'."
+        ),
+    )
+
+
+class PinSlipOut(BaseModel):
+    """A PIN in plaintext. Returned exactly once, to be printed and handed over.
+
+    The stored form is an Argon2id hash, so this is the only moment the PIN is legible to
+    anyone. If the teacher loses it, the remedy is to issue a new one, not to look it up.
+    """
+
+    student_id: uuid.UUID
+    display_name: str
+    pin: str
+
+
+class SessionsRevokedOut(BaseModel):
+    student_id: uuid.UUID
+    revoked: int
 
 
 # --- helpers -----------------------------------------------------------------------
@@ -438,23 +467,9 @@ async def archive_student(
             .values(status=EnrolmentStatus.WITHDRAWN, withdrawn_at=now)
         )
 
-    live_sessions = (
-        await session.exec(
-            select(StudentSession).where(
-                StudentSession.student_id == record.id,
-                StudentSession.revoked_at.is_(None),  # type: ignore[union-attr]
-            )
-        )
-    ).all()
-    if live_sessions:
-        await session.exec(
-            update(StudentSession)
-            .where(
-                StudentSession.student_id == record.id,  # type: ignore[arg-type]
-                StudentSession.revoked_at.is_(None),  # type: ignore[union-attr]
-            )
-            .values(revoked_at=now)
-        )
+    # Same operation as the teacher's kick and as signing in somewhere new, so it lives
+    # in one place rather than three.
+    sessions_revoked = await revoke_live_sessions(session, record.id, now)
 
     # The class ids go in the payload rather than into separate enrolment.withdrawn rows:
     # one row per action keeps "what happened to this child" a single ordered read, and
@@ -465,7 +480,7 @@ async def archive_student(
             "student.archived",
             record.id,
             enrolments_withdrawn=[str(e.class_id) for e in open_enrolments],
-            sessions_revoked=len(live_sessions),
+            sessions_revoked=sessions_revoked,
         )
     )
     await session.commit()
@@ -720,3 +735,100 @@ async def bulk_enrol(
         for enrolment, student in await list_class_roster(session, principal, class_id)
         if student.id in wanted
     ]
+
+
+# --- PINs and sessions -------------------------------------------------------------
+
+
+def _set_pin(
+    session: AsyncSession,
+    principal: Principal,
+    student: Student,
+    credential: StudentCredential | None,
+    action: str,
+) -> PinSlipOut:
+    """Mint a PIN for one student and return the slip. Never commits."""
+    pin = generate_pin()
+    if credential is None:
+        credential = StudentCredential(student_id=student.id, pin_hash=hash_pin(pin))
+    else:
+        credential.pin_hash = hash_pin(pin)
+        credential.pin_set_at = utcnow()
+    credential.pin_set_by = principal.subject_id
+    # `must_change_pin` is deliberately never set. Forcing a child to choose a new PIN
+    # after a reset protects a secret from an admin who should not know it — but here the
+    # teacher is meant to know it, since they generate it and hand out the slip. It would
+    # add a step for a nine-year-old at the moment they are already stuck, and leave the
+    # teacher unable to tell them their PIN next time, making the following reset harder.
+    credential.must_change_pin = False
+    credential.failed_attempts = 0
+    credential.locked_until = None
+    session.add(credential)
+    # The PIN itself never reaches the audit row, a log, or an error message.
+    session.add(_audit(principal, action, student.id))
+    return PinSlipOut(student_id=student.id, display_name=student.display_name, pin=pin)
+
+
+@roster_router.post(
+    "/{class_id}/pins", response_model=list[PinSlipOut], status_code=status.HTTP_201_CREATED
+)
+async def issue_class_pins(
+    class_id: uuid.UUID, body: IssuePinsIn, principal: CurrentTeacher, session: SessionDep
+) -> list[PinSlipOut]:
+    """Issue PINs across a class and return the slips, once.
+
+    The bulk counterpart to bulk roster entry: having pasted twelve names, a teacher is
+    not going to set twelve PINs one form at a time. By default this only touches
+    children who have no PIN yet, so it is safe to run again after adding one student.
+    """
+    await get_owned_class(session, principal, class_id)
+    roster = await list_class_roster(session, principal, class_id)
+
+    slips: list[PinSlipOut] = []
+    for _enrolment, student in roster:
+        credential = await session.get(StudentCredential, student.id)
+        if credential is not None and not body.reset_existing:
+            continue
+        action = "pin.reset" if credential is not None else "pin.issued"
+        slips.append(_set_pin(session, principal, student, credential, action))
+
+    if slips:
+        await session.commit()
+    return slips
+
+
+@students_router.post(
+    "/{student_id}/pin/reset", response_model=PinSlipOut, status_code=status.HTTP_201_CREATED
+)
+async def reset_student_pin(
+    student_id: uuid.UUID, principal: CurrentTeacher, session: SessionDep
+) -> PinSlipOut:
+    """Give one child a new PIN.
+
+    A Year 4 student forgets theirs roughly weekly and the hash cannot be read back, so
+    replacing it is the only recovery there is. That makes this a primary flow: one
+    request, one new PIN, printed and handed over.
+    """
+    student = await get_owned_student(session, principal, student_id)
+    credential = await session.get(StudentCredential, student.id)
+    action = "pin.reset" if credential is not None else "pin.issued"
+    slip = _set_pin(session, principal, student, credential, action)
+    await session.commit()
+    return slip
+
+
+@students_router.post("/{student_id}/sessions/revoke", response_model=SessionsRevokedOut)
+async def revoke_student_sessions(
+    student_id: uuid.UUID, principal: CurrentTeacher, session: SessionDep
+) -> SessionsRevokedOut:
+    """Kick a student's session — wrong child signed in, or a laptop left open.
+
+    Takes effect on the next request rather than at expiry, which is the whole reason the
+    session token is opaque and revocable rather than a JWT.
+    """
+    student = await get_owned_student(session, principal, student_id)
+    revoked = await revoke_live_sessions(session, student.id)
+    if revoked:
+        session.add(_audit(principal, "student.sessions_revoked", student.id, count=revoked))
+        await session.commit()
+    return SessionsRevokedOut(student_id=student.id, revoked=revoked)
