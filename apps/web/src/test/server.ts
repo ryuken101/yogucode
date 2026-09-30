@@ -37,6 +37,94 @@ const signedIn: Schemas['StudentMeOut'] = {
 /** Matches the API: a wrong PIN, an unknown id and a foreign child all fail alike. */
 const WRONG = { detail: 'that name and PIN do not match' }
 
+/* --- teacher-side fixtures ---------------------------------------------------------- */
+
+export const AIDEN_ONE = '018f0000-0000-7000-8000-000000000010'
+export const AIDEN_TWO = '018f0000-0000-7000-8000-000000000011'
+
+const classDetail: Schemas['ClassDetailOut'] = {
+  id: CLASS_ID,
+  name: 'Year 4-6 Python',
+  term_label: '2026 T4',
+  status: 'active',
+  join_code: CODE,
+  created_at: '2026-09-27T00:00:00Z',
+  updated_at: '2026-09-27T00:00:00Z',
+}
+
+/**
+ * One preview row per verdict, so the dialog's six-way branch is exercised in full.
+ * The order matters to the test: it asserts the rows line up with these.
+ */
+const preview: Schemas['RosterPreviewOut'] = {
+  truncated: false,
+  entries: [
+    {
+      line: 1,
+      raw: 'Chen W',
+      display_name: 'Chen W',
+      action: 'create',
+      student_id: null,
+      student_status: null,
+      candidates: [],
+      reason: null,
+    },
+    {
+      line: 2,
+      raw: 'Bella N',
+      display_name: 'Bella N',
+      action: 'enrol_existing',
+      student_id: BELLA_ID,
+      student_status: 'active',
+      candidates: [],
+      reason: null,
+    },
+    {
+      line: 3,
+      raw: 'Aria K',
+      display_name: 'Aria K',
+      action: 'already_enrolled',
+      student_id: ARIA_ID,
+      student_status: 'active',
+      candidates: [],
+      reason: null,
+    },
+    {
+      line: 4,
+      raw: 'Aiden C',
+      display_name: 'Aiden C',
+      action: 'ambiguous',
+      student_id: null,
+      student_status: null,
+      candidates: [
+        { student_id: AIDEN_ONE, display_name: 'Aiden C', status: 'active' },
+        { student_id: AIDEN_TWO, display_name: 'Aiden C', status: 'archived' },
+      ],
+      reason: '2 students at this centre have this name',
+    },
+    {
+      line: 5,
+      raw: 'chen w',
+      display_name: 'chen w',
+      action: 'duplicate_in_paste',
+      student_id: null,
+      student_status: null,
+      candidates: [],
+      reason: 'the same name appears earlier in this list',
+    },
+    {
+      line: 6,
+      raw: 'x'.repeat(90),
+      display_name: 'x'.repeat(90),
+      action: 'invalid',
+      student_id: null,
+      student_status: null,
+      candidates: [],
+      reason: 'longer than 80 characters',
+    },
+  ],
+}
+
 export const handlers = [
   http.post('/api/join/lookup', async ({ request }) => {
     const body = (await request.json()) as Schemas['JoinLookupIn']
@@ -51,6 +139,26 @@ export const handlers = [
     if (body.pin !== ARIA_PIN) return HttpResponse.json(WRONG, { status: 401 })
     return HttpResponse.json(signedIn)
   }),
+
+  http.get('/api/classes', () => HttpResponse.json([] satisfies Schemas['ClassOut'][])),
+
+  http.post('/api/classes', async ({ request }) => {
+    const body = (await request.json()) as Schemas['ClassIn']
+    return HttpResponse.json(
+      { ...classDetail, name: body.name, term_label: body.term_label ?? null },
+      { status: 201 },
+    )
+  }),
+
+  http.post(`/api/classes/${CLASS_ID}/roster/preview`, () => HttpResponse.json(preview)),
+
+  http.post(`/api/classes/${CLASS_ID}/roster/bulk`, () =>
+    HttpResponse.json([] satisfies Schemas['RosterEntryOut'][], { status: 201 }),
+  ),
+
+  http.get(`/api/classes/${CLASS_ID}/roster`, () =>
+    HttpResponse.json([] satisfies Schemas['RosterEntryOut'][]),
+  ),
 ]
 
 export const server = setupServer(...handlers)
@@ -68,4 +176,79 @@ export function lockedOut() {
 /** The API unreachable, which is the only case allowed to show rust. */
 export function unreachable() {
   return http.post('/api/join/lookup', () => HttpResponse.error())
+}
+
+/** A paste with nothing to resolve, so the commit path is actually reachable. */
+export function cleanPreview() {
+  return http.post(`/api/classes/${CLASS_ID}/roster/preview`, () =>
+    HttpResponse.json({
+      truncated: false,
+      entries: [
+        {
+          line: 1,
+          raw: 'Chen W',
+          display_name: 'Chen W',
+          action: 'create',
+          student_id: null,
+          student_status: null,
+          candidates: [],
+          reason: null,
+        },
+        {
+          line: 2,
+          raw: 'Dara P',
+          display_name: 'Dara P',
+          action: 'create',
+          student_id: null,
+          student_status: null,
+          candidates: [],
+          reason: null,
+        },
+      ],
+    } satisfies Schemas['RosterPreviewOut']),
+  )
+}
+
+/** Counts commits, so a test can prove the preview step writes nothing. */
+export function countCommits() {
+  const calls: Schemas['BulkEnrolIn'][] = []
+  const handler = http.post(`/api/classes/${CLASS_ID}/roster/bulk`, async ({ request }) => {
+    calls.push((await request.json()) as Schemas['BulkEnrolIn'])
+    return HttpResponse.json([] satisfies Schemas['RosterEntryOut'][], { status: 201 })
+  })
+  return { calls, handler }
+}
+
+/** A class list with one class in it, for the non-empty case. */
+export function oneClass() {
+  return http.get('/api/classes', () =>
+    HttpResponse.json([
+      {
+        id: CLASS_ID,
+        name: 'Year 4-6 Python',
+        term_label: '2026 T4',
+        status: 'active',
+        created_at: '2026-09-27T00:00:00Z',
+        updated_at: '2026-09-27T00:00:00Z',
+      },
+    ] satisfies Schemas['ClassOut'][]),
+  )
+}
+
+/**
+ * The bulk commit refusing the whole submission, in the shape the router actually sends:
+ * `detail` is an object carrying the rows to fix, not a string and not FastAPI's array.
+ */
+export function bulkRefused() {
+  return http.post(`/api/classes/${CLASS_ID}/roster/bulk`, () =>
+    HttpResponse.json(
+      {
+        detail: {
+          message: 'nothing was added — fix these entries and submit again',
+          entries: [{ index: 0, action: 'name_clash', reason: 'a student named Chen W is already in this class' }],
+        },
+      },
+      { status: 422 },
+    ),
+  )
 }

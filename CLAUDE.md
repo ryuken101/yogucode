@@ -23,9 +23,20 @@ rather than assume the code is right.
 
 Local Postgres 16 via Homebrew — **both** `coding_tool_dev` and `coding_tool_test` must
 exist or the test suite fails at the migration fixture. There is no Docker on this
-machine. Ordinary `uv run` / `npm run` invocations are in `README.md` and the manifests;
-the one worth knowing is `uv run alembic downgrade base && uv run alembic upgrade head`,
-which proves a migration both ways rather than only forwards.
+machine. Ordinary `uv run` / `npm run` invocations are in `README.md` and the manifests.
+
+**`alembic downgrade base` drops every table.** Never point it at `coding_tool_dev` — it
+holds the signed-in teacher, their classes and their roster, and none of it comes back.
+There is no need to: `tests/conftest.py` runs `downgrade base` then `upgrade head` against
+`coding_tool_test` on every `pytest` invocation, so a migration is already proven both ways
+by the suite. To do it by hand, aim it at the test database explicitly:
+
+```bash
+ALEMBIC_DATABASE_URL=postgresql+asyncpg://localhost/coding_tool_test \
+  uv run alembic downgrade base && \
+ALEMBIC_DATABASE_URL=postgresql+asyncpg://localhost/coding_tool_test \
+  uv run alembic upgrade head
+```
 
 ## Architecture
 

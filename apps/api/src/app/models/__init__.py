@@ -18,6 +18,7 @@ from app.models.classes import (
     EnrolmentStatus,
 )
 from app.models.concepts import Concept, ConceptStatus
+from app.models.documents import DocumentStatus, StudentDocument
 from app.models.students import (
     Student,
     StudentCredential,
@@ -37,9 +38,11 @@ __all__ = [
     "ClassTeacherRole",
     "Concept",
     "ConceptStatus",
+    "DocumentStatus",
     "Enrolment",
     "EnrolmentStatus",
     "Student",
+    "StudentDocument",
     "StudentCredential",
     "StudentSession",
     "StudentStatus",
