@@ -1,5 +1,5 @@
 """HTTP routers."""
 
-from app.routers import auth, centres, classes, join, roster
+from app.routers import auth, centres, classes, documents, join, roster
 
-__all__ = ["auth", "centres", "classes", "join", "roster"]
+__all__ = ["auth", "centres", "classes", "documents", "join", "roster"]

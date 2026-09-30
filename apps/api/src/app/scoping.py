@@ -1,8 +1,13 @@
 """Centre-scoped lookups — the one place the tenancy filter lives.
 
 **Routers must not build their own queries against a centre-owned table.** Every read of
-`classes`, `students`, `enrolments` or `class_join_codes` goes through a helper here that
-takes a `Principal` and applies `centre_id` itself.
+`classes`, `students`, `enrolments`, `class_join_codes` or `student_documents` goes through
+a helper here that takes a `Principal` and applies `centre_id` itself.
+
+Most helpers here scope by tenant alone, because the caller is a teacher and teachers at a
+centre share everything. `student_documents` is the exception and the first of its kind:
+a document belongs to **one child**, so its filter carries `student_id` as well. When a
+student principal is the subject of its own query, the subject is part of the boundary.
 
 The reason is the shape of the realistic failure. Nobody forgets the filter today, while
 there are two routes and the boundary is the thing being built. The omission happens in
@@ -29,9 +34,11 @@ from app.models import (
     Class,
     ClassJoinCode,
     ClassStatus,
+    DocumentStatus,
     Enrolment,
     EnrolmentStatus,
     Student,
+    StudentDocument,
     StudentStatus,
 )
 
@@ -204,6 +211,51 @@ async def get_live_join_code(
             .order_by(ClassJoinCode.id.desc())  # type: ignore[attr-defined]
         )
     ).first()
+
+
+async def get_owned_document(
+    session: AsyncSession, principal: Principal, document_id: uuid.UUID
+) -> StudentDocument:
+    """One of the calling student's own documents, or 404.
+
+    Three-part filter, and all three matter. `id` finds the row; `centre_id` is the tenancy
+    boundary as everywhere else; and **`student_id` is the subject boundary** — without it,
+    any signed-in child could read any other child's work by guessing a uuid, which is a
+    worse leak than the cross-centre one because it needs no second account.
+
+    Archived documents are returned. A student reopening something they put away should get
+    it, and the file list is what filters on status.
+    """
+    found = (
+        await session.exec(
+            select(StudentDocument).where(
+                StudentDocument.id == document_id,
+                StudentDocument.centre_id == principal.centre_id,
+                StudentDocument.student_id == principal.subject_id,
+            )
+        )
+    ).one_or_none()
+    if found is None:
+        raise _not_found("document")
+    return found
+
+
+async def list_student_documents(
+    session: AsyncSession, principal: Principal, include_archived: bool = False
+) -> Sequence[StudentDocument]:
+    """The calling student's own files, most recently worked on first.
+
+    Ordered by `updated_at` rather than by id: a child returning to last week's work wants
+    what they were last editing at the top, not what they happened to create last.
+    """
+    statement = select(StudentDocument).where(
+        StudentDocument.centre_id == principal.centre_id,
+        StudentDocument.student_id == principal.subject_id,
+    )
+    if not include_archived:
+        statement = statement.where(StudentDocument.status == DocumentStatus.ACTIVE)
+    statement = statement.order_by(StudentDocument.updated_at.desc())  # type: ignore[attr-defined]
+    return (await session.exec(statement)).all()
 
 
 async def get_enrolment(

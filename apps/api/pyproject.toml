@@ -36,6 +36,9 @@ dev = [
 # Idempotent taxonomy seed: `uv run seed-concepts`. Run it twice; the second run should
 # report everything unchanged.
 seed-concepts = "app.seed.concepts:main"
+# Local development only: rebuilds a class with students and PINs so the student-facing
+# screens can be exercised without the magic-link dance. Refuses non-localhost databases.
+seed-demo = "app.seed.demo:main"
 
 [build-system]
 requires = ["uv_build>=0.12.13,<0.13.0"]

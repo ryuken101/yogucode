@@ -2,7 +2,7 @@
 
 from fastapi import FastAPI
 
-from app.routers import auth, centres, classes, join, roster
+from app.routers import auth, centres, classes, documents, join, roster
 
 app = FastAPI(title="Coding-teaching-tool API")
 
@@ -12,6 +12,7 @@ app.include_router(classes.router)
 app.include_router(roster.students_router)
 app.include_router(roster.roster_router)
 app.include_router(join.router)
+app.include_router(documents.router)
 
 
 @app.get("/health")
