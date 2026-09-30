@@ -1,0 +1,193 @@
+/**
+ * The page's side of the Python runtime.
+ *
+ * Owns one worker for the lifetime of the editor, so a child's variables survive between
+ * runs and a Stop costs nothing. The worker is created lazily on the first run rather than
+ * on mount: 5.7 MB should be fetched because someone pressed Run, not because they opened
+ * a page.
+ */
+
+import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  answerStdin,
+  cancelStdin,
+  createInterruptBuffer,
+  createStdinBuffer,
+  isWaitingForStdin,
+  isolated,
+  signalInterrupt,
+} from './channel'
+import { MAX_OUTPUT_CHARS, type FromWorker } from './protocol'
+
+export interface OutputSegment {
+  /** `stdin` is the terminal echo of what the child typed, not something Python wrote. */
+  stream: 'stdout' | 'stderr' | 'stdin' | 'system'
+  text: string
+}
+
+/**
+ * Keep the newest output and drop the oldest, the way a terminal's scrollback does.
+ *
+ * The case this is for: a child writes `for i in range(5000): print(i)` and wants to watch
+ * it reach 4999. Capping at the *start* would show them 0..1999 and no ending — the half
+ * of the output they did not print it for.
+ */
+function trimToNewest(segments: OutputSegment[]): OutputSegment[] {
+  let total = 0
+  for (const segment of segments) total += segment.text.length
+  if (total <= MAX_OUTPUT_CHARS) return segments
+
+  let excess = total - MAX_OUTPUT_CHARS
+  const kept: OutputSegment[] = []
+  for (const segment of segments) {
+    if (excess <= 0) {
+      kept.push(segment)
+      continue
+    }
+    if (segment.text.length <= excess) {
+      excess -= segment.text.length
+      continue
+    }
+    kept.push({ ...segment, text: segment.text.slice(excess) })
+    excess = 0
+  }
+  return [
+    { stream: 'system', text: '── earlier output dropped ──\n' },
+    ...kept,
+  ]
+}
+
+export type RunState =
+  | { status: 'idle' }
+  | { status: 'loading'; detail: string }
+  | { status: 'running' }
+  /** Parked at an `input()` prompt, waiting for the child to type something. */
+  | { status: 'asking' }
+  | { status: 'unsupported'; reason: string }
+
+const INDEX_URL = '/pyodide/'
+
+export function usePython() {
+  const worker = useRef<Worker | null>(null)
+  const interrupt = useRef<Uint8Array | null>(null)
+  const stdin = useRef<SharedArrayBuffer | null>(null)
+  const runId = useRef(0)
+
+  const [state, setState] = useState<RunState>(() =>
+    isolated()
+      ? { status: 'idle' }
+      : {
+          status: 'unsupported',
+          // Said plainly rather than hidden: without isolation, input() would hang forever
+          // and Stop would do nothing, so offering Run at all would be a lie.
+          reason:
+            'This page is not running in a secure enough context to run Python. ' +
+            'Reload, and tell your teacher if it keeps happening.',
+        },
+  )
+  const [output, setOutput] = useState<OutputSegment[]>([])
+
+  const append = useCallback((segment: OutputSegment) => {
+    setOutput((segments) => trimToNewest([...segments, segment]))
+  }, [])
+
+  useEffect(
+    () => () => {
+      worker.current?.terminate()
+      worker.current = null
+    },
+    [],
+  )
+
+  const ensureWorker = useCallback((): Worker => {
+    if (worker.current) return worker.current
+
+    interrupt.current = createInterruptBuffer()
+    stdin.current = createStdinBuffer()
+    const created = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
+
+    created.onmessage = (event: MessageEvent<FromWorker>) => {
+      const message = event.data
+      switch (message.type) {
+        case 'loading':
+          setState({ status: 'loading', detail: message.detail })
+          break
+        case 'ready':
+          setState({ status: 'idle' })
+          break
+        case 'stdout':
+        case 'stderr':
+          append({ stream: message.type, text: message.text })
+          break
+        case 'stdin':
+          setState({ status: 'asking' })
+          break
+        case 'truncated':
+          append({
+            stream: 'system',
+            text: '\n── this program printed too much to keep up with ──\n',
+          })
+          break
+        case 'done':
+          setState({ status: 'idle' })
+          break
+        case 'fatal':
+          setState({ status: 'unsupported', reason: message.message })
+          break
+      }
+    }
+    created.onerror = () => {
+      setState({ status: 'unsupported', reason: 'Python could not start.' })
+    }
+
+    created.postMessage({
+      type: 'init',
+      indexURL: INDEX_URL,
+      interrupt: interrupt.current,
+      stdin: stdin.current,
+    })
+    worker.current = created
+    return created
+  }, [append])
+
+  const run = useCallback(
+    (code: string) => {
+      if (state.status === 'unsupported') return
+      setOutput([])
+      setState({ status: 'running' })
+      runId.current += 1
+      ensureWorker().postMessage({ type: 'run', runId: runId.current, code })
+    },
+    [ensureWorker, state.status],
+  )
+
+  const answer = useCallback(
+    (text: string) => {
+      if (!stdin.current) return
+      // Echo it, because a terminal shows you what you typed and the transcript should
+      // read back as the conversation it was.
+      append({ stream: 'stdin', text: `${text}\n` })
+      setState({ status: 'running' })
+      answerStdin(stdin.current, text)
+    },
+    [append],
+  )
+
+  /**
+   * Stop, by whichever route applies.
+   *
+   * A program blocked at an `input()` prompt is **not executing Python**, so Pyodide never
+   * looks at the interrupt buffer — that case has to be unblocked through the stdin
+   * channel. Getting this wrong leaves a child pressing a Stop button that does nothing,
+   * which is the failure this branch exists to prevent.
+   */
+  const stop = useCallback(() => {
+    if (stdin.current && isWaitingForStdin(stdin.current)) {
+      cancelStdin(stdin.current)
+      return
+    }
+    if (interrupt.current) signalInterrupt(interrupt.current)
+  }, [])
+
+  return { state, output, run, stop, answer }
+}

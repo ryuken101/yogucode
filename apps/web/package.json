@@ -10,11 +10,16 @@
     "typecheck": "tsc -b --noEmit",
     "test": "vitest run",
     "preview": "vite preview",
-    "api:types": "openapi-typescript ../api/openapi.json -o src/lib/api-types.ts"
+    "api:types": "openapi-typescript ../api/openapi.json -o src/lib/api-types.ts",
+    "pyodide": "node scripts/copy-pyodide.mjs",
+    "predev": "npm run pyodide",
+    "prebuild": "npm run pyodide"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",
     "@tanstack/react-query": "^5.104.0",
+    "monaco-editor": "^0.57.0",
+    "pyodide": "^314.0.7",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router": "^8.4.0"

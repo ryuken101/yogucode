@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Copied from node_modules by scripts/copy-pyodide.mjs; the version is pinned in
+# package.json rather than committed as ~13 MB of binaries.
+public/pyodide

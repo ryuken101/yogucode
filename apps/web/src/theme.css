@@ -20,6 +20,17 @@
   --color-amber: #d9a441;
   --color-rust: #a8503a;
 
+  /*
+   * The code surface — editor and terminal.
+   *
+   * §8 warns against dropping a default dark VS Code theme into a cream page, and this is
+   * the answer to that: a dark panel derived from `ink` rather than VS Code's blue-grey,
+   * so the editor reads as part of this product. `ink-deep` is the background, `ink-raise`
+   * the gutter and selection, and the syntax colours are the palette above.
+   */
+  --color-ink-deep: #23211e;
+  --color-ink-raise: #302d29;
+
   --font-serif: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
   --font-sans:
     ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;

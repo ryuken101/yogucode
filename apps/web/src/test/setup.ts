@@ -14,7 +14,9 @@ afterAll(() => server.close())
 // layer for free, all of which are easy to get subtly wrong by hand and all of which
 // matter to a teacher driving by keyboard in front of a class. So the gap is filled here
 // rather than by making the component worse to suit the test environment.
-if (!HTMLDialogElement.prototype.showModal) {
+// Guarded on the type existing: this setup file is shared with `*.node.test.ts`, which
+// runs without a DOM at all.
+if (typeof HTMLDialogElement !== 'undefined' && !HTMLDialogElement.prototype.showModal) {
   HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement) {
     this.open = true
   }
@@ -22,4 +24,11 @@ if (!HTMLDialogElement.prototype.showModal) {
     this.open = false
     this.dispatchEvent(new Event('close'))
   }
+}
+
+// jsdom has no layout, so it implements no scrolling either. `Console` scrolls to the
+// newest output, which is behaviour worth having in a browser and meaningless here — so
+// the method is stubbed rather than the component being made to check for it.
+if (typeof Element !== 'undefined' && !Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = function scrollIntoView() {}
 }
