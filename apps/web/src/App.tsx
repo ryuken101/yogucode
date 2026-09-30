@@ -15,6 +15,7 @@ import { Join } from './routes/Join'
 import { NotFound } from './routes/NotFound'
 import { RequireTeacher } from './routes/RequireTeacher'
 import { SignIn } from './routes/SignIn'
+import { RequireStudent } from './routes/RequireStudent'
 import { SlipSheet } from './routes/SlipSheet'
 import { Work } from './routes/Work'
 
@@ -25,7 +26,10 @@ export default function App() {
       <Route path="/sign-in" element={<SignIn />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/join" element={<Join />} />
-      <Route path="/work" element={<Work />} />
+
+      <Route element={<RequireStudent />}>
+        <Route path="/work" element={<Work />} />
+      </Route>
 
       <Route element={<RequireTeacher />}>
         <Route path="/classes" element={<ClassList />} />

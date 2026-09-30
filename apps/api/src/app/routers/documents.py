@@ -93,10 +93,22 @@ class DocumentOut(DocumentSummaryOut):
         return cls(**DocumentSummaryOut.build(record).model_dump(), content=record.content)
 
 
-def _duplicate_title(title: str) -> HTTPException:
+def _duplicate_title() -> HTTPException:
+    """The name is taken by another of this student's live files.
+
+    Takes no arguments on purpose. Naming the file here would mean reading `record.title`
+    after `session.rollback()`, which expires the instance — the attribute read then
+    becomes lazy IO where asyncpg cannot service it and surfaces as `MissingGreenlet`
+    instead of a 409. That bug was in this file once.
+
+    Deliberately does not echo the attempted name back. The index is on `lower(title)`, so
+    renaming to "SPIRAL" when "spiral" exists collides — and saying "you already have a
+    file called SPIRAL" would assert something untrue about their files. The names are
+    visible as tabs, so "that name" is enough to act on and is true in every case.
+    """
     return HTTPException(
         status_code=status.HTTP_409_CONFLICT,
-        detail=f"you already have a file called {title}",
+        detail="You already have a file with that name",
     )
 
 
@@ -133,7 +145,7 @@ async def create_document(
         # Only reachable when the title was supplied explicitly; the generated ones are
         # checked above. The database is the arbiter either way.
         await session.rollback()
-        raise _duplicate_title(title) from exc
+        raise _duplicate_title() from exc
     await session.refresh(record)
     return DocumentOut.build_full(record)
 
@@ -186,16 +198,12 @@ async def save_document(
         changed = True
 
     if changed:
-        # Read the title out before committing: a rollback expires the instance, and
-        # touching an attribute afterwards is lazy IO in a place asyncpg cannot service,
-        # which surfaces as MissingGreenlet rather than the 409 the caller should get.
-        attempted = record.title
         session.add(record)
         try:
             await session.commit()
         except IntegrityError as exc:
             await session.rollback()
-            raise _duplicate_title(attempted) from exc
+            raise _duplicate_title() from exc
         await session.refresh(record)
     return DocumentOut.build_full(record)
 
@@ -230,7 +238,6 @@ async def restore_document(
     """
     record = await get_owned_document(session, principal, document_id)
     if record.status != DocumentStatus.ACTIVE:
-        attempted = record.title  # see save_document: a rollback expires the instance
         record.status = DocumentStatus.ACTIVE
         record.updated_at = utcnow()
         session.add(record)
@@ -238,6 +245,6 @@ async def restore_document(
             await session.commit()
         except IntegrityError as exc:
             await session.rollback()
-            raise _duplicate_title(attempted) from exc
+            raise _duplicate_title() from exc
         await session.refresh(record)
     return DocumentOut.build_full(record)

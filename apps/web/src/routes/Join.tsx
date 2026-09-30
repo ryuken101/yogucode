@@ -12,6 +12,7 @@
  */
 
 import { useState } from 'react'
+import { useNavigate } from 'react-router'
 import { Button } from '../components/Button'
 import { Card, PageHeader } from '../components/Card'
 import { TextInput } from '../components/Field'
@@ -28,6 +29,7 @@ type Step =
   | { name: 'in'; me: Schemas['StudentMeOut'] }
 
 export function Join() {
+  const navigate = useNavigate()
   const [step, setStep] = useState<Step>({ name: 'code' })
   const [code, setCode] = useState('')
   const [pin, setPin] = useState('')
@@ -182,10 +184,15 @@ export function Join() {
           <>
             <PageHeader title={`You’re in, ${step.me.display_name}`} />
             <Notice tone="good">{step.me.class_name}</Notice>
-            <p className="mt-4 text-sm text-ink-soft">
-              Your editor and problems arrive in the next phase. You can close this and
-              come back — you’ll still be signed in.
-            </p>
+            <div className="mt-4 flex flex-col gap-3">
+              <Button variant="primary" onClick={() => navigate('/work')}>
+                Start writing Python
+              </Button>
+              <p className="text-sm text-ink-soft">
+                You can close this and come back — you’ll still be signed in, and your work
+                will be where you left it.
+              </p>
+            </div>
           </>
         ) : null}
 

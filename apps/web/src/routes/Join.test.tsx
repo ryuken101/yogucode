@@ -7,14 +7,17 @@
  * will notice.
  */
 
-import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { screen } from '@testing-library/react'
+import type userEvent from '@testing-library/user-event'
 import { expect, test } from 'vitest'
 import { Join } from './Join'
+import { renderScreen } from '../test/render'
 import { ARIA_PIN, CODE, lockedOut, server, unreachable } from '../test/server'
 
+// `renderScreen` supplies the router and a query client: Join navigates to /work once a
+// child is signed in, so it can no longer be rendered bare.
 function renderJoin() {
-  return { user: userEvent.setup(), ...render(<Join />) }
+  return renderScreen(<Join />)
 }
 
 async function reachThePinStep(user: ReturnType<typeof userEvent.setup>) {

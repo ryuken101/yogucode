@@ -25,6 +25,8 @@ export const keys = {
   class: (classId: string) => ['class', classId] as const,
   roster: (classId: string) => ['roster', classId] as const,
   studentMe: ['student-me'] as const,
+  documents: ['documents'] as const,
+  document: (documentId: string) => ['document', documentId] as const,
 }
 
 export function createQueryClient(): QueryClient {
@@ -115,5 +117,80 @@ export function useRenameStudent(classId: string) {
     mutationFn: ({ studentId, name }: { studentId: string; name: string }) =>
       api.renameStudent(studentId, name),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.roster(classId) }),
+  })
+}
+
+/* --- student: identity and files ---------------------------------------------------- */
+
+/** Who the signed-in student is. Drives the guard and the shell. */
+export function useStudentMe() {
+  return useQuery({ queryKey: keys.studentMe, queryFn: api.studentMe, retry: false })
+}
+
+/** The tab strip: newest-edited first, which is what `list_student_documents` returns. */
+export function useDocuments() {
+  return useQuery({ queryKey: keys.documents, queryFn: api.listDocuments })
+}
+
+/**
+ * One file, with its content.
+ *
+ * `staleTime: Infinity` because the editor becomes the source of truth the moment it is
+ * mounted. Refetching would hand a child back a version of their own file from before
+ * their last few keystrokes.
+ */
+export function useDocument(documentId: string | null) {
+  return useQuery({
+    queryKey: keys.document(documentId ?? 'none'),
+    queryFn: () => api.readDocument(documentId as string),
+    enabled: documentId !== null,
+    staleTime: Infinity,
+  })
+}
+
+export function useCreateDocument() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.createDocument(),
+    onSuccess: (created) => {
+      client.setQueryData(keys.document(created.id), created)
+      return client.invalidateQueries({ queryKey: keys.documents })
+    },
+  })
+}
+
+/**
+ * Save, called by the autosave debounce.
+ *
+ * The tab strip is **not** invalidated on every save. It is ordered by `updated_at`, so
+ * refetching it mid-typing would reshuffle the tabs under a child's cursor — and the only
+ * thing that actually changed is the file they are already looking at.
+ */
+export function useSaveDocument() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ documentId, content }: { documentId: string; content: string }) =>
+      api.saveDocument(documentId, { title: null, content }),
+    onSuccess: (saved) => client.setQueryData(keys.document(saved.id), saved),
+  })
+}
+
+export function useRenameDocument() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ documentId, title }: { documentId: string; title: string }) =>
+      api.saveDocument(documentId, { title, content: null }),
+    onSuccess: (saved) => {
+      client.setQueryData(keys.document(saved.id), saved)
+      return client.invalidateQueries({ queryKey: keys.documents })
+    },
+  })
+}
+
+export function useArchiveDocument() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (documentId: string) => api.archiveDocument(documentId),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.documents }),
   })
 }

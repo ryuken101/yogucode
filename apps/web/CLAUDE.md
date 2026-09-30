@@ -56,3 +56,61 @@ genuinely on different domains; `VITE_API_BASE_URL` makes it a config change.
 
 Copy `.env.example` to `.env.local` and fill in the Supabase values. Without them the app
 still builds and `/join` still works — only teacher sign-in is unavailable, and it says so.
+
+## The Python runtime
+
+`src/runtime/` runs Python in a Web Worker under Pyodide, self-hosted from
+`public/pyodide/` (copied out of node_modules by `scripts/copy-pyodide.mjs`, gitignored,
+version pinned in `package.json`).
+
+**The app requires cross-origin isolation**, and `vite.config.ts` sets the two headers for
+it. This is not optional decoration: Pyodide's stdin callback is synchronous, so an
+interactive `input()` from a worker needs `Atomics.wait` on a `SharedArrayBuffer`, and
+interrupting a runaway loop needs `setInterruptBuffer`, which needs the same. Without the
+headers `SharedArrayBuffer` is undefined, `crossOriginIsolated` is false, and the editor
+says so rather than offering a Run button that would hang. **Vercel needs those headers at
+step 10.**
+
+`src/runtime/channel.ts` holds the two shared buffers. Read its comments before changing
+either: `postMessage` cannot reach a worker blocked in `Atomics.wait`, and the interrupt
+buffer does **not** rescue a program waiting at an `input()` prompt — Pyodide only checks
+it while executing Python, so that case goes through the stdin channel's cancel state.
+`channel.node.test.ts` covers this across real threads and needs the `node` environment,
+declared in a per-file docblock (`environmentMatchGlobs` is silently ignored by Vitest 4).
+
+Output is forwarded as **raw bytes**, not lines. `print("a", end="")` and `input("Name? ")`
+both write without a newline, and a line-oriented handler puts the prompt above the cursor
+instead of in front of it. The console keeps the newest 200k characters and drops the
+oldest, like terminal scrollback.
+
+## The editor
+
+Monaco, behind `React.lazy` in `src/editor/CodeSurface.tsx`. `/join`, the class list and
+the roster must never load it — they are the pages twelve children open at once on centre
+wifi. It is a ~695 KB gzipped chunk.
+
+Import `monaco-editor/editor/editor.api` plus the one grammar, **never the package root**:
+the root is `editor.main`, which registers every language Monaco ships and drags in
+TypeScript, CSS, HTML and JSON language workers — about 9 MB of build output to teach
+Python. The odd-looking paths are explained in `monaco-subpaths.d.ts`; the package's
+`exports` map rewrites `./*` to `./esm/vs/*`.
+
+`src/editor/theme.ts` is the §8 answer to "don't drop a default dark VS Code theme into a
+cream page": dark, but derived from `ink` with syntax colours from the product palette.
+There is no red in it — a student's unfinished code is not an error, and mistakes appear in
+the terminal in amber after they press Run.
+
+**Monaco is uncontrolled after mount.** `value` is the initial document; the editor owns
+the text thereafter, which is what keeps typing off the network. Anything mocking
+`CodeSurface` must use `defaultValue`, or it is not testing the real contract.
+
+## Saving a student's work
+
+`src/editor/useAutosave.ts`: debounced ~2 s, skipped when nothing changed, flushed on file
+switch and on `pagehide`. There is no Save button, because a nine-year-old will not press
+one and §3.1's promise is "no lost files between weeks", not "if you remember".
+
+A failed save is the one thing on that screen allowed to be **rust** — it is genuinely our
+fault, and a child typing into a page that silently discards their work is the failure most
+worth shouting about. Saves are deliberately not retried: the usual cause is a revoked
+session, and retrying hides it behind a spinner.

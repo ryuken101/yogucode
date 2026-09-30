@@ -144,4 +144,33 @@ export const api = {
   studentMe: () => request<Schemas['StudentMeOut']>('/auth/student/me', { anonymous: true }),
   studentSignOut: () =>
     request<void>('/auth/student/logout', { method: 'POST', anonymous: true }),
+
+  /* --- student: their own files ---------------------------------------------------
+   *
+   * `anonymous: true` throughout, like the rest of the student routes: identity comes
+   * from the httpOnly session cookie, and a teacher's bearer token has no business being
+   * sent to a route that would refuse it anyway.
+   */
+
+  listDocuments: () =>
+    request<Schemas['DocumentSummaryOut'][]>('/me/documents', { anonymous: true }),
+  readDocument: (documentId: string) =>
+    request<Schemas['DocumentOut']>(`/me/documents/${documentId}`, { anonymous: true }),
+  createDocument: (body: Schemas['DocumentIn'] = { title: null, content: null }) =>
+    request<Schemas['DocumentOut']>('/me/documents', {
+      method: 'POST',
+      body,
+      anonymous: true,
+    }),
+  saveDocument: (documentId: string, body: Schemas['DocumentPatch']) =>
+    request<Schemas['DocumentOut']>(`/me/documents/${documentId}`, {
+      method: 'PATCH',
+      body,
+      anonymous: true,
+    }),
+  archiveDocument: (documentId: string) =>
+    request<Schemas['DocumentOut']>(`/me/documents/${documentId}/archive`, {
+      method: 'POST',
+      anonymous: true,
+    }),
 }

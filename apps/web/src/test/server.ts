@@ -125,6 +125,37 @@ const preview: Schemas['RosterPreviewOut'] = {
   ],
 }
 
+/* --- a student's own files ----------------------------------------------------------- */
+
+export const DOC_ID = '018f0000-0000-7000-8000-000000000020'
+export const OTHER_DOC_ID = '018f0000-0000-7000-8000-000000000021'
+
+const documents: Record<string, Schemas['DocumentOut']> = {
+  [DOC_ID]: {
+    id: DOC_ID,
+    title: 'spiral',
+    content: 'print("spiral")\n',
+    status: 'active',
+    created_at: '2026-10-01T00:00:00Z',
+    updated_at: '2026-10-02T00:00:00Z',
+  },
+  [OTHER_DOC_ID]: {
+    id: OTHER_DOC_ID,
+    title: 'squares',
+    content: 'print("squares")\n',
+    status: 'active',
+    created_at: '2026-10-01T00:00:00Z',
+    updated_at: '2026-10-01T00:00:00Z',
+  },
+}
+
+/** Newest-edited first, exactly as `list_student_documents` orders it. */
+function summaries(): Schemas['DocumentSummaryOut'][] {
+  return Object.values(documents)
+    .map(({ content: _content, ...summary }) => summary)
+    .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+}
+
 export const handlers = [
   http.post('/api/join/lookup', async ({ request }) => {
     const body = (await request.json()) as Schemas['JoinLookupIn']
@@ -159,6 +190,24 @@ export const handlers = [
   http.get(`/api/classes/${CLASS_ID}/roster`, () =>
     HttpResponse.json([] satisfies Schemas['RosterEntryOut'][]),
   ),
+
+  http.get('/api/auth/student/me', () => HttpResponse.json(signedIn)),
+  http.post('/api/auth/student/logout', () => new HttpResponse(null, { status: 204 })),
+
+  http.get('/api/me/documents', () => HttpResponse.json(summaries())),
+  http.get('/api/me/documents/:id', ({ params }) => {
+    const found = documents[params.id as string]
+    return found
+      ? HttpResponse.json(found)
+      : HttpResponse.json({ detail: 'document not found' }, { status: 404 })
+  }),
+  http.patch('/api/me/documents/:id', async ({ params, request }) => {
+    const body = (await request.json()) as Schemas['DocumentPatch']
+    const found = documents[params.id as string]!
+    if (body.content !== null && body.content !== undefined) found.content = body.content
+    if (body.title) found.title = body.title
+    return HttpResponse.json(found)
+  }),
 ]
 
 export const server = setupServer(...handlers)
@@ -251,4 +300,82 @@ export function bulkRefused() {
       { status: 422 },
     ),
   )
+}
+
+/** A student with no files yet — a brand-new account, which must create one. */
+export function noDocuments() {
+  return http.get('/api/me/documents', () =>
+    HttpResponse.json([] satisfies Schemas['DocumentSummaryOut'][]),
+  )
+}
+
+/** Counts saves, so a test can prove the autosave debounce coalesces typing. */
+export function countSaves() {
+  const calls: { id: string; content: string | null | undefined }[] = []
+  const handler = http.patch('/api/me/documents/:id', async ({ params, request }) => {
+    const body = (await request.json()) as Schemas['DocumentPatch']
+    calls.push({ id: params.id as string, content: body.content })
+    return HttpResponse.json({ ...documents[DOC_ID]!, content: body.content ?? '' })
+  })
+  return { calls, handler }
+}
+
+/** Creating a file, for the brand-new-student path. */
+export function createsDocument(id = 'new-doc-id') {
+  return http.post('/api/me/documents', () =>
+    HttpResponse.json(
+      {
+        id,
+        title: 'Untitled',
+        content: '# Write your Python here, then press Run.\nprint("Hello!")\n',
+        status: 'active',
+        created_at: '2026-10-02T00:00:00Z',
+        updated_at: '2026-10-02T00:00:00Z',
+      } satisfies Schemas['DocumentOut'],
+      { status: 201 },
+    ),
+  )
+}
+
+/** A signed-out student: every student route refuses. */
+export function signedOut() {
+  return [
+    http.get('/api/auth/student/me', () =>
+      HttpResponse.json({ detail: 'not signed in' }, { status: 401 }),
+    ),
+    http.get('/api/me/documents', () =>
+      HttpResponse.json({ detail: 'not signed in' }, { status: 401 }),
+    ),
+  ]
+}
+
+/** A session revoked mid-lesson: reads still cached, but saves refuse. */
+export function savesRefused() {
+  return http.patch('/api/me/documents/:id', () =>
+    HttpResponse.json({ detail: 'session is no longer valid' }, { status: 401 }),
+  )
+}
+
+/**
+ * A rename onto a name already in use, as the API answers it: 409 with a sentence written
+ * for a child.
+ *
+ * Only *renames* are refused — a PATCH carrying a title. Autosave uses the same endpoint
+ * with content only, and failing that too would make the test prove the wrong thing.
+ */
+export function renameRefused() {
+  return http.patch('/api/me/documents/:id', async ({ params, request }) => {
+    const body = (await request.json()) as Schemas['DocumentPatch']
+    if (body.title) {
+      // The API deliberately does not echo the attempted name: the index is on
+      // lower(title), so "SPIRAL" clashing with "spiral" would make that a false claim.
+      return HttpResponse.json(
+        { detail: 'you already have a file with that name' },
+        { status: 409 },
+      )
+    }
+    const found = documents[params.id as string]!
+    if (body.content !== null && body.content !== undefined) found.content = body.content
+    return HttpResponse.json(found)
+  })
 }

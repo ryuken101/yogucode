@@ -150,8 +150,14 @@ the taxonomy must be a config edit, not a migration.
 
 ### Where development is now
 
-Phase 1 of the plan in `~/Documents/Ken Nguyen/Startup/phase-1-plan.md`, which runs as
-eleven steps. Backend is steps 1–8, frontend is 9, and 10–11 ship it.
+**Phase 1 is complete bar its deploy; Phase 2 is built.**
+
+Phase 1's plan lives in `~/Documents/Ken Nguyen/Startup/phase-1-plan.md` and runs as eleven
+steps: backend is 1–8, frontend is 9, and 10–11 ship it. Steps 10 and 11 are **deliberately
+deferred** to after Phase 3 or 4 and before Phase 5. Deploying earlier bought nothing —
+students bring their own laptops, so there is no centre machine to test on, and the first
+release to a class is Phase 5 regardless. Doing the infrastructure then also keeps its
+surprises away from the week that matters.
 
 | Step | | State |
 |---|---|---|
@@ -256,13 +262,38 @@ most likely to be broken by reflex.
 which keeps CORS a genuine step 10 concern, for when the web app and the API really are
 on different domains.
 
-**Nothing is deployed.** No Supabase project, Fly app or Vercel project exists. Both
-databases are local Postgres 16.
+**Phase 2 — the editor — is built.** A student signs in at `/join` and lands in `/work`:
+Monaco in a dark theme derived from the §8 palette, Python running in the browser under
+Pyodide, a terminal they type into, and their files as tabs that save themselves.
 
-Phases 2–10 in `docs/product-spec.md` §7 add the Pyodide editor, the turtle shim, problems
-and test cases, homework marking, event capture, quizzes, mastery and the teacher
-dashboard. Phase 5 — homework submit and mark — is the milestone that matters; everything
-before it is prerequisite.
+Three things about it are load-bearing and easy to undo by accident:
+
+- **The app is cross-origin isolated.** Pyodide's stdin callback is synchronous, so an
+  interactive `input()` from a Web Worker needs `Atomics.wait` on a `SharedArrayBuffer`;
+  stopping a runaway `while` loop needs `setInterruptBuffer`, which needs the same. Both
+  need `COOP`/`COEP`, which `vite.config.ts` sets and **Vercel will need at step 10**.
+  Without them the editor refuses to run rather than hanging on the first `input()`.
+- **A Python traceback is amber, never red.** It is a student's mistake, not a system
+  error, and §8's rule exists for exactly this moment. Rust is reserved for Pyodide failing
+  to load and for a save that failed. Tests enforce it.
+- **Monaco is lazy-loaded and Python-only.** `/join` and the teacher screens never fetch
+  it. Importing the package root instead of `editor.api` would add ~9 MB of language
+  workers for languages nobody teaches here.
+
+Pyodide is self-hosted: ~5.7 MB over the wire, about 68 MB across twelve students at a
+first lesson and then cached for a year. Browsers partition the HTTP cache by site now, so
+a CDN would have saved nothing and put a third party in the lesson-start path.
+
+**Nothing is deployed.** A Supabase project exists for teacher auth in `ap-southeast-2`,
+with an asymmetric ES256 signing key; no Fly app or Vercel project exists, and both
+databases are local Postgres 16. Before the first migration runs against Supabase, **turn
+its Data API off** — otherwise PostgREST would publish `students` to anyone holding the
+publishable key.
+
+Phases 3–10 in `docs/product-spec.md` §7 add the turtle shim, problems and test cases,
+homework marking, event capture, quizzes, mastery and the teacher dashboard. Phase 5 —
+homework submit and mark — is the milestone that matters; everything before it is
+prerequisite.
 
 ## Local development
 

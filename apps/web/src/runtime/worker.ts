@@ -115,6 +115,9 @@ function createSink(getRunId: () => number): Sink {
 let currentRunId = 0
 const sink = createSink(() => currentRunId)
 
+/** A run that arrived while Pyodide was still loading; dispatched once ready. */
+let queuedRun: Extract<ToWorker, { type: 'run' }> | null = null
+
 /* --- boot --------------------------------------------------------------------------- */
 
 async function init(message: Extract<ToWorker, { type: 'init' }>): Promise<void> {
@@ -164,13 +167,25 @@ async function init(message: Extract<ToWorker, { type: 'init' }>): Promise<void>
   })
 
   post({ type: 'ready', version: pyodide.version })
+
+  // Whoever pressed Run before Python finished loading gets their run now, rather than
+  // having to press it a second time.
+  if (queuedRun) {
+    const waiting = queuedRun
+    queuedRun = null
+    await run(waiting)
+  }
 }
 
 /* --- run ---------------------------------------------------------------------------- */
 
 async function run(message: Extract<ToWorker, { type: 'run' }>): Promise<void> {
   if (!pyodide || !interruptBuffer) {
-    post({ type: 'fatal', message: 'Python is not ready yet.' })
+    // A run can arrive mid-boot: `onmessage` is re-entered while `init` is still awaiting
+    // the Pyodide download, so the queued `run` lands with no interpreter. That is not a
+    // failure — it is a child pressing Run on a cold page, which is the *normal* first
+    // interaction. Hold it and let `init` dispatch it.
+    queuedRun = message
     return
   }
   currentRunId = message.runId

@@ -69,9 +69,13 @@ const INDEX_URL = '/pyodide/'
 
 export function usePython() {
   const worker = useRef<Worker | null>(null)
+  /** False until the worker has reported `ready`; a run before then is queued there. */
+  const ready = useRef(false)
   const interrupt = useRef<Uint8Array | null>(null)
   const stdin = useRef<SharedArrayBuffer | null>(null)
   const runId = useRef(0)
+  /** True when a run is waiting on the worker's boot to finish. */
+  const pendingRun = useRef(false)
 
   const [state, setState] = useState<RunState>(() =>
     isolated()
@@ -102,6 +106,7 @@ export function usePython() {
   const ensureWorker = useCallback((): Worker => {
     if (worker.current) return worker.current
 
+    ready.current = false
     interrupt.current = createInterruptBuffer()
     stdin.current = createStdinBuffer()
     const created = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
@@ -113,7 +118,15 @@ export function usePython() {
           setState({ status: 'loading', detail: message.detail })
           break
         case 'ready':
-          setState({ status: 'idle' })
+          ready.current = true
+          // If a run was queued during boot the worker is already executing it, so the
+          // state must not drop back to idle and re-enable the Run button underneath it.
+          setState((current) =>
+            current.status === 'loading' && pendingRun.current
+              ? { status: 'running' }
+              : { status: 'idle' },
+          )
+          pendingRun.current = false
           break
         case 'stdout':
         case 'stderr':
@@ -154,9 +167,19 @@ export function usePython() {
     (code: string) => {
       if (state.status === 'unsupported') return
       setOutput([])
-      setState({ status: 'running' })
       runId.current += 1
-      ensureWorker().postMessage({ type: 'run', runId: runId.current, code })
+      const created = ensureWorker()
+
+      // On a cold page the first Run arrives while Pyodide is still downloading. The
+      // worker holds the run and executes it the moment it is ready, so the child presses
+      // Run **once** — pressing it and being told to press it again was the bug here.
+      if (!ready.current) {
+        pendingRun.current = true
+        setState({ status: 'loading', detail: 'Starting Python' })
+      } else {
+        setState({ status: 'running' })
+      }
+      created.postMessage({ type: 'run', runId: runId.current, code })
     },
     [ensureWorker, state.status],
   )

@@ -392,7 +392,7 @@ problems, which is the real bottleneck.
 |---|---|---|
 | Frontend | React + TypeScript + Vite | Already known |
 | Editor | **Monaco** | VS Code's editor; real Python support; **can disable completions** for quiz mode |
-| | *(CodeMirror 6 as alternative)* | Lighter — better if student laptops are low-end. Check what machines they use. |
+| | *(CodeMirror 6 considered)* | Lighter, for low-end laptops. Checked: students bring their own and they cope with Monaco. |
 | Styling | Tailwind | Fast, pairs well with a tight palette |
 | Server state | TanStack Query | |
 | Python runtime | **Pyodide** in a Web Worker | §5.1 |
@@ -427,7 +427,8 @@ next one starts. That matters more than any architectural decision here.
 **Phase 0 — Before writing code (this week)**
 
 - [ ] Confirm which turtle functions the curriculum uses
-- [ ] Confirm what laptops students use (decides Monaco vs CodeMirror)
+- [x] Confirm what laptops students use (decides Monaco vs CodeMirror) — students
+      bring their own and they handle it comfortably, so **Monaco**
 - [ ] Get Magikid's scope and sequence if one exists → concept taxonomy
 - [ ] Baseline measurements (§9)
 - [ ] Run the paper retrieval test (§1.4)
