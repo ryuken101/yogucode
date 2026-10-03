@@ -11,10 +11,44 @@
  * `channel.ts`.
  */
 
+/**
+ * One test case, as the grader takes it — the API's test shape minus anything the
+ * grader does not read. `expected` on a hidden test is still here: it has to be, to
+ * compare against, which is the accepted cost of running tests in the browser.
+ */
+export type TestCheck =
+  | {
+      kind: 'io'
+      name: string
+      hidden?: boolean
+      stdin?: string
+      expected: string
+      match?: 'exact' | 'contains'
+    }
+  | { kind: 'function'; name: string; hidden?: boolean; call: string; expected: string }
+
+/** One test's outcome. A hidden test carries only `name`, `hidden` and `passed`. */
+export interface TestResult {
+  name: string
+  hidden: boolean
+  passed: boolean
+  got?: string
+  expected?: string
+  error?: string | null
+}
+
+export interface TestRun {
+  /** Set when the program does not parse — then nothing ran and every result fails. */
+  compile_error: string | null
+  results: TestResult[]
+}
+
 /** Sent from the page to the worker. */
 export type ToWorker =
   | { type: 'init'; indexURL: string; interrupt: Uint8Array; stdin: SharedArrayBuffer }
   | { type: 'run'; runId: number; code: string }
+  /** Grade `code` against `tests` in fresh globals; the child's session is untouched. */
+  | { type: 'check'; runId: number; code: string; tests: TestCheck[] }
 
 /** Sent from the worker to the page. */
 export type FromWorker =
@@ -34,6 +68,8 @@ export type FromWorker =
   /** The program printed more than the worker is willing to forward. */
   | { type: 'truncated'; runId: number }
   | { type: 'done'; runId: number; ok: boolean; interrupted: boolean }
+  /** A `check` finished. `run` is null when it was stopped before finishing. */
+  | { type: 'checked'; runId: number; run: TestRun | null }
   /** The worker itself failed — Pyodide could not load. Ours to fix, not the student's. */
   | { type: 'fatal'; message: string }
 

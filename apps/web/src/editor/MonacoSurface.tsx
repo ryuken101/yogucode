@@ -32,6 +32,11 @@ export interface CodeSurfaceProps {
   /** product-spec §3.1: on for classwork, off for quiz mode in Phase 7. */
   completions?: boolean
   readOnly?: boolean
+  /**
+   * Take the cursor on mount. Right for a child's one editor; wrong on a page of several
+   * (the teacher's problem editor), where each would steal focus from the last.
+   */
+  autoFocus?: boolean
 }
 
 export default function MonacoSurface({
@@ -39,6 +44,7 @@ export default function MonacoSurface({
   onChange,
   completions = true,
   readOnly = false,
+  autoFocus = true,
 }: CodeSurfaceProps) {
   const host = useRef<HTMLDivElement>(null)
   const editor = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
@@ -56,7 +62,7 @@ export default function MonacoSurface({
     })
     created.onDidChangeModelContent(() => notify.current(created.getValue()))
     editor.current = created
-    created.focus()
+    if (autoFocus) created.focus()
 
     return () => {
       created.getModel()?.dispose()

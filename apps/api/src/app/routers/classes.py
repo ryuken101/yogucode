@@ -12,13 +12,14 @@ import uuid
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlmodel import select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.audit import audit_entry
 from app.auth.principal import CurrentTeacher, Principal
+from app.classwork import ensure_classwork
 from app.db import get_session
 from app.join_codes import mint_code, rotate_code
 from app.models import (
@@ -28,9 +29,17 @@ from app.models import (
     ClassStatus,
     ClassTeacher,
     ClassTeacherRole,
+    CurriculumStatus,
 )
 from app.models.base import utcnow
-from app.scoping import get_live_join_code, get_owned_class, list_owned_classes
+from app.scoping import (
+    get_live_join_code,
+    get_owned_class,
+    get_owned_course,
+    get_owned_lesson,
+    get_owned_unit,
+    list_owned_classes,
+)
 
 router = APIRouter(prefix="/classes", tags=["classes"])
 
@@ -49,11 +58,24 @@ class ClassPatch(BaseModel):
     term_label: str | None = Field(default=None, max_length=60)
 
 
+class ClassCurriculumIn(BaseModel):
+    """The course a class follows and the lesson it is on. Both fields are always sent.
+
+    A PUT rather than a PATCH field on the class: the two values constrain each other (the
+    lesson must be in the course), so they are set together and validated together.
+    """
+
+    course_id: uuid.UUID | None
+    current_lesson_id: uuid.UUID | None
+
+
 class ClassOut(BaseModel):
     id: uuid.UUID
     name: str
     term_label: str | None
     status: ClassStatus
+    course_id: uuid.UUID | None
+    current_lesson_id: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
 
@@ -64,6 +86,8 @@ class ClassOut(BaseModel):
             name=record.name,
             term_label=record.term_label,
             status=record.status,
+            course_id=record.course_id,
+            current_lesson_id=record.current_lesson_id,
             created_at=record.created_at,
             updated_at=record.updated_at,
         )
@@ -248,4 +272,58 @@ async def unarchive_class(
     session.add(_audit(principal, "class.unarchived", record.id))
     await session.commit()
     await session.refresh(record)
+    return ClassOut.build(record)
+
+
+def _unprocessable(detail: str) -> HTTPException:
+    return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
+
+
+@router.put("/{class_id}/curriculum", response_model=ClassOut)
+async def set_class_curriculum(
+    class_id: uuid.UUID, body: ClassCurriculumIn, principal: CurrentTeacher, session: SessionDep
+) -> ClassOut:
+    """Choose the class's course and today's lesson.
+
+    The lesson must sit in the chosen course, and both must be active — a class pointed at
+    an archived lesson would show children a ladder the teacher can no longer see to edit.
+    A lesson with no course is refused rather than inferred: guessing the course from the
+    lesson would silently change what the class follows.
+
+    Ids from another centre come back 404 through scoping, as everywhere, rather than as
+    a 422 that would confirm they exist.
+    """
+    record = await get_owned_class(session, principal, class_id)
+
+    if body.course_id is not None:
+        course = await get_owned_course(session, principal, body.course_id)
+        if course.status != CurriculumStatus.ACTIVE:
+            raise _unprocessable("That course is archived")
+    if body.current_lesson_id is not None:
+        if body.course_id is None:
+            raise _unprocessable("Choose a course before choosing a lesson")
+        lesson = await get_owned_lesson(session, principal, body.current_lesson_id)
+        unit = await get_owned_unit(session, principal, lesson.unit_id)
+        if unit.course_id != body.course_id:
+            raise _unprocessable("That lesson is not in this course")
+        if CurriculumStatus.ARCHIVED in (lesson.status, unit.status):
+            raise _unprocessable("That lesson is archived")
+
+    if (record.course_id, record.current_lesson_id) != (body.course_id, body.current_lesson_id):
+        record.course_id = body.course_id
+        record.current_lesson_id = body.current_lesson_id
+        session.add(record)
+        session.add(
+            _audit(
+                principal,
+                "class.curriculum_set",
+                record.id,
+                course_id=str(body.course_id) if body.course_id else None,
+                current_lesson_id=str(body.current_lesson_id) if body.current_lesson_id else None,
+            )
+        )
+        # Today's lesson opens its ladder for the class, if it has one (app/classwork.py).
+        await ensure_classwork(session, principal, record)
+        await session.commit()
+        await session.refresh(record)
     return ClassOut.build(record)

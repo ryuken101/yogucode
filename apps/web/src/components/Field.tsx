@@ -10,7 +10,7 @@
  */
 
 import { useId } from 'react'
-import type { InputHTMLAttributes, TextareaHTMLAttributes } from 'react'
+import type { InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react'
 
 const BOX =
   'w-full rounded-lg bg-paper px-3 py-2 text-ink ring-1 ring-ink/15 placeholder:text-ink-soft/60 focus:outline-2 focus:outline-offset-0 focus:outline-sky disabled:opacity-50'
@@ -63,6 +63,26 @@ export function Textarea({
           {hint}
         </p>
       ) : null}
+    </div>
+  )
+}
+
+export function Select({
+  label,
+  hint,
+  children,
+  ...rest
+}: Common & SelectHTMLAttributes<HTMLSelectElement>) {
+  const id = useId()
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={id} className="text-sm font-medium text-ink">
+        {label}
+      </label>
+      <select id={id} {...rest} className={BOX}>
+        {children}
+      </select>
+      {hint ? <p className="text-sm text-amber">{hint}</p> : null}
     </div>
   )
 }

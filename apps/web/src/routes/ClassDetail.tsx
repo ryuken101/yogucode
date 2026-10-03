@@ -17,12 +17,16 @@ import { Spinner } from '../components/Spinner'
 import { messageFor } from '../lib/errors'
 import {
   useClass,
+  useCourse,
+  useCourses,
+  useSetClassCurriculum,
   useIssuePins,
   useResetPin,
   useRevokeSessions,
   useRoster,
   useRotateJoinCode,
 } from '../lib/queries'
+import { Select } from '../components/Field'
 import { BulkPasteDialog } from './BulkPasteDialog'
 import type { SlipState } from './SlipSheet'
 
@@ -92,6 +96,12 @@ export function ClassDetail() {
           </div>
         ) : null}
       </Card>
+
+      <CurriculumCard
+        classId={classId}
+        courseId={klass.data.course_id}
+        lessonId={klass.data.current_lesson_id}
+      />
 
       <Card className="mb-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -224,5 +234,79 @@ export function ClassDetail() {
         this when the slips have gone missing.
       </Dialog>
     </>
+  )
+}
+
+/**
+ * Which course the class follows, and which lesson it is on today.
+ *
+ * "Today's lesson" is what decides which ladder a child sees when they open the class
+ * (step 6), so it sits on the class page a teacher already has open at the start of a
+ * lesson rather than somewhere in the curriculum editor.
+ */
+function CurriculumCard({
+  classId,
+  courseId,
+  lessonId,
+}: {
+  classId: string
+  courseId: string | null
+  lessonId: string | null
+}) {
+  const courses = useCourses()
+  const course = useCourse(courseId)
+  const setCurriculum = useSetClassCurriculum(classId)
+
+  return (
+    <Card className="mb-6">
+      <h2 className="mb-3 font-serif text-lg text-ink">Curriculum</h2>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Select
+          label="Course"
+          value={courseId ?? ''}
+          disabled={setCurriculum.isPending}
+          onChange={(event) =>
+            setCurriculum.mutate({
+              course_id: event.target.value || null,
+              current_lesson_id: null,
+            })
+          }
+        >
+          <option value="">No course yet</option>
+          {(courses.data ?? []).map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.title}
+            </option>
+          ))}
+        </Select>
+        <Select
+          label="Today’s lesson"
+          value={lessonId ?? ''}
+          disabled={!courseId || setCurriculum.isPending}
+          onChange={(event) =>
+            setCurriculum.mutate({
+              course_id: courseId,
+              current_lesson_id: event.target.value || null,
+            })
+          }
+        >
+          <option value="">None</option>
+          {(course.data?.units ?? []).map((unit) => (
+            <optgroup key={unit.id} label={unit.title}>
+              {unit.lessons.map((lesson) => (
+                <option key={lesson.id} value={lesson.id}>
+                  {lesson.title}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </Select>
+      </div>
+      {setCurriculum.error ? (
+        <div className="mt-3">
+          <Notice tone="not-yet">{messageFor(setCurriculum.error)}</Notice>
+        </div>
+      ) : null}
+    </Card>
   )
 }

@@ -27,8 +27,9 @@ region is far easier to choose now than to migrate later down the line.
 ```mermaid
 flowchart TB
     subgraph browser["Browser — centre laptop, or home for homework"]
-        teacher["Teacher<br/>class list · roster · PIN reset"]
-        student["Student<br/>/join · editor from Phase 2"]
+        teacher["Teacher<br/>classes · roster · curriculum · problem bank"]
+        student["Student<br/>/join · today's ladder · editor"]
+        pyodide["Pyodide in a Web Worker<br/>runs code and grades tests"]
     end
 
     subgraph webapp["apps/web · Vite + React + TS — Vercel"]
@@ -37,7 +38,7 @@ flowchart TB
 
     subgraph apisvc["apps/api · FastAPI + SQLModel — Fly.io syd"]
         seam["get_current_principal()<br/><b>one seam, two verifiers</b>"]
-        routes["Routers — centres · classes · roster · join · auth"]
+        routes["Routers — classes · roster · join · auth<br/>curriculum · items · student work"]
     end
 
     auth["Supabase Auth<br/>magic link → JWT"]
@@ -47,6 +48,7 @@ flowchart TB
     auth -- "2 JWT" --> teacher
     teacher --> shell
     student --> shell
+    shell -. "Run · Check" .-> pyodide
     shell -- "Bearer JWT" --> seam
     shell -- "opaque session cookie<br/>httpOnly · Secure · SameSite=Lax" --> seam
     seam -. "verify signature<br/>against JWKS" .-> auth
@@ -119,7 +121,26 @@ erDiagram
     students ||--|| student_credentials : "PIN"
     students ||--o{ student_sessions : "signed in"
     concepts ||--o{ concepts : "parent of"
+    courses ||--o{ units : contains
+    units   ||--o{ lessons : contains
+    lessons ||--o{ lesson_concepts : introduces
+    items   ||--o{ items : "parts a/b/c"
+    items   ||--o{ item_concepts : "tagged"
+    items   ||--o{ test_cases : "checked by"
+    items   ||--o{ hints : "ladder"
+    lessons ||--o| sets : "ladder"
+    sets    ||--o{ set_items : lists
+    classes ||--o{ assignments : "given"
+    sets    ||--o{ assignments : "as"
+    assignments ||--o{ attempts : "worked in"
+    students ||--o{ attempts : makes
 ```
+
+**Everything a child does is an attempt at a tagged problem** (spec §2). A problem is an
+**item**; a **set** is an ordered list of them; an **assignment** gives a set to a class as
+classwork, homework or (Phase 7) a quiz; an **attempt** is one child's work on one problem
+within one assignment. The three surfaces differ only in the assignment's settings, so
+the editor, the tests and the mastery data are the same code in every mode.
 
 A **centre** is the tenancy root. It exists in an MVP serving one class because adding a
 tenancy column later means backfilling every table and re-auditing every query.
@@ -150,7 +171,9 @@ the taxonomy must be a config edit, not a migration.
 
 ### Where development is now
 
-**Phase 1 is complete bar its deploy; Phase 2 is built.**
+**Phase 1 is complete bar its deploy; Phase 2 is built; Phase 3 (turtle) is skipped for
+now; Phase 4 is built.** Phases 4–5 are planned in
+`~/Documents/Ken Nguyen/Startup/phase-4-5-plan.md`.
 
 Phase 1's plan lives in `~/Documents/Ken Nguyen/Startup/phase-1-plan.md` and runs as eleven
 steps: backend is 1–8, frontend is 9, and 10–11 ship it. Steps 10 and 11 are **deliberately
@@ -290,10 +313,38 @@ databases are local Postgres 16. Before the first migration runs against Supabas
 its Data API off** — otherwise PostgREST would publish `students` to anyone holding the
 publishable key.
 
-Phases 3–10 in `docs/product-spec.md` §7 add the turtle shim, problems and test cases,
-homework marking, event capture, quizzes, mastery and the teacher dashboard. Phase 5 —
-homework submit and mark — is the milestone that matters; everything before it is
-prerequisite.
+**Phase 4 — problems and test cases — is built.** A teacher builds the curriculum
+(course → unit → lesson, each lesson listing the concepts it introduces), writes problems
+in the bank, puts them on a lesson's ladder, and sets the class's "today's lesson". A child
+lands on `/home`, climbs the ladder, and presses **Check** for "3 of 5 passing".
+
+Load-bearing decisions, each easy to undo by accident:
+
+- **Tests run in the browser, in the same Pyodide worker.** `src/runtime/grader.py` runs
+  each test in fresh globals, feeds `input()` from the test without capturing its prompt,
+  and stops a runaway loop with a per-test deadline from a trace function. It is plain
+  stdlib Python, so the API's test suite also runs it under CPython against the starter
+  pack (`tests/test_starter_problems.py`). Hidden tests reach the browser — a test cannot
+  run without its expected value — which is accepted; the reference solution never does.
+- **Publishing needs proof.** The teacher's browser runs every solution against its tests,
+  and publish sends the `updated_at` the run was against; a save since then refuses it.
+- **A published problem is never edited in place.** "Make changes" opens a new-version
+  draft; publishing it marks the old one `superseded`. Ladders and attempts keep the
+  version a child actually saw, and a ladder offers the newer version rather than taking it.
+- **The server decides hint unlocks** — after N runs or M minutes on the problem, counted
+  from the attempt itself, never from the request.
+- **Choosing today's lesson opens its ladder as classwork**, one assignment per class per
+  ladder, so last week's attempts are still there when the class comes back to a lesson.
+- **Problems also arrive as YAML.** Problems → Import previews and then applies a file;
+  re-importing is idempotent on each problem's `key`, and nothing is published by import —
+  "Check & publish all" in the bank does that. `uv run check-problems FILE` validates a file
+  without a database. `src/app/seed/starter-problems.yaml` is eight drafts to review.
+- **Teacher problem screens and the attempt page are lazy-loaded**, so `/join` does not
+  carry the markdown renderer or the editor modules.
+
+Phase 5 — homework submit and mark, with a minimal event capture pulled forward from Phase 6
+— is next, and is the milestone that matters: the first release to a class. Phase 1's
+steps 10–11 (deploy, real hardware) and the Supabase Pro upgrade come before it.
 
 ## Local development
 

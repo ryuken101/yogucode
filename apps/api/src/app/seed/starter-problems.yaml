@@ -1,0 +1,337 @@
+# A starter pack of problems for the Year 4–6 Python class — DRAFTS FOR REVIEW.
+#
+# Written to prove the import path and to give Phase 5 something real to assign. They
+# follow the spec's ladder (1-dot on one concept, 2-dot mixing in a prior concept, 3-dot
+# extension), use the provisional taxonomy in concepts.yaml, and every solution is checked
+# against its tests by `tests/test_starter_problems.py`. Edit freely; re-importing updates
+# the drafts (or starts new versions of anything already published).
+#
+# Import: Problems → Import in the app, paste or pick this file.
+# Validate without a database: `uv run check-problems src/app/seed/starter-problems.yaml`
+#
+# Format, per problem:
+#   key        stable id across imports — never reuse one for a different problem
+#   title, prompt (markdown), difficulty (1–3 dots)
+#   concepts   keys from concepts.yaml; `main:` picks the main one (default: the first)
+#   starter, solution
+#   tests      `prints:` (+ optional `input:` lines, `match: contains`)
+#              or `call:` + `returns:` (Python expressions); `hidden: true` to hide
+#   hints      `text:` + `after_runs:` / `after_minutes:` (whichever comes first)
+#   parts      a/b/c — each part has its own concepts, code, tests and hints
+
+problems:
+  - key: greet-by-name
+    title: Say hello
+    difficulty: 1
+    concepts: [input_output, strings]
+    prompt: |
+      Ask the user for their name, then greet them.
+
+      If they type `Aria`, your program should print:
+
+      ```
+      Hello, Aria!
+      ```
+    starter: |
+      name = input("What is your name? ")
+    solution: |
+      name = input("What is your name? ")
+      print("Hello, " + name + "!")
+    tests:
+      - name: greets Aria
+        input: "Aria\n"
+        prints: "Hello, Aria!"
+      - name: greets someone else
+        input: "Sam\n"
+        prints: "Hello, Sam!"
+        hidden: true
+    hints:
+      - text: You can join strings together with `+`.
+      - text: "Try `print(\"Hello, \" + name)` and then add the `!` on the end."
+        after_runs: 3
+        after_minutes: 4
+
+  - key: double-a-number
+    title: Double it
+    difficulty: 1
+    concepts: [type_casting, arithmetic, input_output]
+    prompt: |
+      Ask for a number and print it doubled. If they type `4`, print `8`.
+    starter: |
+      number = input("Pick a number: ")
+    solution: |
+      number = int(input("Pick a number: "))
+      print(number * 2)
+    tests:
+      - name: doubles 4
+        input: "4\n"
+        prints: "8"
+      - name: doubles 0
+        input: "0\n"
+        prints: "0"
+      - name: doubles a negative number
+        input: "-3\n"
+        prints: "-6"
+        hidden: true
+    hints:
+      - text: "`input()` always gives you text. What happens if you do `\"4\" * 2`?"
+      - text: "`int(...)` turns text like `\"4\"` into the number `4`."
+        after_runs: 2
+        after_minutes: 3
+
+  - key: old-enough-to-ride
+    title: Old enough to ride?
+    difficulty: 1
+    concepts: [conditionals, comparison_and_boolean_logic, type_casting]
+    main: conditionals
+    prompt: |
+      The roller coaster is for people aged **10 or older**.
+
+      Ask for the user's age. Print `You can ride!` if they are old enough, otherwise
+      print `Not yet!`.
+    starter: |
+      age = int(input("How old are you? "))
+    solution: |
+      age = int(input("How old are you? "))
+      if age >= 10:
+          print("You can ride!")
+      else:
+          print("Not yet!")
+    tests:
+      - name: a 12-year-old can ride
+        input: "12\n"
+        prints: "You can ride!"
+      - name: an 8-year-old cannot yet
+        input: "8\n"
+        prints: "Not yet!"
+      - name: exactly 10 can ride
+        input: "10\n"
+        prints: "You can ride!"
+        hidden: true
+    hints:
+      - text: Use `if` and `else`.
+      - text: Is 10 "old enough"? Think about `>` and `>=`.
+        after_runs: 3
+        after_minutes: 4
+
+  - key: add-five-to-list
+    title: Add to the end
+    difficulty: 1
+    concepts: [list_methods, lists]
+    prompt: |
+      Add the number `5` to the **end** of `numbers`, without typing out a new list.
+    starter: |
+      numbers = [1, 2, 3]
+      # Add 5 to the end of numbers here
+
+      print(numbers)
+    solution: |
+      numbers = [1, 2, 3]
+      numbers.append(5)
+      print(numbers)
+    tests:
+      - name: prints the list with 5 on the end
+        prints: "[1, 2, 3, 5]"
+      - name: the last item is 5
+        call: numbers[-1]
+        returns: "5"
+      - name: nothing else changed
+        call: numbers[:3]
+        returns: "[1, 2, 3]"
+        hidden: true
+    hints:
+      - text: Lists have a method that adds one item to the end.
+      - text: "It starts with `numbers.` and then the method name. It rhymes with *pend*."
+        after_runs: 2
+        after_minutes: 3
+      - text: "`numbers.append(5)`"
+        after_runs: 4
+        after_minutes: 6
+
+  - key: countdown
+    title: Countdown
+    difficulty: 2
+    concepts: [for_loops, range, type_casting]
+    prompt: |
+      Ask what number to start from, count down to 1, then print `Lift off!`.
+
+      Starting from `3`:
+
+      ```
+      3
+      2
+      1
+      Lift off!
+      ```
+    starter: |
+      start = int(input("Start from: "))
+    solution: |
+      start = int(input("Start from: "))
+      for i in range(start, 0, -1):
+          print(i)
+      print("Lift off!")
+    tests:
+      - name: counts down from 3
+        input: "3\n"
+        prints: "3\n2\n1\nLift off!"
+      - name: counts down from 1
+        input: "1\n"
+        prints: "1\nLift off!"
+      - name: from 0, just lifts off
+        input: "0\n"
+        prints: "Lift off!"
+        hidden: true
+    hints:
+      - text: "`range` can take three numbers: where to start, where to stop, and the step."
+      - text: "A step of `-1` counts backwards. Where should it stop so that 1 is the last number?"
+        after_runs: 3
+        after_minutes: 5
+
+  - key: times-table
+    title: Times table
+    difficulty: 2
+    concepts: [for_loops, range, arithmetic]
+    prompt: |
+      Ask which times table to show, then print the first five lines of it.
+
+      For `3`:
+
+      ```
+      3 x 1 = 3
+      3 x 2 = 6
+      3 x 3 = 9
+      3 x 4 = 12
+      3 x 5 = 15
+      ```
+    starter: |
+      table = int(input("Which times table? "))
+    solution: |
+      table = int(input("Which times table? "))
+      for i in range(1, 6):
+          print(table, "x", i, "=", table * i)
+    tests:
+      - name: the 3 times table
+        input: "3\n"
+        prints: "3 x 1 = 3\n3 x 2 = 6\n3 x 3 = 9\n3 x 4 = 12\n3 x 5 = 15"
+      - name: the 7 times table
+        input: "7\n"
+        prints: "7 x 1 = 7\n7 x 2 = 14\n7 x 3 = 21\n7 x 4 = 28\n7 x 5 = 35"
+        hidden: true
+    hints:
+      - text: "`print` puts a space between things separated by commas: `print(3, \"x\", 1)`."
+      - text: "`range(1, 6)` gives 1, 2, 3, 4, 5."
+        after_runs: 3
+        after_minutes: 5
+
+  - key: shopping-list
+    title: Shopping list
+    difficulty: 2
+    concepts: [lists, while_loops]
+    prompt: |
+      Two parts. Each part starts from its own code, so you can do (b) even if (a) is
+      not finished.
+    parts:
+      - label: a
+        difficulty: 2
+        concepts: [while_loops, list_methods]
+        prompt: |
+          Keep asking for items until the user types `done`, then print the list.
+
+          Typing `milk`, `eggs`, `done` prints `['milk', 'eggs']`.
+        starter: |
+          items = []
+        solution: |
+          items = []
+          item = input("Item: ")
+          while item != "done":
+              items.append(item)
+              item = input("Item: ")
+          print(items)
+        tests:
+          - name: two items
+            input: "milk\neggs\ndone\n"
+            prints: "['milk', 'eggs']"
+          - name: nothing at all
+            input: "done\n"
+            prints: "[]"
+          - name: three items
+            input: "a\nb\nc\ndone\n"
+            prints: "['a', 'b', 'c']"
+            hidden: true
+        hints:
+          - text: Ask once before the loop, and again at the end of each time round the loop.
+          - text: "`while item != \"done\":` keeps going until they type done."
+            after_runs: 3
+            after_minutes: 5
+      - label: b
+        difficulty: 1
+        concepts: [indexing, lists]
+        prompt: |
+          Print how many items are in `items`, then print the first item.
+        starter: |
+          items = ["milk", "eggs", "bread"]
+        solution: |
+          items = ["milk", "eggs", "bread"]
+          print(len(items))
+          print(items[0])
+        tests:
+          - name: three items, milk first
+            prints: "3\nmilk"
+        hints:
+          - text: "`len(...)` tells you how many things are in a list."
+          - text: The first item is at index `0`, not `1`.
+            after_runs: 2
+            after_minutes: 3
+
+  - key: biggest-number
+    title: The biggest number
+    difficulty: 3
+    concepts: [functions, return, for_loops, comparison_and_boolean_logic]
+    prompt: |
+      Write a function `biggest(numbers)` that **returns** the largest number in the list.
+
+      Do it with a loop — no `max()`.
+
+      ```python
+      biggest([3, 9, 2])   # gives 9
+      ```
+    starter: |
+      def biggest(numbers):
+          # your code here
+          return 0
+    solution: |
+      def biggest(numbers):
+          best = numbers[0]
+          for n in numbers:
+              if n > best:
+                  best = n
+          return best
+    tests:
+      - name: finds 9 in [3, 9, 2]
+        call: biggest([3, 9, 2])
+        returns: "9"
+      - name: works with one number
+        call: biggest([5])
+        returns: "5"
+      - name: works when the biggest is last
+        call: biggest([1, 2, 30])
+        returns: "30"
+      - name: works with negative numbers
+        call: biggest([-4, -2, -9])
+        returns: "-2"
+        hidden: true
+    hints:
+      - text: Keep track of the biggest number you have seen so far.
+      - text: Start with the first number in the list as "the biggest so far".
+        after_runs: 3
+        after_minutes: 5
+      - text: |
+          ```python
+          best = numbers[0]
+          for n in numbers:
+              if n > best:
+                  best = n
+          return best
+          ```
+        after_runs: 6
+        after_minutes: 10

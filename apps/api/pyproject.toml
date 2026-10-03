@@ -39,6 +39,9 @@ seed-concepts = "app.seed.concepts:main"
 # Local development only: rebuilds a class with students and PINs so the student-facing
 # screens can be exercised without the magic-link dance. Refuses non-localhost databases.
 seed-demo = "app.seed.demo:main"
+# Validate a YAML problem file without a database: `uv run check-problems FILE.yaml`.
+# Importing happens in the app, under the teacher's own identity.
+check-problems = "app.problem_import:main"
 
 [build-system]
 requires = ["uv_build>=0.12.13,<0.13.0"]

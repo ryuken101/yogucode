@@ -1,6 +1,89 @@
 {
   "components": {
     "schemas": {
+      "AssignmentMode": {
+        "enum": [
+          "classwork",
+          "homework",
+          "quiz"
+        ],
+        "title": "AssignmentMode",
+        "type": "string"
+      },
+      "AttemptOut": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_passed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Passed"
+          },
+          "last_total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Total"
+          },
+          "run_count": {
+            "title": "Run Count",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AttemptStatus"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "status",
+          "run_count",
+          "last_passed",
+          "last_total"
+        ],
+        "title": "AttemptOut",
+        "type": "object"
+      },
+      "AttemptSaveIn": {
+        "properties": {
+          "code": {
+            "maxLength": 65536,
+            "title": "Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "AttemptSaveIn",
+        "type": "object"
+      },
+      "AttemptStatus": {
+        "enum": [
+          "in_progress",
+          "submitted"
+        ],
+        "title": "AttemptStatus",
+        "type": "string"
+      },
       "BulkEnrolIn": {
         "properties": {
           "entries": {
@@ -97,13 +180,72 @@
         "title": "CentreOut",
         "type": "object"
       },
+      "ClassCurriculumIn": {
+        "description": "The course a class follows and the lesson it is on. Both fields are always sent.\n\nA PUT rather than a PATCH field on the class: the two values constrain each other (the\nlesson must be in the course), so they are set together and validated together.",
+        "properties": {
+          "course_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Course Id"
+          },
+          "current_lesson_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Lesson Id"
+          }
+        },
+        "required": [
+          "course_id",
+          "current_lesson_id"
+        ],
+        "title": "ClassCurriculumIn",
+        "type": "object"
+      },
       "ClassDetailOut": {
         "description": "A class plus its join code.\n\nSeparate from `ClassOut` so the list route does not have to fetch a code per class.\nA teacher reads the code off the class itself, not off a list of twelve of them.\nMirrors the StudentOut / StudentDetailOut split in the roster router.",
         "properties": {
+          "course_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Course Id"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
             "type": "string"
+          },
+          "current_lesson_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Lesson Id"
           },
           "id": {
             "format": "uuid",
@@ -150,6 +292,8 @@
           "name",
           "term_label",
           "status",
+          "course_id",
+          "current_lesson_id",
           "created_at",
           "updated_at",
           "join_code"
@@ -186,10 +330,34 @@
       },
       "ClassOut": {
         "properties": {
+          "course_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Course Id"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
             "type": "string"
+          },
+          "current_lesson_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Lesson Id"
           },
           "id": {
             "format": "uuid",
@@ -225,6 +393,8 @@
           "name",
           "term_label",
           "status",
+          "course_id",
+          "current_lesson_id",
           "created_at",
           "updated_at"
         ],
@@ -269,6 +439,121 @@
           "archived"
         ],
         "title": "ClassStatus",
+        "type": "string"
+      },
+      "ConceptOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "label",
+          "status"
+        ],
+        "title": "ConceptOut",
+        "type": "object"
+      },
+      "CourseOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CurriculumStatus"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "CourseOut",
+        "type": "object"
+      },
+      "CourseTreeOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CurriculumStatus"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "units": {
+            "items": {
+              "$ref": "#/components/schemas/UnitTreeOut"
+            },
+            "title": "Units",
+            "type": "array"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "status",
+          "created_at",
+          "updated_at",
+          "units"
+        ],
+        "title": "CourseTreeOut",
+        "type": "object"
+      },
+      "CurriculumStatus": {
+        "enum": [
+          "active",
+          "archived"
+        ],
+        "title": "CurriculumStatus",
         "type": "string"
       },
       "DocumentIn": {
@@ -439,6 +724,47 @@
         "title": "EnrolmentStatus",
         "type": "string"
       },
+      "FunctionTest": {
+        "description": "Run the program, then evaluate `call` and compare it with `expected` using `==`.\n\nBoth are Python expressions: `call=\"add(2, 3)\"`, `expected=\"5\"`.",
+        "properties": {
+          "call": {
+            "maxLength": 10000,
+            "minLength": 1,
+            "title": "Call",
+            "type": "string"
+          },
+          "expected": {
+            "maxLength": 10000,
+            "minLength": 1,
+            "title": "Expected",
+            "type": "string"
+          },
+          "hidden": {
+            "default": false,
+            "title": "Hidden",
+            "type": "boolean"
+          },
+          "kind": {
+            "const": "function",
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "name",
+          "call",
+          "expected"
+        ],
+        "title": "FunctionTest",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -452,6 +778,199 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "HintDoc": {
+        "description": "One rung. Unlocks when either threshold is met; zero for both means \"always open\".",
+        "properties": {
+          "body_md": {
+            "maxLength": 20000,
+            "minLength": 1,
+            "title": "Body Md",
+            "type": "string"
+          },
+          "unlock_after_runs": {
+            "default": 1,
+            "maximum": 50.0,
+            "minimum": 0.0,
+            "title": "Unlock After Runs",
+            "type": "integer"
+          },
+          "unlock_after_seconds": {
+            "default": 120,
+            "maximum": 3600.0,
+            "minimum": 0.0,
+            "title": "Unlock After Seconds",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "body_md"
+        ],
+        "title": "HintDoc",
+        "type": "object"
+      },
+      "ImportEntryOut": {
+        "properties": {
+          "action": {
+            "enum": [
+              "create",
+              "update_draft",
+              "new_version",
+              "unchanged",
+              "error"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "item_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Id"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "publish_problems": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Publish Problems",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "title",
+          "action",
+          "item_id",
+          "error",
+          "publish_problems"
+        ],
+        "title": "ImportEntryOut",
+        "type": "object"
+      },
+      "ImportIn": {
+        "properties": {
+          "apply": {
+            "default": false,
+            "title": "Apply",
+            "type": "boolean"
+          },
+          "yaml": {
+            "maxLength": 1000000,
+            "title": "Yaml",
+            "type": "string"
+          }
+        },
+        "required": [
+          "yaml"
+        ],
+        "title": "ImportIn",
+        "type": "object"
+      },
+      "ImportReportOut": {
+        "properties": {
+          "applied": {
+            "title": "Applied",
+            "type": "boolean"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/ImportEntryOut"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "required": [
+          "applied",
+          "error",
+          "entries"
+        ],
+        "title": "ImportReportOut",
+        "type": "object"
+      },
+      "IoTest": {
+        "description": "Feed `stdin` to the program, compare what it prints with `expected`.\n\n`exact` ignores trailing whitespace on each line and trailing blank lines \u2014 a child\nfailing a test over a stray space learns nothing about Python. `contains` passes when\n`expected` appears anywhere in the output.",
+        "properties": {
+          "expected": {
+            "maxLength": 10000,
+            "title": "Expected",
+            "type": "string"
+          },
+          "hidden": {
+            "default": false,
+            "title": "Hidden",
+            "type": "boolean"
+          },
+          "kind": {
+            "const": "io",
+            "default": "io",
+            "title": "Kind",
+            "type": "string"
+          },
+          "match": {
+            "default": "exact",
+            "enum": [
+              "exact",
+              "contains"
+            ],
+            "title": "Match",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "stdin": {
+            "default": "",
+            "maxLength": 10000,
+            "title": "Stdin",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "expected"
+        ],
+        "title": "IoTest",
+        "type": "object"
+      },
       "IssuePinsIn": {
         "properties": {
           "reset_existing": {
@@ -463,6 +982,16 @@
         },
         "title": "IssuePinsIn",
         "type": "object"
+      },
+      "ItemStatus": {
+        "enum": [
+          "draft",
+          "published",
+          "superseded",
+          "archived"
+        ],
+        "title": "ItemStatus",
+        "type": "string"
       },
       "JoinLookupIn": {
         "properties": {
@@ -541,6 +1070,341 @@
           "has_pin"
         ],
         "title": "JoinStudentOut",
+        "type": "object"
+      },
+      "LadderIn": {
+        "properties": {
+          "item_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 12,
+            "title": "Item Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "item_ids"
+        ],
+        "title": "LadderIn",
+        "type": "object"
+      },
+      "LadderItemOut": {
+        "properties": {
+          "difficulty": {
+            "title": "Difficulty",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "newer_version_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Newer Version Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ItemStatus"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "difficulty",
+          "status",
+          "version",
+          "newer_version_id"
+        ],
+        "title": "LadderItemOut",
+        "type": "object"
+      },
+      "LadderProblemOut": {
+        "properties": {
+          "difficulty": {
+            "title": "Difficulty",
+            "type": "integer"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "part_labels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Part Labels",
+            "type": "array"
+          },
+          "progress": {
+            "enum": [
+              "not_started",
+              "started",
+              "passing"
+            ],
+            "title": "Progress",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "title",
+          "difficulty",
+          "part_labels",
+          "progress"
+        ],
+        "title": "LadderProblemOut",
+        "type": "object"
+      },
+      "LessonConceptsIn": {
+        "properties": {
+          "concept_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 18,
+            "title": "Concept Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "concept_ids"
+        ],
+        "title": "LessonConceptsIn",
+        "type": "object"
+      },
+      "LessonOut": {
+        "properties": {
+          "concept_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Concept Ids",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "sort_order": {
+            "title": "Sort Order",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CurriculumStatus"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "unit_id": {
+            "format": "uuid",
+            "title": "Unit Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "unit_id",
+          "title",
+          "sort_order",
+          "status",
+          "concept_ids"
+        ],
+        "title": "LessonOut",
+        "type": "object"
+      },
+      "NextHintOut": {
+        "description": "The next rung, without its text. `available` is the server's verdict right now.",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "level": {
+            "title": "Level",
+            "type": "integer"
+          },
+          "runs_needed": {
+            "title": "Runs Needed",
+            "type": "integer"
+          },
+          "seconds_needed": {
+            "title": "Seconds Needed",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "level",
+          "available",
+          "runs_needed",
+          "seconds_needed"
+        ],
+        "title": "NextHintOut",
+        "type": "object"
+      },
+      "NodePatch": {
+        "description": "Every field optional \u2014 an absent field means \"leave it alone\".",
+        "properties": {
+          "sort_order": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort Order"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "NodePatch",
+        "type": "object"
+      },
+      "PartDoc": {
+        "properties": {
+          "concept_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 18,
+            "title": "Concept Ids",
+            "type": "array"
+          },
+          "difficulty": {
+            "default": 1,
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "title": "Difficulty",
+            "type": "integer"
+          },
+          "hints": {
+            "items": {
+              "$ref": "#/components/schemas/HintDoc"
+            },
+            "maxItems": 3,
+            "title": "Hints",
+            "type": "array"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "primary_concept_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Concept Id"
+          },
+          "prompt_md": {
+            "default": "",
+            "maxLength": 20000,
+            "title": "Prompt Md",
+            "type": "string"
+          },
+          "solution_code": {
+            "default": "",
+            "maxLength": 65536,
+            "title": "Solution Code",
+            "type": "string"
+          },
+          "starter_code": {
+            "default": "",
+            "maxLength": 65536,
+            "title": "Starter Code",
+            "type": "string"
+          },
+          "tests": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "function": "#/components/schemas/FunctionTest",
+                  "io": "#/components/schemas/IoTest"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/IoTest"
+                },
+                {
+                  "$ref": "#/components/schemas/FunctionTest"
+                }
+              ]
+            },
+            "maxItems": 30,
+            "title": "Tests",
+            "type": "array"
+          }
+        },
+        "required": [
+          "label"
+        ],
+        "title": "PartDoc",
+        "type": "object"
+      },
+      "PartRef": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label"
+        ],
+        "title": "PartRef",
         "type": "object"
       },
       "PasteAction": {
@@ -665,6 +1529,269 @@
         "title": "PreviewEntryOut",
         "type": "object"
       },
+      "ProblemDoc": {
+        "properties": {
+          "concept_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 18,
+            "title": "Concept Ids",
+            "type": "array"
+          },
+          "difficulty": {
+            "default": 1,
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "title": "Difficulty",
+            "type": "integer"
+          },
+          "hints": {
+            "items": {
+              "$ref": "#/components/schemas/HintDoc"
+            },
+            "maxItems": 3,
+            "title": "Hints",
+            "type": "array"
+          },
+          "parts": {
+            "items": {
+              "$ref": "#/components/schemas/PartDoc"
+            },
+            "maxItems": 6,
+            "title": "Parts",
+            "type": "array"
+          },
+          "primary_concept_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Concept Id"
+          },
+          "prompt_md": {
+            "default": "",
+            "maxLength": 20000,
+            "title": "Prompt Md",
+            "type": "string"
+          },
+          "solution_code": {
+            "default": "",
+            "maxLength": 65536,
+            "title": "Solution Code",
+            "type": "string"
+          },
+          "starter_code": {
+            "default": "",
+            "maxLength": 65536,
+            "title": "Starter Code",
+            "type": "string"
+          },
+          "tests": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "function": "#/components/schemas/FunctionTest",
+                  "io": "#/components/schemas/IoTest"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/IoTest"
+                },
+                {
+                  "$ref": "#/components/schemas/FunctionTest"
+                }
+              ]
+            },
+            "maxItems": 30,
+            "title": "Tests",
+            "type": "array"
+          },
+          "title": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "ProblemDoc",
+        "type": "object"
+      },
+      "ProblemOut": {
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/ProblemDoc"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "parts": {
+            "items": {
+              "$ref": "#/components/schemas/PartRef"
+            },
+            "title": "Parts",
+            "type": "array"
+          },
+          "publish_problems": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Publish Problems",
+            "type": "array"
+          },
+          "source_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Key"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ItemStatus"
+          },
+          "supersedes_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supersedes Id"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "version",
+          "supersedes_id",
+          "source_key",
+          "updated_at",
+          "document",
+          "parts",
+          "publish_problems"
+        ],
+        "title": "ProblemOut",
+        "type": "object"
+      },
+      "ProblemSummaryOut": {
+        "description": "A row in the bank list \u2014 no code, no tests, no hints.",
+        "properties": {
+          "concept_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Concept Ids",
+            "type": "array"
+          },
+          "difficulty": {
+            "title": "Difficulty",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "part_labels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Part Labels",
+            "type": "array"
+          },
+          "primary_concept_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Concept Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ItemStatus"
+          },
+          "test_count": {
+            "title": "Test Count",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "difficulty",
+          "status",
+          "version",
+          "concept_ids",
+          "primary_concept_id",
+          "part_labels",
+          "test_count",
+          "updated_at"
+        ],
+        "title": "ProblemSummaryOut",
+        "type": "object"
+      },
+      "PublishIn": {
+        "description": "Proof the teacher's browser ran the solution against the tests of *this* version.\n\n`verified_updated_at` is the `updated_at` the editor had when its run passed. A save\nin another tab since then moves `updated_at`, and the publish is refused \u2014 the run\nproved something about a version that no longer exists.",
+        "properties": {
+          "verified_updated_at": {
+            "format": "date-time",
+            "title": "Verified Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "verified_updated_at"
+        ],
+        "title": "PublishIn",
+        "type": "object"
+      },
       "RosterEntryOut": {
         "description": "A student as seen from inside a class: who they are, plus how they got there.",
         "properties": {
@@ -732,6 +1859,39 @@
           "truncated"
         ],
         "title": "RosterPreviewOut",
+        "type": "object"
+      },
+      "RunIn": {
+        "description": "One press of Run (no result) or Check (with a result).",
+        "properties": {
+          "passed": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passed"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          }
+        },
+        "title": "RunIn",
         "type": "object"
       },
       "SessionsRevokedOut": {
@@ -866,6 +2026,75 @@
         "title": "StudentIn",
         "type": "object"
       },
+      "StudentLeafOut": {
+        "properties": {
+          "attempt": {
+            "$ref": "#/components/schemas/AttemptOut"
+          },
+          "hints": {
+            "items": {
+              "$ref": "#/components/schemas/UnlockedHintOut"
+            },
+            "title": "Hints",
+            "type": "array"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "next_hint": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NextHintOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "prompt_md": {
+            "title": "Prompt Md",
+            "type": "string"
+          },
+          "tests": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/IoTest"
+                },
+                {
+                  "$ref": "#/components/schemas/FunctionTest"
+                }
+              ]
+            },
+            "title": "Tests",
+            "type": "array"
+          }
+        },
+        "required": [
+          "item_id",
+          "label",
+          "prompt_md",
+          "tests",
+          "hints",
+          "next_hint",
+          "attempt"
+        ],
+        "title": "StudentLeafOut",
+        "type": "object"
+      },
       "StudentMeOut": {
         "properties": {
           "class_id": {
@@ -963,6 +2192,58 @@
         "title": "StudentPatch",
         "type": "object"
       },
+      "StudentProblemOut": {
+        "properties": {
+          "assignment_id": {
+            "format": "uuid",
+            "title": "Assignment Id",
+            "type": "string"
+          },
+          "completions": {
+            "title": "Completions",
+            "type": "boolean"
+          },
+          "difficulty": {
+            "title": "Difficulty",
+            "type": "integer"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "leaves": {
+            "items": {
+              "$ref": "#/components/schemas/StudentLeafOut"
+            },
+            "title": "Leaves",
+            "type": "array"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/AssignmentMode"
+          },
+          "prompt_md": {
+            "title": "Prompt Md",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assignment_id",
+          "item_id",
+          "title",
+          "prompt_md",
+          "difficulty",
+          "mode",
+          "completions",
+          "leaves"
+        ],
+        "title": "StudentProblemOut",
+        "type": "object"
+      },
       "StudentSignInIn": {
         "properties": {
           "code": {
@@ -1029,6 +2310,162 @@
           "centre"
         ],
         "title": "TeacherProfileOut",
+        "type": "object"
+      },
+      "TitleIn": {
+        "properties": {
+          "title": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "TitleIn",
+        "type": "object"
+      },
+      "TodayOut": {
+        "description": "Today, for one child: their class, the lesson it is on, and its ladder.",
+        "properties": {
+          "assignment_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignment Id"
+          },
+          "class_name": {
+            "title": "Class Name",
+            "type": "string"
+          },
+          "lesson_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lesson Title"
+          },
+          "problems": {
+            "items": {
+              "$ref": "#/components/schemas/LadderProblemOut"
+            },
+            "title": "Problems",
+            "type": "array"
+          }
+        },
+        "required": [
+          "class_name",
+          "lesson_title",
+          "assignment_id",
+          "problems"
+        ],
+        "title": "TodayOut",
+        "type": "object"
+      },
+      "UnitOut": {
+        "properties": {
+          "course_id": {
+            "format": "uuid",
+            "title": "Course Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "sort_order": {
+            "title": "Sort Order",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CurriculumStatus"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "course_id",
+          "title",
+          "sort_order",
+          "status"
+        ],
+        "title": "UnitOut",
+        "type": "object"
+      },
+      "UnitTreeOut": {
+        "properties": {
+          "course_id": {
+            "format": "uuid",
+            "title": "Course Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "lessons": {
+            "items": {
+              "$ref": "#/components/schemas/LessonOut"
+            },
+            "title": "Lessons",
+            "type": "array"
+          },
+          "sort_order": {
+            "title": "Sort Order",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CurriculumStatus"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "course_id",
+          "title",
+          "sort_order",
+          "status",
+          "lessons"
+        ],
+        "title": "UnitTreeOut",
+        "type": "object"
+      },
+      "UnlockedHintOut": {
+        "properties": {
+          "body_md": {
+            "title": "Body Md",
+            "type": "string"
+          },
+          "level": {
+            "title": "Level",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "level",
+          "body_md"
+        ],
+        "title": "UnlockedHintOut",
         "type": "object"
       },
       "UserRole": {
@@ -1668,6 +3105,76 @@
         ]
       }
     },
+    "/classes/{class_id}/curriculum": {
+      "put": {
+        "description": "Choose the class's course and today's lesson.\n\nThe lesson must sit in the chosen course, and both must be active \u2014 a class pointed at\nan archived lesson would show children a ladder the teacher can no longer see to edit.\nA lesson with no course is refused rather than inferred: guessing the course from the\nlesson would silently change what the class follows.\n\nIds from another centre come back 404 through scoping, as everywhere, rather than as\na 422 that would confirm they exist.",
+        "operationId": "set_class_curriculum_classes__class_id__curriculum_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "class_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Class Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClassCurriculumIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Class Curriculum",
+        "tags": [
+          "classes"
+        ]
+      }
+    },
     "/classes/{class_id}/enrolments": {
       "post": {
         "description": "Enrol an existing centre student into a class.\n\nBoth ids are resolved through `scoping`, so a class in another centre and a student in\nanother centre are each a 404 \u2014 and so is the cross pairing, which is the case worth\nhaving a test for.",
@@ -2290,6 +3797,504 @@
         ]
       }
     },
+    "/concepts": {
+      "get": {
+        "description": "The taxonomy a teacher can tag with. Read-only here; it is edited as YAML.",
+        "operationId": "list_concepts_concepts_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ConceptOut"
+                  },
+                  "title": "Response List Concepts Concepts Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Concepts",
+        "tags": [
+          "curriculum"
+        ]
+      }
+    },
+    "/courses": {
+      "get": {
+        "operationId": "list_courses_courses_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "include_archived",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Archived",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CourseOut"
+                  },
+                  "title": "Response List Courses Courses Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Courses",
+        "tags": [
+          "curriculum"
+        ]
+      },
+      "post": {
+        "operationId": "create_course_courses_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TitleIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourseTreeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Course",
+        "tags": [
+          "curriculum"
+        ]
+      }
+    },
+    "/courses/{course_id}": {
+      "get": {
+        "operationId": "read_course_courses__course_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "course_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Course Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_archived",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Archived",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourseTreeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Course",
+        "tags": [
+          "curriculum"
+        ]
+      },
+      "patch": {
+        "operationId": "rename_course_courses__course_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "course_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Course Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TitleIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourseOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rename Course",
+        "tags": [
+          "curriculum"
+        ]
+      }
+    },
+    "/courses/{course_id}/archive": {
+      "post": {
+        "operationId": "archive_course_courses__course_id__archive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "course_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Course Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourseOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Archive Course",
+        "tags": [
+          "curriculum"
+        ]
+      }
+    },
+    "/courses/{course_id}/unarchive": {
+      "post": {
+        "operationId": "unarchive_course_courses__course_id__unarchive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "course_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Course Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourseOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unarchive Course",
+        "tags": [
+          "curriculum"
+        ]
+      }
+    },
+    "/courses/{course_id}/units": {
+      "post": {
+        "description": "Add a unit at the end of the course.",
+        "operationId": "create_unit_courses__course_id__units_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "course_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Course Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TitleIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnitOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Unit",
+        "tags": [
+          "curriculum"
+        ]
+      }
+    },
     "/health": {
       "get": {
         "operationId": "health_health_get",
@@ -2310,6 +4315,626 @@
           }
         },
         "summary": "Health"
+      }
+    },
+    "/items": {
+      "get": {
+        "description": "The bank, newest edit first. Drafts and published by default.",
+        "operationId": "list_problems_items_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/ItemStatus"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "concept_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Concept Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "difficulty",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 3,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Difficulty"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 120,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProblemSummaryOut"
+                  },
+                  "title": "Response List Problems Items Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Problems",
+        "tags": [
+          "items"
+        ]
+      },
+      "post": {
+        "description": "Start a problem as a draft. Any amount of it can be missing.",
+        "operationId": "create_problem_items_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProblemDoc"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Problem",
+        "tags": [
+          "items"
+        ]
+      }
+    },
+    "/items/import": {
+      "post": {
+        "description": "Plan, and optionally apply, a YAML file of problems (see `app/problem_import.py`).\n\nA file with any bad entry applies nothing, and says which entries to fix. Always a 200:\na file with mistakes in it is the normal first draft of a file, not a failed request.",
+        "operationId": "import_problems_items_import_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportReportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Import Problems",
+        "tags": [
+          "items"
+        ]
+      }
+    },
+    "/items/{item_id}": {
+      "get": {
+        "operationId": "read_problem_items__item_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Problem",
+        "tags": [
+          "items"
+        ]
+      },
+      "put": {
+        "description": "Replace a draft with the document sent. Anything else is a 409.",
+        "operationId": "save_problem_items__item_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProblemDoc"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Problem",
+        "tags": [
+          "items"
+        ]
+      }
+    },
+    "/items/{item_id}/archive": {
+      "post": {
+        "description": "Take a problem out of the bank. Sets that already use it keep it.",
+        "operationId": "archive_problem_items__item_id__archive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Archive Problem",
+        "tags": [
+          "items"
+        ]
+      }
+    },
+    "/items/{item_id}/new-version": {
+      "post": {
+        "description": "A draft copy of a published problem, to edit and publish in its place.\n\nIf a draft of the next version already exists it is returned rather than a second one\nmade: two teachers pressing \"edit\" on the same problem should land on the same draft.",
+        "operationId": "new_version_items__item_id__new_version_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "New Version",
+        "tags": [
+          "items"
+        ]
+      }
+    },
+    "/items/{item_id}/publish": {
+      "post": {
+        "description": "Make a draft available to sets \u2014 and retire the version it replaces, if any.",
+        "operationId": "publish_problem_items__item_id__publish_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Publish Problem",
+        "tags": [
+          "items"
+        ]
+      }
+    },
+    "/items/{item_id}/unarchive": {
+      "post": {
+        "description": "Bring a problem back as a draft.\n\nAlways to draft, never straight to published: a newer version may have been published\nwhile this one was put away, and a re-publish runs the tests again anyway.",
+        "operationId": "unarchive_problem_items__item_id__unarchive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unarchive Problem",
+        "tags": [
+          "items"
+        ]
       }
     },
     "/join/lookup": {
@@ -2351,6 +4976,668 @@
         "summary": "Lookup Class",
         "tags": [
           "join"
+        ]
+      }
+    },
+    "/lessons/{lesson_id}": {
+      "patch": {
+        "operationId": "update_lesson_lessons__lesson_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lesson_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Lesson Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NodePatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LessonOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Lesson",
+        "tags": [
+          "curriculum"
+        ]
+      }
+    },
+    "/lessons/{lesson_id}/archive": {
+      "post": {
+        "operationId": "archive_lesson_lessons__lesson_id__archive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lesson_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Lesson Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LessonOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Archive Lesson",
+        "tags": [
+          "curriculum"
+        ]
+      }
+    },
+    "/lessons/{lesson_id}/concepts": {
+      "put": {
+        "description": "Replace the concepts a lesson introduces.\n\nEvery id must be a concept this centre can see \u2014 a global one, or the centre's own.\nAccepting any concept id would let a centre tag with another centre's private\nconcept, which is a cross-tenant reference even if nothing reads through it yet. An\nunknown id is a 422 naming nothing, the same as a missing one would be.",
+        "operationId": "set_lesson_concepts_lessons__lesson_id__concepts_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lesson_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Lesson Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LessonConceptsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LessonOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Lesson Concepts",
+        "tags": [
+          "curriculum"
+        ]
+      }
+    },
+    "/lessons/{lesson_id}/ladder": {
+      "get": {
+        "operationId": "read_ladder_lessons__lesson_id__ladder_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lesson_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Lesson Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LadderItemOut"
+                  },
+                  "title": "Response Read Ladder Lessons  Lesson Id  Ladder Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Ladder",
+        "tags": [
+          "curriculum"
+        ]
+      },
+      "put": {
+        "description": "Replace the lesson's ladder, and open it in any class that is on this lesson today.",
+        "operationId": "save_ladder_lessons__lesson_id__ladder_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lesson_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Lesson Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LadderIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LadderItemOut"
+                  },
+                  "title": "Response Save Ladder Lessons  Lesson Id  Ladder Put",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Ladder",
+        "tags": [
+          "curriculum"
+        ]
+      }
+    },
+    "/lessons/{lesson_id}/unarchive": {
+      "post": {
+        "operationId": "unarchive_lesson_lessons__lesson_id__unarchive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lesson_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Lesson Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LessonOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unarchive Lesson",
+        "tags": [
+          "curriculum"
+        ]
+      }
+    },
+    "/me/assignments/{assignment_id}/items/{item_id}/open": {
+      "post": {
+        "description": "A problem as the child sees it, with their attempt at each part.\n\nA POST because the first open creates the attempts \u2014 which is also what starts the\nclock the hint ladder's minutes are measured from.",
+        "operationId": "open_problem_me_assignments__assignment_id__items__item_id__open_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assignment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Assignment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentProblemOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Open Problem",
+        "tags": [
+          "student work"
+        ]
+      }
+    },
+    "/me/attempts/{attempt_id}": {
+      "patch": {
+        "description": "Autosave. Like a file save, a save that changes nothing writes nothing.",
+        "operationId": "save_attempt_me_attempts__attempt_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attempt_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Attempt Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttemptSaveIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttemptOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Attempt",
+        "tags": [
+          "student work"
+        ]
+      }
+    },
+    "/me/attempts/{attempt_id}/hints": {
+      "post": {
+        "description": "Unlock the next rung, if the child has earned it. Rungs open in order.",
+        "operationId": "unlock_hint_me_attempts__attempt_id__hints_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attempt_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Attempt Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentLeafOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unlock Hint",
+        "tags": [
+          "student work"
+        ]
+      }
+    },
+    "/me/attempts/{attempt_id}/runs": {
+      "post": {
+        "description": "Count a Run or a Check. A Check also records how many tests passed.\n\nThe result is the browser's word, and is used for the teacher's progress view, never\nfor marks: homework is re-run in the teacher's browser at marking time (Phase 5).",
+        "operationId": "record_run_me_attempts__attempt_id__runs_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attempt_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Attempt Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttemptOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Record Run",
+        "tags": [
+          "student work"
         ]
       }
     },
@@ -2604,7 +5891,7 @@
     },
     "/me/documents/{document_id}/archive": {
       "post": {
-        "description": "Put a file away. It leaves the list; it stays in the database.\n\nArchive rather than delete, as everywhere else. A child who tidies up mid-term should\nnot be able to destroy a term of their own work with one tap, and from Phase 4 these\nrows may be referenced by attempts.",
+        "description": "Put a file away. It leaves the list; it stays in the database.\n\nArchive rather than delete, as everywhere else. A child who tidies up mid-term should\nnot be able to destroy a term of their own work with one tap.",
         "operationId": "archive_document_me_documents__document_id__archive_post",
         "parameters": [
           {
@@ -2719,6 +6006,56 @@
         "summary": "Restore Document",
         "tags": [
           "documents"
+        ]
+      }
+    },
+    "/me/lesson": {
+      "get": {
+        "description": "The child's class, today's lesson, and its ladder with their progress on each rung.",
+        "operationId": "todays_lesson_me_lesson_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TodayOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Todays Lesson",
+        "tags": [
+          "student work"
         ]
       }
     },
@@ -3207,6 +6544,263 @@
         "summary": "Unarchive Student",
         "tags": [
           "roster"
+        ]
+      }
+    },
+    "/units/{unit_id}": {
+      "patch": {
+        "operationId": "update_unit_units__unit_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "unit_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Unit Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NodePatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnitOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Unit",
+        "tags": [
+          "curriculum"
+        ]
+      }
+    },
+    "/units/{unit_id}/archive": {
+      "post": {
+        "operationId": "archive_unit_units__unit_id__archive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "unit_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Unit Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnitOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Archive Unit",
+        "tags": [
+          "curriculum"
+        ]
+      }
+    },
+    "/units/{unit_id}/lessons": {
+      "post": {
+        "description": "Add a lesson at the end of the unit.",
+        "operationId": "create_lesson_units__unit_id__lessons_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "unit_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Unit Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TitleIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LessonOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Lesson",
+        "tags": [
+          "curriculum"
+        ]
+      }
+    },
+    "/units/{unit_id}/unarchive": {
+      "post": {
+        "operationId": "unarchive_unit_units__unit_id__unarchive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "unit_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Unit Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnitOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unarchive Unit",
+        "tags": [
+          "curriculum"
         ]
       }
     }

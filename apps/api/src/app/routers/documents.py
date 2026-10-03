@@ -215,8 +215,7 @@ async def archive_document(
     """Put a file away. It leaves the list; it stays in the database.
 
     Archive rather than delete, as everywhere else. A child who tidies up mid-term should
-    not be able to destroy a term of their own work with one tap, and from Phase 4 these
-    rows may be referenced by attempts.
+    not be able to destroy a term of their own work with one tap.
     """
     record = await get_owned_document(session, principal, document_id)
     if record.status != DocumentStatus.ARCHIVED:

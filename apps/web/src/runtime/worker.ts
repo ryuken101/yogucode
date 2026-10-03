@@ -20,15 +20,20 @@ import {
   FLUSH_INTERVAL_MS,
   MAX_FORWARDED_CHARS,
   type FromWorker,
+  type TestRun,
   type ToWorker,
 } from './protocol'
 import { awaitStdin, clearInterrupt } from './channel'
+import graderSource from './grader.py?raw'
 
 // Pyodide's own types describe far more than this worker touches, and importing them would
 // pull the package into the bundle — the whole point is that it is fetched at runtime.
 interface Pyodide {
   version: string
+  FS: { writeFile(path: string, data: string): void }
+  runPython(code: string): unknown
   runPythonAsync(code: string): Promise<unknown>
+  pyimport(name: string): { run_tests(code: string, tests: string): string }
   setStdout(options: { write: (buffer: Uint8Array) => number }): void
   setStderr(options: { write: (buffer: Uint8Array) => number }): void
   setStdin(options: { stdin: () => string | null; autoEOF?: boolean }): void
@@ -115,8 +120,12 @@ function createSink(getRunId: () => number): Sink {
 let currentRunId = 0
 const sink = createSink(() => currentRunId)
 
-/** A run that arrived while Pyodide was still loading; dispatched once ready. */
-let queuedRun: Extract<ToWorker, { type: 'run' }> | null = null
+type Job = Extract<ToWorker, { type: 'run' | 'check' }>
+
+/** A run or check that arrived while Pyodide was still loading; dispatched once ready. */
+let queuedJob: Job | null = null
+
+let grader: ReturnType<Pyodide['pyimport']> | null = null
 
 /* --- boot --------------------------------------------------------------------------- */
 
@@ -166,15 +175,26 @@ async function init(message: Extract<ToWorker, { type: 'init' }>): Promise<void>
     },
   })
 
+  // The grader is a module of its own, so its names never appear in the child's session
+  // and a child's variable called `run_tests` cannot shadow it.
+  pyodide.FS.writeFile('/home/pyodide/_grader.py', graderSource)
+  pyodide.runPython('import sys\nif "/home/pyodide" not in sys.path: sys.path.insert(0, "/home/pyodide")')
+  grader = pyodide.pyimport('_grader')
+
   post({ type: 'ready', version: pyodide.version })
 
   // Whoever pressed Run before Python finished loading gets their run now, rather than
   // having to press it a second time.
-  if (queuedRun) {
-    const waiting = queuedRun
-    queuedRun = null
-    await run(waiting)
+  if (queuedJob) {
+    const waiting = queuedJob
+    queuedJob = null
+    await dispatch(waiting)
   }
+}
+
+async function dispatch(job: Job): Promise<void> {
+  if (job.type === 'run') await run(job)
+  else await check(job)
 }
 
 /* --- run ---------------------------------------------------------------------------- */
@@ -185,7 +205,7 @@ async function run(message: Extract<ToWorker, { type: 'run' }>): Promise<void> {
     // the Pyodide download, so the queued `run` lands with no interpreter. That is not a
     // failure — it is a child pressing Run on a cold page, which is the *normal* first
     // interaction. Hold it and let `init` dispatch it.
-    queuedRun = message
+    queuedJob = message
     return
   }
   currentRunId = message.runId
@@ -211,11 +231,39 @@ async function run(message: Extract<ToWorker, { type: 'run' }>): Promise<void> {
   }
 }
 
+/* --- check ------------------------------------------------------------------------- */
+
+/**
+ * Grade a program against test cases. See `grader.py` for what "fresh globals" and the
+ * per-test deadline mean.
+ *
+ * Synchronous inside Python, so the worker is busy for the whole check — which is fine,
+ * because the editor does not offer Run while a check is going. Stop still works: the
+ * interrupt buffer raises KeyboardInterrupt, which the grader lets through, and the page
+ * gets `run: null`.
+ */
+async function check(message: Extract<ToWorker, { type: 'check' }>): Promise<void> {
+  if (!pyodide || !interruptBuffer || !grader) {
+    queuedJob = message
+    return
+  }
+  clearInterrupt(interruptBuffer)
+  let result: TestRun | null = null
+  try {
+    result = JSON.parse(grader.run_tests(message.code, JSON.stringify(message.tests))) as TestRun
+  } catch {
+    result = null
+  } finally {
+    clearInterrupt(interruptBuffer)
+    post({ type: 'checked', runId: message.runId, run: result })
+  }
+}
+
 self.onmessage = async (event: MessageEvent<ToWorker>) => {
   const message = event.data
   try {
     if (message.type === 'init') await init(message)
-    if (message.type === 'run') await run(message)
+    if (message.type === 'run' || message.type === 'check') await dispatch(message)
   } catch (error) {
     post({
       type: 'fatal',

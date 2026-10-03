@@ -16,7 +16,7 @@ import {
   useQueryClient,
   type UseQueryOptions,
 } from '@tanstack/react-query'
-import { api, type Schemas } from './api'
+import { api, type ProblemFilters, type Schemas } from './api'
 import { ApiError } from './errors'
 
 export const keys = {
@@ -27,6 +27,16 @@ export const keys = {
   studentMe: ['student-me'] as const,
   documents: ['documents'] as const,
   document: (documentId: string) => ['document', documentId] as const,
+  concepts: ['concepts'] as const,
+  courses: ['courses'] as const,
+  course: (courseId: string) => ['course', courseId] as const,
+  problems: (filters: ProblemFilters) => ['problems', filters] as const,
+  allProblems: ['problems'] as const,
+  problem: (itemId: string) => ['problem', itemId] as const,
+  ladder: (lessonId: string) => ['ladder', lessonId] as const,
+  today: ['today'] as const,
+  studentProblem: (assignmentId: string, itemId: string) =>
+    ['student-problem', assignmentId, itemId] as const,
 }
 
 export function createQueryClient(): QueryClient {
@@ -192,5 +202,119 @@ export function useArchiveDocument() {
   return useMutation({
     mutationFn: (documentId: string) => api.archiveDocument(documentId),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.documents }),
+  })
+}
+
+/* --- teacher: curriculum ------------------------------------------------------------ */
+
+export function useConcepts() {
+  // The taxonomy changes by YAML seed, not in a session; no reason to refetch it.
+  return useQuery({ queryKey: keys.concepts, queryFn: api.listConcepts, staleTime: Infinity })
+}
+
+export function useCourses() {
+  return useQuery({ queryKey: keys.courses, queryFn: api.listCourses })
+}
+
+export function useCourse(courseId: string | null) {
+  return useQuery({
+    queryKey: keys.course(courseId ?? ''),
+    queryFn: () => api.readCourse(courseId ?? ''),
+    enabled: Boolean(courseId),
+  })
+}
+
+export function useCreateCourse() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (title: string) => api.createCourse(title),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.courses }),
+  })
+}
+
+/**
+ * Every edit inside a course's outline — units, lessons, their concepts — invalidates that
+ * one course. The outline is read whole, so there is no narrower key to aim at.
+ */
+export function useCourseEdit<T>(courseId: string, mutationFn: (input: T) => Promise<unknown>) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn,
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.course(courseId) }),
+  })
+}
+
+export function useSetClassCurriculum(classId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (body: Schemas['ClassCurriculumIn']) => api.setClassCurriculum(classId, body),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.class(classId) }),
+  })
+}
+
+/* --- teacher: problem bank ---------------------------------------------------------- */
+
+export function useProblems(filters: ProblemFilters) {
+  return useQuery({ queryKey: keys.problems(filters), queryFn: () => api.listProblems(filters) })
+}
+
+export function useProblem(itemId: string | null) {
+  return useQuery({
+    queryKey: keys.problem(itemId ?? ''),
+    queryFn: () => api.readProblem(itemId ?? ''),
+    enabled: Boolean(itemId),
+  })
+}
+
+/**
+ * A mutation that returns the problem as it now stands. The answer is written straight
+ * into that problem's cache entry — it *is* the fresh read — and every bank list is
+ * invalidated, since any list might be filtered on what just changed.
+ */
+export function useProblemMutation<T>(mutationFn: (input: T) => Promise<Schemas['ProblemOut']>) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn,
+    onSuccess: (problem) => {
+      client.setQueryData(keys.problem(problem.id), problem)
+      return client.invalidateQueries({ queryKey: keys.allProblems })
+    },
+  })
+}
+
+export function useLadder(lessonId: string | null) {
+  return useQuery({
+    queryKey: keys.ladder(lessonId ?? ''),
+    queryFn: () => api.readLadder(lessonId ?? ''),
+    enabled: Boolean(lessonId),
+  })
+}
+
+export function useSaveLadder(lessonId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (itemIds: string[]) => api.saveLadder(lessonId, itemIds),
+    onSuccess: (ladder) => client.setQueryData(keys.ladder(lessonId), ladder),
+  })
+}
+
+/* --- student: classwork ------------------------------------------------------------ */
+
+export function useToday() {
+  return useQuery({ queryKey: keys.today, queryFn: api.today })
+}
+
+/**
+ * A problem as the child sees it. The request is a POST — the first open creates the
+ * attempts — but it is idempotent, so it is safe to treat as a read.
+ *
+ * Never refetched in the background: the editor is uncontrolled and owns the code once
+ * open, and a refetch would hand it a stale copy of what the child is typing.
+ */
+export function useStudentProblem(assignmentId: string, itemId: string) {
+  return useQuery({
+    queryKey: keys.studentProblem(assignmentId, itemId),
+    queryFn: () => api.openProblem(assignmentId, itemId),
+    staleTime: Infinity,
   })
 }

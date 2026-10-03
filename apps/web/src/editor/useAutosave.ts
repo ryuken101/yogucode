@@ -23,8 +23,22 @@ export const AUTOSAVE_DELAY_MS = 2_000
 
 export type SaveState = 'saved' | 'saving' | 'failed'
 
-export function useAutosave(documentId: string | null) {
-  const save = useSaveDocument()
+/**
+ * What actually writes. Defaults to saving a file; a problem attempt passes its own, so
+ * attempts get the same debounce, flush-on-leave and failure behaviour as files rather
+ * than a second, subtly different copy of it.
+ */
+export type Saver = (id: string, content: string) => Promise<unknown>
+
+export function useAutosave(documentId: string | null, saver?: Saver) {
+  const saveDocument = useSaveDocument()
+  const saveDocumentAsync = saveDocument.mutateAsync
+  // The newest saver, kept in a ref so `flush` stays stable and the pagehide listener is
+  // never re-attached. Updated after render, not during it.
+  const write = useRef<Saver>((id, content) => saveDocumentAsync({ documentId: id, content }))
+  useEffect(() => {
+    write.current = saver ?? ((id, content) => saveDocumentAsync({ documentId: id, content }))
+  })
   const [state, setState] = useState<SaveState>('saved')
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -44,20 +58,17 @@ export function useAutosave(documentId: string | null) {
 
     pending.current = null
     setState('saving')
-    save.mutate(
-      { documentId: id, content },
-      {
-        onSuccess: () => {
-          persisted.current = content
-          setState('saved')
-        },
-        // Deliberately not retried: the usual cause is a revoked or expired session, and
-        // retrying would hide that behind a spinner while the child keeps typing into
-        // something that cannot be saved. The editor says so instead.
-        onError: () => setState('failed'),
+    write.current(id, content).then(
+      () => {
+        persisted.current = content
+        setState('saved')
       },
+      // Deliberately not retried: the usual cause is a revoked or expired session, and
+      // retrying would hide that behind a spinner while the child keeps typing into
+      // something that cannot be saved. The editor says so instead.
+      () => setState('failed'),
     )
-  }, [save])
+  }, [])
 
   /** Tell the hook what the server already has, when a file is opened or created. */
   const adopt = useCallback((documentId: string | null, content: string) => {

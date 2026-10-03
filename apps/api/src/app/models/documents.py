@@ -11,10 +11,10 @@ centre *and* the subject: a document is reachable only by the child who owns it.
 scoping helper carries both halves, and the routes live under `/me/...` so that no route
 even has a student id available to point at the wrong child.
 
-**Problems are not referenced here.** They arrive in Phase 4 with their own tables, and a
-nullable `problem_id` with no foreign key behind it — two phases of an unconstrained
-reference — is how orphaned rows appear. Phase 4 links work to problems when there is
-something real to link to.
+**Problems are not referenced here, and that stayed true in Phase 4.** Work on a problem
+lives on `attempts` (`models/assignments.py`), not in a document: attempts would otherwise
+crowd a child's file list and collide with this table's one-live-title rule. My files are
+for free coding; attempts are for problems.
 """
 
 import uuid

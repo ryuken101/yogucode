@@ -14,7 +14,7 @@
  * obvious to press when handing the machine to the next student.
  */
 
-import { Navigate, Outlet, useNavigate } from 'react-router'
+import { NavLink, Navigate, Outlet, useNavigate } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '../components/Button'
 import { Spinner } from '../components/Spinner'
@@ -50,10 +50,26 @@ export function RequireStudent() {
   return (
     <div className="flex h-dvh flex-col bg-cream">
       <header className="flex shrink-0 items-center justify-between border-b border-ink/10 px-4 py-2">
-        <p className="text-sm text-ink">
-          <span className="font-medium">{me.display_name}</span>
-          <span className="text-ink-soft"> · {me.class_name}</span>
-        </p>
+        <div className="flex items-center gap-5">
+          <p className="text-sm text-ink">
+            <span className="font-medium">{me.display_name}</span>
+            <span className="text-ink-soft"> · {me.class_name}</span>
+          </p>
+          <nav className="flex gap-4 text-sm">
+            {[
+              ['/home', 'Today'],
+              ['/work', 'My files'],
+            ].map(([to, label]) => (
+              <NavLink
+                key={to}
+                to={to}
+                className={({ isActive }) => (isActive ? 'text-sky-deep' : 'text-ink-soft hover:text-ink')}
+              >
+                {label}
+              </NavLink>
+            ))}
+          </nav>
+        </div>
         <Button variant="quiet" onClick={() => void signOut()}>
           Sign out
         </Button>

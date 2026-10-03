@@ -8,9 +8,8 @@
  * Both panels are dark, a deliberately *considered* dark built from the §8 palette rather
  * than VS Code's, which is what §8 asks for. The page stays cream around them.
  *
- * There are no problems on screen yet; those are Phase 4. Until then this is usable
- * classwork on its own: the teacher says "write a program that prints your name", and a
- * child does exactly that.
+ * This is free coding — "write a program that prints your name". Problems, with their
+ * checks and hints, live in `ProblemAttempt` and save to attempts rather than to files.
  */
 
 import { useEffect, useState } from 'react'

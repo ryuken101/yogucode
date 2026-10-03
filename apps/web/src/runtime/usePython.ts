@@ -17,7 +17,7 @@ import {
   isolated,
   signalInterrupt,
 } from './channel'
-import { MAX_OUTPUT_CHARS, type FromWorker } from './protocol'
+import { MAX_OUTPUT_CHARS, type FromWorker, type TestCheck, type TestRun } from './protocol'
 
 export interface OutputSegment {
   /** `stdin` is the terminal echo of what the child typed, not something Python wrote. */
@@ -63,6 +63,8 @@ export type RunState =
   | { status: 'running' }
   /** Parked at an `input()` prompt, waiting for the child to type something. */
   | { status: 'asking' }
+  /** Running the problem's tests. The console is left alone; results come back by promise. */
+  | { status: 'checking' }
   | { status: 'unsupported'; reason: string }
 
 const INDEX_URL = '/pyodide/'
@@ -76,6 +78,8 @@ export function usePython() {
   const runId = useRef(0)
   /** True when a run is waiting on the worker's boot to finish. */
   const pendingRun = useRef(false)
+  /** Checks in flight, by runId — a check answers by promise rather than into the console. */
+  const pendingChecks = useRef(new Map<number, (run: TestRun | null) => void>())
 
   const [state, setState] = useState<RunState>(() =>
     isolated()
@@ -123,7 +127,7 @@ export function usePython() {
           // state must not drop back to idle and re-enable the Run button underneath it.
           setState((current) =>
             current.status === 'loading' && pendingRun.current
-              ? { status: 'running' }
+              ? { status: pendingChecks.current.size ? 'checking' : 'running' }
               : { status: 'idle' },
           )
           pendingRun.current = false
@@ -144,13 +148,25 @@ export function usePython() {
         case 'done':
           setState({ status: 'idle' })
           break
+        case 'checked': {
+          const resolve = pendingChecks.current.get(message.runId)
+          pendingChecks.current.delete(message.runId)
+          resolve?.(message.run)
+          setState({ status: 'idle' })
+          break
+        }
         case 'fatal':
           setState({ status: 'unsupported', reason: message.message })
+          for (const resolve of pendingChecks.current.values()) resolve(null)
+          pendingChecks.current.clear()
           break
       }
     }
     created.onerror = () => {
       setState({ status: 'unsupported', reason: 'Python could not start.' })
+      // Nothing is coming back for a check in flight; let its caller move on.
+      for (const resolve of pendingChecks.current.values()) resolve(null)
+      pendingChecks.current.clear()
     }
 
     created.postMessage({
@@ -184,6 +200,33 @@ export function usePython() {
     [ensureWorker, state.status],
   )
 
+  /**
+   * Run the problem's tests against `code`. Resolves with the results, or null if the
+   * check was stopped or Python could not start.
+   *
+   * Leaves the console alone — a child who printed something useful should not lose it
+   * to pressing "Check" — and leaves their session's variables alone too (`grader.py`).
+   */
+  const check = useCallback(
+    (code: string, tests: TestCheck[]): Promise<TestRun | null> => {
+      if (state.status === 'unsupported') return Promise.resolve(null)
+      runId.current += 1
+      const id = runId.current
+      const created = ensureWorker()
+      if (!ready.current) {
+        pendingRun.current = true
+        setState({ status: 'loading', detail: 'Starting Python' })
+      } else {
+        setState({ status: 'checking' })
+      }
+      return new Promise((resolve) => {
+        pendingChecks.current.set(id, resolve)
+        created.postMessage({ type: 'check', runId: id, code, tests })
+      })
+    },
+    [ensureWorker, state.status],
+  )
+
   const answer = useCallback(
     (text: string) => {
       if (!stdin.current) return
@@ -212,5 +255,5 @@ export function usePython() {
     if (interrupt.current) signalInterrupt(interrupt.current)
   }, [])
 
-  return { state, output, run, stop, answer }
+  return { state, output, run, check, stop, answer }
 }

@@ -34,6 +34,12 @@ class Class(TimestampMixin, table=True):
     name: str
     term_label: str | None = Field(default=None)
     status: ClassStatus = Field(default=ClassStatus.ACTIVE, sa_type=String)
+    # The course this class follows, and the lesson it is on today. Both nullable: a class
+    # exists before anyone has decided its curriculum, and "today's lesson" is unset
+    # between terms. The current lesson must belong to the course — the route checks it,
+    # since a CHECK cannot see across tables.
+    course_id: uuid.UUID | None = Field(default=None, foreign_key="courses.id")
+    current_lesson_id: uuid.UUID | None = Field(default=None, foreign_key="lessons.id")
 
 
 class ClassTeacher(TimestampMixin, table=True):

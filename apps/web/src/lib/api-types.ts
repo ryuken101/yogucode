@@ -194,6 +194,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/classes/{class_id}/curriculum": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Class Curriculum
+         * @description Choose the class's course and today's lesson.
+         *
+         *     The lesson must sit in the chosen course, and both must be active — a class pointed at
+         *     an archived lesson would show children a ladder the teacher can no longer see to edit.
+         *     A lesson with no course is refused rather than inferred: guessing the course from the
+         *     lesson would silently change what the class follows.
+         *
+         *     Ids from another centre come back 404 through scoping, as everywhere, rather than as
+         *     a 422 that would confirm they exist.
+         */
+        put: operations["set_class_curriculum_classes__class_id__curriculum_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/classes/{class_id}/enrolments": {
         parameters: {
             query?: never;
@@ -408,6 +436,116 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/concepts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Concepts
+         * @description The taxonomy a teacher can tag with. Read-only here; it is edited as YAML.
+         */
+        get: operations["list_concepts_concepts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/courses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Courses */
+        get: operations["list_courses_courses_get"];
+        put?: never;
+        /** Create Course */
+        post: operations["create_course_courses_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/courses/{course_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Course */
+        get: operations["read_course_courses__course_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Rename Course */
+        patch: operations["rename_course_courses__course_id__patch"];
+        trace?: never;
+    };
+    "/courses/{course_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive Course */
+        post: operations["archive_course_courses__course_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/courses/{course_id}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unarchive Course */
+        post: operations["unarchive_course_courses__course_id__unarchive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/courses/{course_id}/units": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Unit
+         * @description Add a unit at the end of the course.
+         */
+        post: operations["create_unit_courses__course_id__units_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -419,6 +557,160 @@ export interface paths {
         get: operations["health_health_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Problems
+         * @description The bank, newest edit first. Drafts and published by default.
+         */
+        get: operations["list_problems_items_get"];
+        put?: never;
+        /**
+         * Create Problem
+         * @description Start a problem as a draft. Any amount of it can be missing.
+         */
+        post: operations["create_problem_items_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/items/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Problems
+         * @description Plan, and optionally apply, a YAML file of problems (see `app/problem_import.py`).
+         *
+         *     A file with any bad entry applies nothing, and says which entries to fix. Always a 200:
+         *     a file with mistakes in it is the normal first draft of a file, not a failed request.
+         */
+        post: operations["import_problems_items_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/items/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Problem */
+        get: operations["read_problem_items__item_id__get"];
+        /**
+         * Save Problem
+         * @description Replace a draft with the document sent. Anything else is a 409.
+         */
+        put: operations["save_problem_items__item_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/items/{item_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive Problem
+         * @description Take a problem out of the bank. Sets that already use it keep it.
+         */
+        post: operations["archive_problem_items__item_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/items/{item_id}/new-version": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * New Version
+         * @description A draft copy of a published problem, to edit and publish in its place.
+         *
+         *     If a draft of the next version already exists it is returned rather than a second one
+         *     made: two teachers pressing "edit" on the same problem should land on the same draft.
+         */
+        post: operations["new_version_items__item_id__new_version_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/items/{item_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish Problem
+         * @description Make a draft available to sets — and retire the version it replaces, if any.
+         */
+        post: operations["publish_problem_items__item_id__publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/items/{item_id}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unarchive Problem
+         * @description Bring a problem back as a draft.
+         *
+         *     Always to draft, never straight to published: a newer version may have been published
+         *     while this one was put away, and a re-publish runs the tests again anyway.
+         */
+        post: operations["unarchive_problem_items__item_id__unarchive_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -439,6 +731,189 @@ export interface paths {
          * @description Turn a class code into the list of names a child picks from.
          */
         post: operations["lookup_class_join_lookup_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/lessons/{lesson_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Lesson */
+        patch: operations["update_lesson_lessons__lesson_id__patch"];
+        trace?: never;
+    };
+    "/lessons/{lesson_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive Lesson */
+        post: operations["archive_lesson_lessons__lesson_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/lessons/{lesson_id}/concepts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Lesson Concepts
+         * @description Replace the concepts a lesson introduces.
+         *
+         *     Every id must be a concept this centre can see — a global one, or the centre's own.
+         *     Accepting any concept id would let a centre tag with another centre's private
+         *     concept, which is a cross-tenant reference even if nothing reads through it yet. An
+         *     unknown id is a 422 naming nothing, the same as a missing one would be.
+         */
+        put: operations["set_lesson_concepts_lessons__lesson_id__concepts_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/lessons/{lesson_id}/ladder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Ladder */
+        get: operations["read_ladder_lessons__lesson_id__ladder_get"];
+        /**
+         * Save Ladder
+         * @description Replace the lesson's ladder, and open it in any class that is on this lesson today.
+         */
+        put: operations["save_ladder_lessons__lesson_id__ladder_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/lessons/{lesson_id}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unarchive Lesson */
+        post: operations["unarchive_lesson_lessons__lesson_id__unarchive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/assignments/{assignment_id}/items/{item_id}/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open Problem
+         * @description A problem as the child sees it, with their attempt at each part.
+         *
+         *     A POST because the first open creates the attempts — which is also what starts the
+         *     clock the hint ladder's minutes are measured from.
+         */
+        post: operations["open_problem_me_assignments__assignment_id__items__item_id__open_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/attempts/{attempt_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Save Attempt
+         * @description Autosave. Like a file save, a save that changes nothing writes nothing.
+         */
+        patch: operations["save_attempt_me_attempts__attempt_id__patch"];
+        trace?: never;
+    };
+    "/me/attempts/{attempt_id}/hints": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unlock Hint
+         * @description Unlock the next rung, if the child has earned it. Rungs open in order.
+         */
+        post: operations["unlock_hint_me_attempts__attempt_id__hints_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/attempts/{attempt_id}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record Run
+         * @description Count a Run or a Check. A Check also records how many tests passed.
+         *
+         *     The result is the browser's word, and is used for the teacher's progress view, never
+         *     for marks: homework is re-run in the teacher's browser at marking time (Phase 5).
+         */
+        post: operations["record_run_me_attempts__attempt_id__runs_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -510,8 +985,7 @@ export interface paths {
          * @description Put a file away. It leaves the list; it stays in the database.
          *
          *     Archive rather than delete, as everywhere else. A child who tidies up mid-term should
-         *     not be able to destroy a term of their own work with one tap, and from Phase 4 these
-         *     rows may be referenced by attempts.
+         *     not be able to destroy a term of their own work with one tap.
          */
         post: operations["archive_document_me_documents__document_id__archive_post"];
         delete?: never;
@@ -537,6 +1011,26 @@ export interface paths {
          *     created since — hence the same 409 as a rename, rather than an IntegrityError.
          */
         post: operations["restore_document_me_documents__document_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/lesson": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Todays Lesson
+         * @description The child's class, today's lesson, and its ladder with their progress on each rung.
+         */
+        get: operations["todays_lesson_me_lesson_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -690,10 +1184,113 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/units/{unit_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Unit */
+        patch: operations["update_unit_units__unit_id__patch"];
+        trace?: never;
+    };
+    "/units/{unit_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive Unit */
+        post: operations["archive_unit_units__unit_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/units/{unit_id}/lessons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Lesson
+         * @description Add a lesson at the end of the unit.
+         */
+        post: operations["create_lesson_units__unit_id__lessons_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/units/{unit_id}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unarchive Unit */
+        post: operations["unarchive_unit_units__unit_id__unarchive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AssignmentMode
+         * @enum {string}
+         */
+        AssignmentMode: "classwork" | "homework" | "quiz";
+        /** AttemptOut */
+        AttemptOut: {
+            /** Code */
+            code: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Last Passed */
+            last_passed: number | null;
+            /** Last Total */
+            last_total: number | null;
+            /** Run Count */
+            run_count: number;
+            status: components["schemas"]["AttemptStatus"];
+        };
+        /** AttemptSaveIn */
+        AttemptSaveIn: {
+            /** Code */
+            code: string;
+        };
+        /**
+         * AttemptStatus
+         * @enum {string}
+         */
+        AttemptStatus: "in_progress" | "submitted";
         /** BulkEnrolIn */
         BulkEnrolIn: {
             /** Entries */
@@ -737,6 +1334,19 @@ export interface components {
             slug: string;
         };
         /**
+         * ClassCurriculumIn
+         * @description The course a class follows and the lesson it is on. Both fields are always sent.
+         *
+         *     A PUT rather than a PATCH field on the class: the two values constrain each other (the
+         *     lesson must be in the course), so they are set together and validated together.
+         */
+        ClassCurriculumIn: {
+            /** Course Id */
+            course_id: string | null;
+            /** Current Lesson Id */
+            current_lesson_id: string | null;
+        };
+        /**
          * ClassDetailOut
          * @description A class plus its join code.
          *
@@ -745,11 +1355,15 @@ export interface components {
          *     Mirrors the StudentOut / StudentDetailOut split in the roster router.
          */
         ClassDetailOut: {
+            /** Course Id */
+            course_id: string | null;
             /**
              * Created At
              * Format: date-time
              */
             created_at: string;
+            /** Current Lesson Id */
+            current_lesson_id: string | null;
             /**
              * Id
              * Format: uuid
@@ -777,11 +1391,15 @@ export interface components {
         };
         /** ClassOut */
         ClassOut: {
+            /** Course Id */
+            course_id: string | null;
             /**
              * Created At
              * Format: date-time
              */
             created_at: string;
+            /** Current Lesson Id */
+            current_lesson_id: string | null;
             /**
              * Id
              * Format: uuid
@@ -813,6 +1431,69 @@ export interface components {
          * @enum {string}
          */
         ClassStatus: "active" | "archived";
+        /** ConceptOut */
+        ConceptOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Status */
+            status: string;
+        };
+        /** CourseOut */
+        CourseOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            status: components["schemas"]["CurriculumStatus"];
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** CourseTreeOut */
+        CourseTreeOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            status: components["schemas"]["CurriculumStatus"];
+            /** Title */
+            title: string;
+            /** Units */
+            units: components["schemas"]["UnitTreeOut"][];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * CurriculumStatus
+         * @enum {string}
+         */
+        CurriculumStatus: "active" | "archived";
         /** DocumentIn */
         DocumentIn: {
             /** Content */
@@ -898,10 +1579,124 @@ export interface components {
          * @enum {string}
          */
         EnrolmentStatus: "active" | "withdrawn";
+        /**
+         * FunctionTest
+         * @description Run the program, then evaluate `call` and compare it with `expected` using `==`.
+         *
+         *     Both are Python expressions: `call="add(2, 3)"`, `expected="5"`.
+         */
+        FunctionTest: {
+            /** Call */
+            call: string;
+            /** Expected */
+            expected: string;
+            /**
+             * Hidden
+             * @default false
+             */
+            hidden: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "function";
+            /** Name */
+            name: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * HintDoc
+         * @description One rung. Unlocks when either threshold is met; zero for both means "always open".
+         */
+        HintDoc: {
+            /** Body Md */
+            body_md: string;
+            /**
+             * Unlock After Runs
+             * @default 1
+             */
+            unlock_after_runs: number;
+            /**
+             * Unlock After Seconds
+             * @default 120
+             */
+            unlock_after_seconds: number;
+        };
+        /** ImportEntryOut */
+        ImportEntryOut: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "create" | "update_draft" | "new_version" | "unchanged" | "error";
+            /** Error */
+            error: string | null;
+            /** Item Id */
+            item_id: string | null;
+            /** Key */
+            key: string;
+            /** Publish Problems */
+            publish_problems: string[];
+            /** Title */
+            title: string;
+        };
+        /** ImportIn */
+        ImportIn: {
+            /**
+             * Apply
+             * @default false
+             */
+            apply: boolean;
+            /** Yaml */
+            yaml: string;
+        };
+        /** ImportReportOut */
+        ImportReportOut: {
+            /** Applied */
+            applied: boolean;
+            /** Entries */
+            entries: components["schemas"]["ImportEntryOut"][];
+            /** Error */
+            error: string | null;
+        };
+        /**
+         * IoTest
+         * @description Feed `stdin` to the program, compare what it prints with `expected`.
+         *
+         *     `exact` ignores trailing whitespace on each line and trailing blank lines — a child
+         *     failing a test over a stray space learns nothing about Python. `contains` passes when
+         *     `expected` appears anywhere in the output.
+         */
+        IoTest: {
+            /** Expected */
+            expected: string;
+            /**
+             * Hidden
+             * @default false
+             */
+            hidden: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "io";
+            /**
+             * Match
+             * @default exact
+             * @enum {string}
+             */
+            match: "exact" | "contains";
+            /** Name */
+            name: string;
+            /**
+             * Stdin
+             * @default
+             */
+            stdin: string;
         };
         /** IssuePinsIn */
         IssuePinsIn: {
@@ -912,6 +1707,11 @@ export interface components {
              */
             reset_existing: boolean;
         };
+        /**
+         * ItemStatus
+         * @enum {string}
+         */
+        ItemStatus: "draft" | "published" | "superseded" | "archived";
         /** JoinLookupIn */
         JoinLookupIn: {
             /** Code */
@@ -945,6 +1745,139 @@ export interface components {
              * Format: uuid
              */
             id: string;
+        };
+        /** LadderIn */
+        LadderIn: {
+            /** Item Ids */
+            item_ids: string[];
+        };
+        /** LadderItemOut */
+        LadderItemOut: {
+            /** Difficulty */
+            difficulty: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Newer Version Id */
+            newer_version_id: string | null;
+            status: components["schemas"]["ItemStatus"];
+            /** Title */
+            title: string;
+            /** Version */
+            version: number;
+        };
+        /** LadderProblemOut */
+        LadderProblemOut: {
+            /** Difficulty */
+            difficulty: number;
+            /**
+             * Item Id
+             * Format: uuid
+             */
+            item_id: string;
+            /** Part Labels */
+            part_labels: string[];
+            /**
+             * Progress
+             * @enum {string}
+             */
+            progress: "not_started" | "started" | "passing";
+            /** Title */
+            title: string;
+        };
+        /** LessonConceptsIn */
+        LessonConceptsIn: {
+            /** Concept Ids */
+            concept_ids: string[];
+        };
+        /** LessonOut */
+        LessonOut: {
+            /** Concept Ids */
+            concept_ids: string[];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Sort Order */
+            sort_order: number;
+            status: components["schemas"]["CurriculumStatus"];
+            /** Title */
+            title: string;
+            /**
+             * Unit Id
+             * Format: uuid
+             */
+            unit_id: string;
+        };
+        /**
+         * NextHintOut
+         * @description The next rung, without its text. `available` is the server's verdict right now.
+         */
+        NextHintOut: {
+            /** Available */
+            available: boolean;
+            /** Level */
+            level: number;
+            /** Runs Needed */
+            runs_needed: number;
+            /** Seconds Needed */
+            seconds_needed: number;
+        };
+        /**
+         * NodePatch
+         * @description Every field optional — an absent field means "leave it alone".
+         */
+        NodePatch: {
+            /** Sort Order */
+            sort_order?: number | null;
+            /** Title */
+            title?: string | null;
+        };
+        /** PartDoc */
+        PartDoc: {
+            /** Concept Ids */
+            concept_ids?: string[];
+            /**
+             * Difficulty
+             * @default 1
+             */
+            difficulty: number;
+            /** Hints */
+            hints?: components["schemas"]["HintDoc"][];
+            /** Label */
+            label: string;
+            /** Primary Concept Id */
+            primary_concept_id?: string | null;
+            /**
+             * Prompt Md
+             * @default
+             */
+            prompt_md: string;
+            /**
+             * Solution Code
+             * @default
+             */
+            solution_code: string;
+            /**
+             * Starter Code
+             * @default
+             */
+            starter_code: string;
+            /** Tests */
+            tests?: (components["schemas"]["IoTest"] | components["schemas"]["FunctionTest"])[];
+        };
+        /** PartRef */
+        PartRef: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Label */
+            label: string;
         };
         /**
          * PasteAction
@@ -991,6 +1924,112 @@ export interface components {
             student_id: string | null;
             student_status: components["schemas"]["StudentStatus"] | null;
         };
+        /** ProblemDoc */
+        ProblemDoc: {
+            /** Concept Ids */
+            concept_ids?: string[];
+            /**
+             * Difficulty
+             * @default 1
+             */
+            difficulty: number;
+            /** Hints */
+            hints?: components["schemas"]["HintDoc"][];
+            /** Parts */
+            parts?: components["schemas"]["PartDoc"][];
+            /** Primary Concept Id */
+            primary_concept_id?: string | null;
+            /**
+             * Prompt Md
+             * @default
+             */
+            prompt_md: string;
+            /**
+             * Solution Code
+             * @default
+             */
+            solution_code: string;
+            /**
+             * Starter Code
+             * @default
+             */
+            starter_code: string;
+            /** Tests */
+            tests?: (components["schemas"]["IoTest"] | components["schemas"]["FunctionTest"])[];
+            /** Title */
+            title: string;
+        };
+        /** ProblemOut */
+        ProblemOut: {
+            document: components["schemas"]["ProblemDoc"];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Parts */
+            parts: components["schemas"]["PartRef"][];
+            /** Publish Problems */
+            publish_problems: string[];
+            /** Source Key */
+            source_key: string | null;
+            status: components["schemas"]["ItemStatus"];
+            /** Supersedes Id */
+            supersedes_id: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * ProblemSummaryOut
+         * @description A row in the bank list — no code, no tests, no hints.
+         */
+        ProblemSummaryOut: {
+            /** Concept Ids */
+            concept_ids: string[];
+            /** Difficulty */
+            difficulty: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Part Labels */
+            part_labels: string[];
+            /** Primary Concept Id */
+            primary_concept_id: string | null;
+            status: components["schemas"]["ItemStatus"];
+            /** Test Count */
+            test_count: number;
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * PublishIn
+         * @description Proof the teacher's browser ran the solution against the tests of *this* version.
+         *
+         *     `verified_updated_at` is the `updated_at` the editor had when its run passed. A save
+         *     in another tab since then moves `updated_at`, and the publish is refused — the run
+         *     proved something about a version that no longer exists.
+         */
+        PublishIn: {
+            /**
+             * Verified Updated At
+             * Format: date-time
+             */
+            verified_updated_at: string;
+        };
         /**
          * RosterEntryOut
          * @description A student as seen from inside a class: who they are, plus how they got there.
@@ -1022,6 +2061,16 @@ export interface components {
              * @description True when the paste held more than 100 names and was cut short.
              */
             truncated: boolean;
+        };
+        /**
+         * RunIn
+         * @description One press of Run (no result) or Check (with a result).
+         */
+        RunIn: {
+            /** Passed */
+            passed?: number | null;
+            /** Total */
+            total?: number | null;
         };
         /** SessionsRevokedOut */
         SessionsRevokedOut: {
@@ -1084,6 +2133,24 @@ export interface components {
             /** Display Name */
             display_name: string;
         };
+        /** StudentLeafOut */
+        StudentLeafOut: {
+            attempt: components["schemas"]["AttemptOut"];
+            /** Hints */
+            hints: components["schemas"]["UnlockedHintOut"][];
+            /**
+             * Item Id
+             * Format: uuid
+             */
+            item_id: string;
+            /** Label */
+            label: string | null;
+            next_hint: components["schemas"]["NextHintOut"] | null;
+            /** Prompt Md */
+            prompt_md: string;
+            /** Tests */
+            tests: (components["schemas"]["IoTest"] | components["schemas"]["FunctionTest"])[];
+        };
         /** StudentMeOut */
         StudentMeOut: {
             /**
@@ -1132,6 +2199,30 @@ export interface components {
             /** Display Name */
             display_name?: string | null;
         };
+        /** StudentProblemOut */
+        StudentProblemOut: {
+            /**
+             * Assignment Id
+             * Format: uuid
+             */
+            assignment_id: string;
+            /** Completions */
+            completions: boolean;
+            /** Difficulty */
+            difficulty: number;
+            /**
+             * Item Id
+             * Format: uuid
+             */
+            item_id: string;
+            /** Leaves */
+            leaves: components["schemas"]["StudentLeafOut"][];
+            mode: components["schemas"]["AssignmentMode"];
+            /** Prompt Md */
+            prompt_md: string;
+            /** Title */
+            title: string;
+        };
         /** StudentSignInIn */
         StudentSignInIn: {
             /** Code */
@@ -1162,6 +2253,70 @@ export interface components {
              */
             id: string;
             role: components["schemas"]["UserRole"];
+        };
+        /** TitleIn */
+        TitleIn: {
+            /** Title */
+            title: string;
+        };
+        /**
+         * TodayOut
+         * @description Today, for one child: their class, the lesson it is on, and its ladder.
+         */
+        TodayOut: {
+            /** Assignment Id */
+            assignment_id: string | null;
+            /** Class Name */
+            class_name: string;
+            /** Lesson Title */
+            lesson_title: string | null;
+            /** Problems */
+            problems: components["schemas"]["LadderProblemOut"][];
+        };
+        /** UnitOut */
+        UnitOut: {
+            /**
+             * Course Id
+             * Format: uuid
+             */
+            course_id: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Sort Order */
+            sort_order: number;
+            status: components["schemas"]["CurriculumStatus"];
+            /** Title */
+            title: string;
+        };
+        /** UnitTreeOut */
+        UnitTreeOut: {
+            /**
+             * Course Id
+             * Format: uuid
+             */
+            course_id: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Lessons */
+            lessons: components["schemas"]["LessonOut"][];
+            /** Sort Order */
+            sort_order: number;
+            status: components["schemas"]["CurriculumStatus"];
+            /** Title */
+            title: string;
+        };
+        /** UnlockedHintOut */
+        UnlockedHintOut: {
+            /** Body Md */
+            body_md: string;
+            /** Level */
+            level: number;
         };
         /**
          * UserRole
@@ -1538,6 +2693,43 @@ export interface operations {
             };
         };
     };
+    set_class_curriculum_classes__class_id__curriculum_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                class_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClassCurriculumIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     enrol_student_classes__class_id__enrolments_post: {
         parameters: {
             query?: never;
@@ -1855,6 +3047,280 @@ export interface operations {
             };
         };
     };
+    list_concepts_concepts_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_courses_courses_get: {
+        parameters: {
+            query?: {
+                include_archived?: boolean;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_course_courses_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TitleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseTreeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_course_courses__course_id__get: {
+        parameters: {
+            query?: {
+                include_archived?: boolean;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                course_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseTreeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rename_course_courses__course_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                course_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TitleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_course_courses__course_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                course_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unarchive_course_courses__course_id__unarchive_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                course_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_unit_courses__course_id__units_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                course_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TitleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnitOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     health_health_get: {
         parameters: {
             query?: never;
@@ -1873,6 +3339,318 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+        };
+    };
+    list_problems_items_get: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["ItemStatus"][] | null;
+                concept_id?: string | null;
+                difficulty?: number | null;
+                q?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemSummaryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_problem_items_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProblemDoc"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_problems_items_import_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_problem_items__item_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_problem_items__item_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProblemDoc"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_problem_items__item_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    new_version_items__item_id__new_version_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_problem_items__item_id__publish_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unarchive_problem_items__item_id__unarchive_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1897,6 +3675,357 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JoinLookupOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_lesson_lessons__lesson_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                lesson_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NodePatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LessonOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_lesson_lessons__lesson_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                lesson_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LessonOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_lesson_concepts_lessons__lesson_id__concepts_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                lesson_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LessonConceptsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LessonOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_ladder_lessons__lesson_id__ladder_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                lesson_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LadderItemOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_ladder_lessons__lesson_id__ladder_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                lesson_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LadderIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LadderItemOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unarchive_lesson_lessons__lesson_id__unarchive_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                lesson_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LessonOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_problem_me_assignments__assignment_id__items__item_id__open_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                assignment_id: string;
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentProblemOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_attempt_me_attempts__attempt_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                attempt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AttemptSaveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttemptOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unlock_hint_me_attempts__attempt_id__hints_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                attempt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentLeafOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_run_me_attempts__attempt_id__runs_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                attempt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttemptOut"];
                 };
             };
             /** @description Validation Error */
@@ -2101,6 +4230,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DocumentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    todays_lesson_me_lesson_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TodayOut"];
                 };
             };
             /** @description Validation Error */
@@ -2371,6 +4531,146 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StudentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_unit_units__unit_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                unit_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NodePatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnitOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_unit_units__unit_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                unit_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnitOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_lesson_units__unit_id__lessons_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                unit_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TitleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LessonOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unarchive_unit_units__unit_id__unarchive_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                unit_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnitOut"];
                 };
             };
             /** @description Validation Error */

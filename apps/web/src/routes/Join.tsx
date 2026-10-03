@@ -185,7 +185,7 @@ export function Join() {
             <PageHeader title={`You’re in, ${step.me.display_name}`} />
             <Notice tone="good">{step.me.class_name}</Notice>
             <div className="mt-4 flex flex-col gap-3">
-              <Button variant="primary" onClick={() => navigate('/work')}>
+              <Button variant="primary" onClick={() => navigate('/home')}>
                 Start writing Python
               </Button>
               <p className="text-sm text-ink-soft">

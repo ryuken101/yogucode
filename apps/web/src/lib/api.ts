@@ -21,7 +21,7 @@ export type Schemas = components['schemas']
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api'
 
 interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PATCH'
+  method?: 'GET' | 'POST' | 'PATCH' | 'PUT'
   body?: unknown
   /**
    * Skip the Authorization header. The student routes are reached by people who have no
@@ -73,6 +73,13 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   return parsed as T
 }
 
+export interface ProblemFilters {
+  statuses?: Schemas['ItemStatus'][]
+  conceptId?: string
+  difficulty?: number
+  q?: string
+}
+
 export const api = {
   /* --- teacher: identity --------------------------------------------------------- */
 
@@ -92,6 +99,91 @@ export const api = {
     request<Schemas['ClassDetailOut']>(`/classes/${classId}/join-code/rotate`, {
       method: 'POST',
     }),
+
+  setClassCurriculum: (classId: string, body: Schemas['ClassCurriculumIn']) =>
+    request<Schemas['ClassOut']>(`/classes/${classId}/curriculum`, { method: 'PUT', body }),
+
+  /* --- teacher: curriculum ------------------------------------------------------- */
+
+  listConcepts: () => request<Schemas['ConceptOut'][]>('/concepts'),
+  listCourses: () => request<Schemas['CourseOut'][]>('/courses'),
+  readCourse: (courseId: string) => request<Schemas['CourseTreeOut']>(`/courses/${courseId}`),
+  createCourse: (title: string) =>
+    request<Schemas['CourseTreeOut']>('/courses', {
+      method: 'POST',
+      body: { title } satisfies Schemas['TitleIn'],
+    }),
+  renameCourse: (courseId: string, title: string) =>
+    request<Schemas['CourseOut']>(`/courses/${courseId}`, {
+      method: 'PATCH',
+      body: { title } satisfies Schemas['TitleIn'],
+    }),
+  archiveCourse: (courseId: string) =>
+    request<Schemas['CourseOut']>(`/courses/${courseId}/archive`, { method: 'POST' }),
+  createUnit: (courseId: string, title: string) =>
+    request<Schemas['UnitOut']>(`/courses/${courseId}/units`, {
+      method: 'POST',
+      body: { title } satisfies Schemas['TitleIn'],
+    }),
+  updateUnit: (unitId: string, body: Schemas['NodePatch']) =>
+    request<Schemas['UnitOut']>(`/units/${unitId}`, { method: 'PATCH', body }),
+  archiveUnit: (unitId: string) =>
+    request<Schemas['UnitOut']>(`/units/${unitId}/archive`, { method: 'POST' }),
+  createLesson: (unitId: string, title: string) =>
+    request<Schemas['LessonOut']>(`/units/${unitId}/lessons`, {
+      method: 'POST',
+      body: { title } satisfies Schemas['TitleIn'],
+    }),
+  updateLesson: (lessonId: string, body: Schemas['NodePatch']) =>
+    request<Schemas['LessonOut']>(`/lessons/${lessonId}`, { method: 'PATCH', body }),
+  archiveLesson: (lessonId: string) =>
+    request<Schemas['LessonOut']>(`/lessons/${lessonId}/archive`, { method: 'POST' }),
+  setLessonConcepts: (lessonId: string, conceptIds: string[]) =>
+    request<Schemas['LessonOut']>(`/lessons/${lessonId}/concepts`, {
+      method: 'PUT',
+      body: { concept_ids: conceptIds } satisfies Schemas['LessonConceptsIn'],
+    }),
+
+  readLadder: (lessonId: string) =>
+    request<Schemas['LadderItemOut'][]>(`/lessons/${lessonId}/ladder`),
+  saveLadder: (lessonId: string, itemIds: string[]) =>
+    request<Schemas['LadderItemOut'][]>(`/lessons/${lessonId}/ladder`, {
+      method: 'PUT',
+      body: { item_ids: itemIds } satisfies Schemas['LadderIn'],
+    }),
+
+  /* --- teacher: problem bank ----------------------------------------------------- */
+
+  listProblems: (filters: ProblemFilters = {}) => {
+    const params = new URLSearchParams()
+    for (const status of filters.statuses ?? []) params.append('status', status)
+    if (filters.conceptId) params.set('concept_id', filters.conceptId)
+    if (filters.difficulty) params.set('difficulty', String(filters.difficulty))
+    if (filters.q) params.set('q', filters.q)
+    const query = params.toString()
+    return request<Schemas['ProblemSummaryOut'][]>(`/items${query ? `?${query}` : ''}`)
+  },
+  importProblems: (yaml: string, apply: boolean) =>
+    request<Schemas['ImportReportOut']>('/items/import', {
+      method: 'POST',
+      body: { yaml, apply } satisfies Schemas['ImportIn'],
+    }),
+  readProblem: (itemId: string) => request<Schemas['ProblemOut']>(`/items/${itemId}`),
+  createProblem: (body: Schemas['ProblemDoc']) =>
+    request<Schemas['ProblemOut']>('/items', { method: 'POST', body }),
+  saveProblem: (itemId: string, body: Schemas['ProblemDoc']) =>
+    request<Schemas['ProblemOut']>(`/items/${itemId}`, { method: 'PUT', body }),
+  publishProblem: (itemId: string, verifiedUpdatedAt: string) =>
+    request<Schemas['ProblemOut']>(`/items/${itemId}/publish`, {
+      method: 'POST',
+      body: { verified_updated_at: verifiedUpdatedAt } satisfies Schemas['PublishIn'],
+    }),
+  newProblemVersion: (itemId: string) =>
+    request<Schemas['ProblemOut']>(`/items/${itemId}/new-version`, { method: 'POST' }),
+  archiveProblem: (itemId: string) =>
+    request<Schemas['ProblemOut']>(`/items/${itemId}/archive`, { method: 'POST' }),
+  unarchiveProblem: (itemId: string) =>
+    request<Schemas['ProblemOut']>(`/items/${itemId}/unarchive`, { method: 'POST' }),
 
   /* --- teacher: roster ----------------------------------------------------------- */
 
@@ -168,6 +260,32 @@ export const api = {
       body,
       anonymous: true,
     }),
+  /* --- student: classwork ---------------------------------------------------------- */
+
+  today: () => request<Schemas['TodayOut']>('/me/lesson', { anonymous: true }),
+  openProblem: (assignmentId: string, itemId: string) =>
+    request<Schemas['StudentProblemOut']>(
+      `/me/assignments/${assignmentId}/items/${itemId}/open`,
+      { method: 'POST', anonymous: true },
+    ),
+  saveAttempt: (attemptId: string, code: string) =>
+    request<Schemas['AttemptOut']>(`/me/attempts/${attemptId}`, {
+      method: 'PATCH',
+      body: { code } satisfies Schemas['AttemptSaveIn'],
+      anonymous: true,
+    }),
+  recordRun: (attemptId: string, result: Schemas['RunIn'] = {}) =>
+    request<Schemas['AttemptOut']>(`/me/attempts/${attemptId}/runs`, {
+      method: 'POST',
+      body: result,
+      anonymous: true,
+    }),
+  unlockHint: (attemptId: string) =>
+    request<Schemas['StudentLeafOut']>(`/me/attempts/${attemptId}/hints`, {
+      method: 'POST',
+      anonymous: true,
+    }),
+
   archiveDocument: (documentId: string) =>
     request<Schemas['DocumentOut']>(`/me/documents/${documentId}/archive`, {
       method: 'POST',

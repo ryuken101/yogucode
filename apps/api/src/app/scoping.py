@@ -1,8 +1,9 @@
 """Centre-scoped lookups — the one place the tenancy filter lives.
 
 **Routers must not build their own queries against a centre-owned table.** Every read of
-`classes`, `students`, `enrolments`, `class_join_codes` or `student_documents` goes through
-a helper here that takes a `Principal` and applies `centre_id` itself.
+`classes`, `students`, `enrolments`, `class_join_codes`, `student_documents` or the
+curriculum tables goes through a helper here that takes a `Principal` and applies
+`centre_id` itself.
 
 Most helpers here scope by tenant alone, because the caller is a teacher and teachers at a
 centre share everything. `student_documents` is the exception and the first of its kind:
@@ -30,16 +31,29 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.auth.principal import Principal
 from app.models import (
+    Assignment,
+    AssignmentStatus,
+    Attempt,
     Centre,
     Class,
     ClassJoinCode,
     ClassStatus,
+    Concept,
+    ConceptStatus,
+    Course,
+    CurriculumStatus,
     DocumentStatus,
     Enrolment,
     EnrolmentStatus,
+    Item,
+    ItemConcept,
+    ItemStatus,
+    Lesson,
+    LessonConcept,
     Student,
     StudentDocument,
     StudentStatus,
+    Unit,
 )
 
 
@@ -278,3 +292,274 @@ async def get_enrolment(
             )
         )
     ).one_or_none()
+
+
+# --- curriculum -----------------------------------------------------------------------
+#
+# Courses, units and lessons each carry their own `centre_id` (see `models/curriculum.py`),
+# so each lookup is the same two-part filter as `get_owned_class` — one helper per table
+# rather than one generic one, so a reviewer grepping for `Lesson.centre_id` finds it.
+
+
+async def get_owned_course(
+    session: AsyncSession, principal: Principal, course_id: uuid.UUID
+) -> Course:
+    found = (
+        await session.exec(
+            select(Course).where(Course.id == course_id, Course.centre_id == principal.centre_id)
+        )
+    ).one_or_none()
+    if found is None:
+        raise _not_found("course")
+    return found
+
+
+async def list_owned_courses(
+    session: AsyncSession, principal: Principal, include_archived: bool = False
+) -> Sequence[Course]:
+    """Every course at the principal's centre, newest first — by id, as classes are."""
+    statement = select(Course).where(Course.centre_id == principal.centre_id)
+    if not include_archived:
+        statement = statement.where(Course.status == CurriculumStatus.ACTIVE)
+    statement = statement.order_by(Course.id.desc())  # type: ignore[attr-defined]
+    return (await session.exec(statement)).all()
+
+
+async def get_owned_unit(session: AsyncSession, principal: Principal, unit_id: uuid.UUID) -> Unit:
+    found = (
+        await session.exec(
+            select(Unit).where(Unit.id == unit_id, Unit.centre_id == principal.centre_id)
+        )
+    ).one_or_none()
+    if found is None:
+        raise _not_found("unit")
+    return found
+
+
+async def get_owned_lesson(
+    session: AsyncSession, principal: Principal, lesson_id: uuid.UUID
+) -> Lesson:
+    found = (
+        await session.exec(
+            select(Lesson).where(Lesson.id == lesson_id, Lesson.centre_id == principal.centre_id)
+        )
+    ).one_or_none()
+    if found is None:
+        raise _not_found("lesson")
+    return found
+
+
+async def list_course_outline(
+    session: AsyncSession, principal: Principal, course_id: uuid.UUID, include_archived: bool
+) -> tuple[Sequence[Unit], Sequence[Lesson], Sequence[LessonConcept]]:
+    """A course's units, their lessons, and those lessons' concept links, in sort order.
+
+    Three flat queries rather than one join, because the router assembles a tree and a
+    join would repeat every unit once per lesson. Each is filtered by centre on its own
+    table — call `get_owned_course` first if the course itself needs to 404.
+
+    `include_archived` applies to units and lessons alike; an archived unit's lessons are
+    left out with it, since a lesson in a unit nobody can see is not reachable to edit.
+    """
+    unit_statement = select(Unit).where(
+        Unit.course_id == course_id, Unit.centre_id == principal.centre_id
+    )
+    if not include_archived:
+        unit_statement = unit_statement.where(Unit.status == CurriculumStatus.ACTIVE)
+    units = (
+        await session.exec(unit_statement.order_by(Unit.sort_order, Unit.id))  # type: ignore[arg-type]
+    ).all()
+
+    unit_ids = [unit.id for unit in units]
+    if not unit_ids:
+        return units, [], []
+    lesson_statement = select(Lesson).where(
+        Lesson.unit_id.in_(unit_ids),  # type: ignore[attr-defined]
+        Lesson.centre_id == principal.centre_id,
+    )
+    if not include_archived:
+        lesson_statement = lesson_statement.where(Lesson.status == CurriculumStatus.ACTIVE)
+    lessons = (
+        await session.exec(lesson_statement.order_by(Lesson.sort_order, Lesson.id))  # type: ignore[arg-type]
+    ).all()
+
+    lesson_ids = [lesson.id for lesson in lessons]
+    if not lesson_ids:
+        return units, lessons, []
+    links = (
+        await session.exec(
+            select(LessonConcept).where(LessonConcept.lesson_id.in_(lesson_ids))  # type: ignore[attr-defined]
+        )
+    ).all()
+    return units, lessons, links
+
+
+async def list_visible_concepts(session: AsyncSession, principal: Principal) -> list[Concept]:
+    """The taxonomy as this centre sees it: global concepts, with the centre's own on top.
+
+    A centre concept whose key matches a global one *replaces* it — that is what "override"
+    in `models/concepts.py` means — so the result has one row per key. Archived concepts
+    are left out; provisional ones are not, because the whole taxonomy is provisional
+    until next term's scope and sequence is confirmed.
+    """
+    rows = (
+        await session.exec(
+            select(Concept).where(
+                (Concept.centre_id == principal.centre_id) | (Concept.centre_id.is_(None)),  # type: ignore[union-attr]
+                Concept.status != ConceptStatus.ARCHIVED,
+            )
+        )
+    ).all()
+    by_key: dict[str, Concept] = {}
+    for concept in rows:
+        if concept.key not in by_key or concept.centre_id is not None:
+            by_key[concept.key] = concept
+    return sorted(by_key.values(), key=lambda c: (c.sort_order, c.key))
+
+
+# --- problem bank -----------------------------------------------------------------------
+
+
+async def get_owned_item(session: AsyncSession, principal: Principal, item_id: uuid.UUID) -> Item:
+    """A top-level item in the principal's centre, or 404.
+
+    Parts are not addressable on their own here: a part is edited, versioned and published
+    as part of its parent, so a route that took a part's id would be a second way to change
+    one half of a problem.
+    """
+    found = (
+        await session.exec(
+            select(Item).where(
+                Item.id == item_id,
+                Item.centre_id == principal.centre_id,
+                Item.parent_id.is_(None),  # type: ignore[union-attr]
+            )
+        )
+    ).one_or_none()
+    if found is None:
+        raise _not_found("problem")
+    return found
+
+
+async def list_owned_items(
+    session: AsyncSession,
+    principal: Principal,
+    *,
+    statuses: Sequence[ItemStatus],
+    concept_id: uuid.UUID | None = None,
+    difficulty: int | None = None,
+    search: str | None = None,
+) -> Sequence[Item]:
+    """Top-level items at the principal's centre, most recently edited first.
+
+    The concept filter matches a tag on the item *or on any of its parts* — a teacher
+    looking for list problems wants the three-part problem whose part (b) drills lists.
+    """
+    statement = select(Item).where(
+        Item.centre_id == principal.centre_id,
+        Item.parent_id.is_(None),  # type: ignore[union-attr]
+        Item.status.in_(list(statuses)),  # type: ignore[attr-defined]
+    )
+    if difficulty is not None:
+        statement = statement.where(Item.difficulty == difficulty)
+    if search:
+        statement = statement.where(Item.title.ilike(f"%{search}%"))  # type: ignore[attr-defined]
+    if concept_id is not None:
+        tagged = (
+            select(Item.id)
+            .join(ItemConcept, ItemConcept.item_id == Item.id)
+            .where(  # type: ignore[arg-type]
+                ItemConcept.concept_id == concept_id,
+                Item.centre_id == principal.centre_id,
+            )
+        )
+        parents_of_tagged = select(Item.parent_id).where(
+            Item.id.in_(tagged),  # type: ignore[attr-defined]
+            Item.parent_id.is_not(None),  # type: ignore[union-attr]
+        )
+        statement = statement.where(
+            Item.id.in_(tagged) | Item.id.in_(parents_of_tagged)  # type: ignore[attr-defined]
+        )
+    statement = statement.order_by(Item.updated_at.desc())  # type: ignore[attr-defined]
+    return (await session.exec(statement)).all()
+
+
+async def list_item_parts(
+    session: AsyncSession, principal: Principal, item_id: uuid.UUID
+) -> Sequence[Item]:
+    """An item's parts, a → c. The parent must already have come through scoping."""
+    return (
+        await session.exec(
+            select(Item)
+            .where(Item.parent_id == item_id, Item.centre_id == principal.centre_id)
+            .order_by(Item.sort_order, Item.part_label)  # type: ignore[arg-type]
+        )
+    ).all()
+
+
+# --- a student's own work -----------------------------------------------------------------
+#
+# The subject boundary again, as for `student_documents`: a child reaches an assignment only
+# through a class they are *actively* enrolled in, and an attempt only if it is their own.
+# A withdrawn child loses access to the class's work at once, which is what withdrawal
+# means; their attempts stay in the database for the teacher.
+
+
+async def get_student_assignment(
+    session: AsyncSession, principal: Principal, assignment_id: uuid.UUID
+) -> Assignment:
+    """An open assignment in one of the calling student's active classes, or 404."""
+    found = (
+        await session.exec(
+            select(Assignment)
+            .join(Enrolment, Enrolment.class_id == Assignment.class_id)  # type: ignore[arg-type]
+            .where(
+                Assignment.id == assignment_id,
+                Assignment.centre_id == principal.centre_id,
+                Assignment.status == AssignmentStatus.OPEN,
+                Enrolment.student_id == principal.subject_id,
+                Enrolment.status == EnrolmentStatus.ACTIVE,
+            )
+        )
+    ).one_or_none()
+    if found is None:
+        raise _not_found("assignment")
+    return found
+
+
+async def get_own_attempt(
+    session: AsyncSession, principal: Principal, attempt_id: uuid.UUID
+) -> Attempt:
+    """One of the calling student's own attempts, or 404 — the three-part filter."""
+    found = (
+        await session.exec(
+            select(Attempt).where(
+                Attempt.id == attempt_id,
+                Attempt.centre_id == principal.centre_id,
+                Attempt.student_id == principal.subject_id,
+            )
+        )
+    ).one_or_none()
+    if found is None:
+        raise _not_found("attempt")
+    return found
+
+
+async def get_student_class(session: AsyncSession, principal: Principal) -> Class | None:
+    """The class a signed-in student is in: their newest active enrolment.
+
+    The same rule `/auth/student/me` uses, so the class a child is told they are in and the
+    class whose lesson they are shown cannot disagree.
+    """
+    return (
+        await session.exec(
+            select(Class)
+            .join(Enrolment, Enrolment.class_id == Class.id)  # type: ignore[arg-type]
+            .where(
+                Enrolment.student_id == principal.subject_id,
+                Enrolment.status == EnrolmentStatus.ACTIVE,
+                Class.centre_id == principal.centre_id,
+            )
+            .order_by(Enrolment.id.desc())  # type: ignore[attr-defined]
+        )
+    ).first()
