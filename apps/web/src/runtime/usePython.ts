@@ -69,7 +69,22 @@ export type RunState =
 
 const INDEX_URL = '/pyodide/'
 
-export function usePython() {
+export interface RunFinished {
+  ok: boolean
+  interrupted: boolean
+  /** What the program wrote to stderr — the traceback, when `ok` is false. */
+  stderr: string
+}
+
+export function usePython({ onRunFinished }: { onRunFinished?: (run: RunFinished) => void } = {}) {
+  // The newest callback, read when a run ends; held in a ref so the worker's message
+  // handler never needs re-binding.
+  const finished = useRef(onRunFinished)
+  useEffect(() => {
+    finished.current = onRunFinished
+  })
+  /** stderr of the run in progress, for `onRunFinished`. */
+  const stderrOfRun = useRef('')
   const worker = useRef<Worker | null>(null)
   /** False until the worker has reported `ready`; a run before then is queued there. */
   const ready = useRef(false)
@@ -134,6 +149,7 @@ export function usePython() {
           break
         case 'stdout':
         case 'stderr':
+          if (message.type === 'stderr') stderrOfRun.current += message.text
           append({ stream: message.type, text: message.text })
           break
         case 'stdin':
@@ -147,6 +163,12 @@ export function usePython() {
           break
         case 'done':
           setState({ status: 'idle' })
+          finished.current?.({
+            ok: message.ok,
+            interrupted: message.interrupted,
+            stderr: stderrOfRun.current,
+          })
+          stderrOfRun.current = ''
           break
         case 'checked': {
           const resolve = pendingChecks.current.get(message.runId)

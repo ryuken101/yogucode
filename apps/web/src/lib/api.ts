@@ -29,10 +29,12 @@ interface RequestOptions {
    * a stale teacher token there would be noise at best.
    */
   anonymous?: boolean
+  /** Let the request outlive the page — for the event recorder's flush on `pagehide`. */
+  keepalive?: boolean
 }
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, anonymous = false } = options
+  const { method = 'GET', body, anonymous = false, keepalive = false } = options
 
   const headers: Record<string, string> = {}
   if (body !== undefined) headers['Content-Type'] = 'application/json'
@@ -49,6 +51,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
       // The student session cookie. Harmless for teacher requests, and required for
       // every student one.
       credentials: 'include',
+      keepalive,
       body: body === undefined ? undefined : JSON.stringify(body),
     })
   } catch {
@@ -151,6 +154,45 @@ export const api = {
       method: 'PUT',
       body: { item_ids: itemIds } satisfies Schemas['LadderIn'],
     }),
+
+  /* --- teacher: homework, marking, progress --------------------------------------- */
+
+  listHomework: (classId: string) =>
+    request<Schemas['HomeworkOut'][]>(`/classes/${classId}/homework`),
+  readHomework: (assignmentId: string) =>
+    request<Schemas['HomeworkOut']>(`/assignments/${assignmentId}`),
+  createHomework: (classId: string, body: Schemas['HomeworkIn']) =>
+    request<Schemas['HomeworkOut']>(`/classes/${classId}/homework`, { method: 'POST', body }),
+  updateHomework: (assignmentId: string, body: Schemas['HomeworkPatch']) =>
+    request<Schemas['HomeworkOut']>(`/assignments/${assignmentId}`, { method: 'PATCH', body }),
+  setHomework: (assignmentId: string) =>
+    request<Schemas['HomeworkOut']>(`/assignments/${assignmentId}/set`, { method: 'POST' }),
+  closeHomework: (assignmentId: string) =>
+    request<Schemas['HomeworkOut']>(`/assignments/${assignmentId}/close`, { method: 'POST' }),
+  reopenHomework: (assignmentId: string) =>
+    request<Schemas['HomeworkOut']>(`/assignments/${assignmentId}/reopen`, { method: 'POST' }),
+  markingOverview: (assignmentId: string) =>
+    request<Schemas['MarkingOverviewOut']>(`/assignments/${assignmentId}/marking`),
+  markingQuestion: (assignmentId: string, itemId: string) =>
+    request<Schemas['QuestionMarkingOut']>(`/assignments/${assignmentId}/marking/${itemId}`),
+  saveMark: (attemptId: string, body: Schemas['MarkIn']) =>
+    request<Schemas['MarkOut']>(`/attempts/${attemptId}/mark`, { method: 'PUT', body }),
+  saveNote: (assignmentId: string, studentId: string, note: string) =>
+    request<Schemas['NoteIn']>(`/assignments/${assignmentId}/notes/${studentId}`, {
+      method: 'PUT',
+      body: { note } satisfies Schemas['NoteIn'],
+    }),
+  releaseHomework: (assignmentId: string) =>
+    request<Schemas['ReleaseOut']>(`/assignments/${assignmentId}/release`, { method: 'POST' }),
+  listSnippets: (q?: string) =>
+    request<Schemas['SnippetOut'][]>(`/snippets${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+  createSnippet: (body: Schemas['SnippetIn']) =>
+    request<Schemas['SnippetOut']>('/snippets', { method: 'POST', body }),
+  homeworkGrid: (assignmentId: string) =>
+    request<Schemas['GridOut']>(`/assignments/${assignmentId}/grid`),
+  todayGrid: (classId: string) => request<Schemas['GridOut']>(`/classes/${classId}/today`),
+  studentHistory: (studentId: string) =>
+    request<Schemas['StudentHistoryOut']>(`/students/${studentId}/history`),
 
   /* --- teacher: problem bank ----------------------------------------------------- */
 
@@ -263,6 +305,15 @@ export const api = {
   /* --- student: classwork ---------------------------------------------------------- */
 
   today: () => request<Schemas['TodayOut']>('/me/lesson', { anonymous: true }),
+  home: () => request<Schemas['HomeOut']>('/me/home', { anonymous: true }),
+  sheet: (assignmentId: string) =>
+    request<Schemas['SheetOut']>(`/me/homework/${assignmentId}`, { anonymous: true }),
+  handIn: (assignmentId: string, results: Schemas['HandInResult'][]) =>
+    request<Schemas['SheetOut']>(`/me/homework/${assignmentId}/hand-in`, {
+      method: 'POST',
+      body: { results } satisfies Schemas['HandInIn'],
+      anonymous: true,
+    }),
   openProblem: (assignmentId: string, itemId: string) =>
     request<Schemas['StudentProblemOut']>(
       `/me/assignments/${assignmentId}/items/${itemId}/open`,
@@ -284,6 +335,14 @@ export const api = {
     request<Schemas['StudentLeafOut']>(`/me/attempts/${attemptId}/hints`, {
       method: 'POST',
       anonymous: true,
+    }),
+
+  recordEvents: (events: Schemas['EventIn'][], keepalive = false) =>
+    request<Schemas['EventBatchOut']>('/me/events', {
+      method: 'POST',
+      body: { events } satisfies Schemas['EventBatchIn'],
+      anonymous: true,
+      keepalive,
     }),
 
   archiveDocument: (documentId: string) =>

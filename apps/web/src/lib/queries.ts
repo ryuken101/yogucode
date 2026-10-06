@@ -35,6 +35,17 @@ export const keys = {
   problem: (itemId: string) => ['problem', itemId] as const,
   ladder: (lessonId: string) => ['ladder', lessonId] as const,
   today: ['today'] as const,
+  home: ['home'] as const,
+  sheet: (assignmentId: string) => ['sheet', assignmentId] as const,
+  homework: (classId: string) => ['homework', classId] as const,
+  homeworkOne: (assignmentId: string) => ['homework-one', assignmentId] as const,
+  marking: (assignmentId: string) => ['marking', assignmentId] as const,
+  markingQuestion: (assignmentId: string, itemId: string) =>
+    ['marking', assignmentId, itemId] as const,
+  snippets: ['snippets'] as const,
+  grid: (assignmentId: string) => ['grid', assignmentId] as const,
+  todayGrid: (classId: string) => ['today-grid', classId] as const,
+  history: (studentId: string) => ['history', studentId] as const,
   studentProblem: (assignmentId: string, itemId: string) =>
     ['student-problem', assignmentId, itemId] as const,
 }
@@ -317,4 +328,76 @@ export function useStudentProblem(assignmentId: string, itemId: string) {
     queryFn: () => api.openProblem(assignmentId, itemId),
     staleTime: Infinity,
   })
+}
+
+/* --- homework ------------------------------------------------------------------------ */
+
+export function useHome() {
+  return useQuery({ queryKey: keys.home, queryFn: api.home })
+}
+
+export function useSheet(assignmentId: string) {
+  return useQuery({ queryKey: keys.sheet(assignmentId), queryFn: () => api.sheet(assignmentId) })
+}
+
+export function useClassHomework(classId: string) {
+  return useQuery({ queryKey: keys.homework(classId), queryFn: () => api.listHomework(classId) })
+}
+
+export function useHomework(assignmentId: string | null) {
+  return useQuery({
+    queryKey: keys.homeworkOne(assignmentId ?? ''),
+    queryFn: () => api.readHomework(assignmentId ?? ''),
+    enabled: Boolean(assignmentId),
+  })
+}
+
+/** A change to one homework: refresh it and its class's list. */
+export function useHomeworkMutation<T>(
+  classId: string,
+  mutationFn: (input: T) => Promise<Schemas['HomeworkOut']>,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn,
+    onSuccess: (homework) => {
+      client.setQueryData(keys.homeworkOne(homework.id), homework)
+      return client.invalidateQueries({ queryKey: keys.homework(classId) })
+    },
+  })
+}
+
+export function useMarkingOverview(assignmentId: string) {
+  return useQuery({
+    queryKey: keys.marking(assignmentId),
+    queryFn: () => api.markingOverview(assignmentId),
+  })
+}
+
+/**
+ * One question's answers. Not refetched behind the teacher's back: the marking screen
+ * holds unsaved rubric state per child, and a refetch mid-mark would fight it.
+ */
+export function useMarkingQuestion(assignmentId: string, itemId: string) {
+  return useQuery({
+    queryKey: keys.markingQuestion(assignmentId, itemId),
+    queryFn: () => api.markingQuestion(assignmentId, itemId),
+    staleTime: Infinity,
+  })
+}
+
+export function useSnippets() {
+  return useQuery({ queryKey: keys.snippets, queryFn: () => api.listSnippets() })
+}
+
+export function useHomeworkGrid(assignmentId: string) {
+  return useQuery({ queryKey: keys.grid(assignmentId), queryFn: () => api.homeworkGrid(assignmentId) })
+}
+
+export function useTodayGrid(classId: string) {
+  return useQuery({ queryKey: keys.todayGrid(classId), queryFn: () => api.todayGrid(classId) })
+}
+
+export function useStudentHistory(studentId: string) {
+  return useQuery({ queryKey: keys.history(studentId), queryFn: () => api.studentHistory(studentId) })
 }

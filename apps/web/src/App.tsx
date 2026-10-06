@@ -42,6 +42,22 @@ const ProblemAttempt = lazy(() =>
   import('./routes/ProblemAttempt').then((m) => ({ default: m.ProblemAttempt })),
 )
 
+const HomeworkSheet = lazy(() =>
+  import('./routes/HomeworkSheet').then((m) => ({ default: m.HomeworkSheet })),
+)
+
+const HomeworkBuilder = lazy(() =>
+  import('./routes/HomeworkBuilder').then((m) => ({ default: m.HomeworkBuilder })),
+)
+const Marking = lazy(() => import('./routes/Marking').then((m) => ({ default: m.Marking })))
+const MarkingStart = lazy(() =>
+  import('./routes/Marking').then((m) => ({ default: m.MarkingStart })),
+)
+const Progress = lazy(() => import('./routes/Progress').then((m) => ({ default: m.Progress })))
+const StudentHistory = lazy(() =>
+  import('./routes/StudentHistory').then((m) => ({ default: m.StudentHistory })),
+)
+
 function Loading({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<Spinner label="Loading" />}>{children}</Suspense>
 }
@@ -57,6 +73,7 @@ export default function App() {
       <Route element={<RequireStudent />}>
         <Route path="/home" element={<StudentHome />} />
         <Route path="/work" element={<Work />} />
+        <Route path="/homework/:assignmentId" element={<Loading><HomeworkSheet /></Loading>} />
         <Route
           path="/lesson/:assignmentId/:itemId"
           element={<Loading><ProblemAttempt /></Loading>}
@@ -67,6 +84,18 @@ export default function App() {
         <Route path="/classes" element={<ClassList />} />
         <Route path="/classes/:classId" element={<ClassDetail />} />
         <Route path="/classes/:classId/slips" element={<SlipSheet />} />
+        <Route path="/classes/:classId/homework/new" element={<Loading><HomeworkBuilder /></Loading>} />
+        <Route
+          path="/classes/:classId/homework/:assignmentId"
+          element={<Loading><HomeworkBuilder /></Loading>}
+        />
+        <Route path="/classes/:classId/progress" element={<Loading><Progress /></Loading>} />
+        <Route path="/assignments/:assignmentId/mark" element={<Loading><MarkingStart /></Loading>} />
+        <Route
+          path="/assignments/:assignmentId/mark/:itemId"
+          element={<Loading><Marking /></Loading>}
+        />
+        <Route path="/students/:studentId" element={<Loading><StudentHistory /></Loading>} />
         <Route path="/curriculum" element={<Loading><Curriculum /></Loading>} />
         <Route path="/problems" element={<Loading><ProblemBank /></Loading>} />
         {/* One key for both: saving a new problem navigates from /new to /:itemId, and a

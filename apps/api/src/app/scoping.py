@@ -506,9 +506,18 @@ async def list_item_parts(
 
 
 async def get_student_assignment(
-    session: AsyncSession, principal: Principal, assignment_id: uuid.UUID
+    session: AsyncSession,
+    principal: Principal,
+    assignment_id: uuid.UUID,
+    *,
+    include_closed: bool = False,
 ) -> Assignment:
-    """An open assignment in one of the calling student's active classes, or 404."""
+    """An open assignment in one of the calling student's active classes, or 404.
+
+    `include_closed` is for *reading*: a closed homework with feedback on it is still the
+    child's to look at. Drafts and archived assignments are never visible to a child.
+    """
+    statuses = [AssignmentStatus.OPEN] + ([AssignmentStatus.CLOSED] if include_closed else [])
     found = (
         await session.exec(
             select(Assignment)
@@ -516,7 +525,7 @@ async def get_student_assignment(
             .where(
                 Assignment.id == assignment_id,
                 Assignment.centre_id == principal.centre_id,
-                Assignment.status == AssignmentStatus.OPEN,
+                Assignment.status.in_(statuses),  # type: ignore[attr-defined]
                 Enrolment.student_id == principal.subject_id,
                 Enrolment.status == EnrolmentStatus.ACTIVE,
             )
@@ -563,3 +572,42 @@ async def get_student_class(session: AsyncSession, principal: Principal) -> Clas
             .order_by(Enrolment.id.desc())  # type: ignore[attr-defined]
         )
     ).first()
+
+
+async def get_owned_assignment(
+    session: AsyncSession, principal: Principal, assignment_id: uuid.UUID
+) -> Assignment:
+    """An assignment at the principal's centre, or 404 — the teacher's view of one."""
+    found = (
+        await session.exec(
+            select(Assignment).where(
+                Assignment.id == assignment_id,
+                Assignment.centre_id == principal.centre_id,
+            )
+        )
+    ).one_or_none()
+    if found is None:
+        raise _not_found("assignment")
+    return found
+
+
+async def get_centre_attempt(
+    session: AsyncSession, principal: Principal, attempt_id: uuid.UUID
+) -> Attempt:
+    """Any attempt at the principal's centre, or 404 — for a teacher marking it.
+
+    Teachers at a centre share classes, so they share the marking of them. The subject
+    boundary that `get_own_attempt` enforces is a *student's*; a teacher reaching a child's
+    work is what marking is.
+    """
+    found = (
+        await session.exec(
+            select(Attempt).where(
+                Attempt.id == attempt_id,
+                Attempt.centre_id == principal.centre_id,
+            )
+        )
+    ).one_or_none()
+    if found is None:
+        raise _not_found("attempt")
+    return found

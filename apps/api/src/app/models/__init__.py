@@ -30,6 +30,15 @@ from app.models.classes import (
 from app.models.concepts import Concept, ConceptStatus
 from app.models.curriculum import Course, CurriculumStatus, Lesson, LessonConcept, Unit
 from app.models.documents import DocumentStatus, StudentDocument
+from app.models.events import Event, EventType
+from app.models.marking import (
+    AssignmentNote,
+    FeedbackSnippet,
+    Mark,
+    SnippetStatus,
+    Submission,
+    SubmissionSource,
+)
 from app.models.problems import Hint, Item, ItemConcept, ItemKind, ItemStatus, TestCase, TestKind
 from app.models.students import (
     Student,
@@ -43,6 +52,7 @@ __all__ = [
     "ActorType",
     "Assignment",
     "AssignmentMode",
+    "AssignmentNote",
     "AssignmentStatus",
     "Attempt",
     "AttemptStatus",
@@ -60,6 +70,9 @@ __all__ = [
     "DocumentStatus",
     "Enrolment",
     "EnrolmentStatus",
+    "FeedbackSnippet",
+    "Event",
+    "EventType",
     "Hint",
     "Item",
     "ItemConcept",
@@ -67,14 +80,18 @@ __all__ = [
     "ItemStatus",
     "Lesson",
     "LessonConcept",
+    "Mark",
     "ProblemSet",
     "SetItem",
     "SetStatus",
+    "SnippetStatus",
     "Student",
     "StudentDocument",
     "StudentCredential",
     "StudentSession",
     "StudentStatus",
+    "Submission",
+    "SubmissionSource",
     "TestCase",
     "TestKind",
     "TimestampMixin",

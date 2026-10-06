@@ -20,6 +20,7 @@ import uuid
 from collections.abc import Sequence
 
 from fastapi import HTTPException, status
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlmodel import col, delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -28,6 +29,8 @@ from app.models import (
     Assignment,
     AssignmentMode,
     AssignmentStatus,
+    Attempt,
+    AttemptStatus,
     Class,
     ClassStatus,
     Item,
@@ -37,6 +40,7 @@ from app.models import (
     SetItem,
     SetStatus,
 )
+from app.models.base import new_uuid, utcnow
 
 MAX_LADDER = 12
 CLASSWORK_SETTINGS = {"completions": True, "hints": True}
@@ -97,24 +101,23 @@ def _unprocessable(detail: str) -> HTTPException:
     return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
 
 
-async def set_ladder(
+async def check_set_items(
     session: AsyncSession,
     principal: Principal,
-    lesson: Lesson,
     item_ids: Sequence[uuid.UUID],
-) -> ProblemSet:
-    """Replace a lesson's ladder with `item_ids`, in that order. The caller commits.
+    *,
+    already: set[uuid.UUID],
+    limit: int = MAX_LADDER,
+) -> None:
+    """Refuse a problem list that cannot go on a set. Shared by ladders and homework.
 
     Every id must be a top-level problem at this centre that is published — or that is
-    already on this ladder, which is how a superseded version stays until it is swapped.
+    `already` on the set, which is how a superseded version stays until it is swapped.
     """
     if len(set(item_ids)) != len(item_ids):
-        raise _unprocessable("A problem is on the ladder twice")
-    if len(item_ids) > MAX_LADDER:
-        raise _unprocessable(f"A ladder has at most {MAX_LADDER} problems")
-
-    ladder = await get_ladder(session, principal, lesson)
-    already = {i.id for i in await ladder_items(session, principal, ladder.id)} if ladder else set()
+        raise _unprocessable("A problem is on the list twice")
+    if len(item_ids) > limit:
+        raise _unprocessable(f"A list has at most {limit} problems")
     found = {
         item.id: item
         for item in (
@@ -135,6 +138,30 @@ async def set_ladder(
         if item.status != ItemStatus.PUBLISHED and item_id not in already:
             raise _unprocessable(f"“{item.title}” is not published yet")
 
+
+async def replace_set_items(
+    session: AsyncSession, set_id: uuid.UUID, item_ids: Sequence[uuid.UUID]
+) -> None:
+    """Make a set's problems exactly `item_ids`, in order. Checked by `check_set_items`."""
+    await session.exec(delete(SetItem).where(col(SetItem.set_id) == set_id))  # type: ignore[call-overload]
+    session.add_all(
+        SetItem(set_id=set_id, item_id=item_id, sort_order=order)
+        for order, item_id in enumerate(item_ids)
+    )
+    await session.flush()
+
+
+async def set_ladder(
+    session: AsyncSession,
+    principal: Principal,
+    lesson: Lesson,
+    item_ids: Sequence[uuid.UUID],
+) -> ProblemSet:
+    """Replace a lesson's ladder with `item_ids`, in that order. The caller commits."""
+    ladder = await get_ladder(session, principal, lesson)
+    already = {i.id for i in await ladder_items(session, principal, ladder.id)} if ladder else set()
+    await check_set_items(session, principal, item_ids, already=already)
+
     if ladder is None:
         ladder = ProblemSet(
             centre_id=principal.centre_id,
@@ -144,13 +171,7 @@ async def set_ladder(
         )
         session.add(ladder)
         await session.flush()
-    else:
-        await session.exec(delete(SetItem).where(col(SetItem.set_id) == ladder.id))  # type: ignore[call-overload]
-    session.add_all(
-        SetItem(set_id=ladder.id, item_id=item_id, sort_order=order)
-        for order, item_id in enumerate(item_ids)
-    )
-    await session.flush()
+    await replace_set_items(session, ladder.id, item_ids)
     return ladder
 
 
@@ -215,3 +236,40 @@ async def open_classwork_for_lesson(
     ).all()
     for klass in classes:
         await ensure_classwork(session, principal, klass)
+
+
+async def open_attempt(
+    session: AsyncSession, principal: Principal, assignment: Assignment, leaf: Item
+) -> Attempt:
+    """The child's attempt at a leaf, created with the starter code on first open.
+
+    `ON CONFLICT DO NOTHING` rather than check-then-insert: a child with the problem open
+    in two tabs opens it twice at once, and the second must find the first's row rather
+    than fail on the unique constraint.
+    """
+    await session.exec(
+        pg_insert(Attempt)  # type: ignore[call-overload]
+        .values(
+            id=new_uuid(),
+            centre_id=principal.centre_id,
+            student_id=principal.subject_id,
+            assignment_id=assignment.id,
+            item_id=leaf.id,
+            code=leaf.starter_code,
+            status=AttemptStatus.IN_PROGRESS,
+            run_count=0,
+            hints_unlocked=0,
+            created_at=utcnow(),
+            updated_at=utcnow(),
+        )
+        .on_conflict_do_nothing(constraint="uq_attempts_assignment_item_student")
+    )
+    return (
+        await session.exec(
+            select(Attempt).where(
+                Attempt.assignment_id == assignment.id,
+                Attempt.item_id == leaf.id,
+                Attempt.student_id == principal.subject_id,
+            )
+        )
+    ).one()

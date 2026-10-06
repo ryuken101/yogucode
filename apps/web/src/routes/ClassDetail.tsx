@@ -7,17 +7,21 @@
  */
 
 import { useState } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { Link, useNavigate, useParams } from 'react-router'
 import { Badge } from '../components/Badge'
 import { Button } from '../components/Button'
 import { Card, EmptyState, PageHeader } from '../components/Card'
 import { Dialog } from '../components/Dialog'
 import { Notice } from '../components/Notice'
 import { Spinner } from '../components/Spinner'
+import { api } from '../lib/api'
+import { formatDue } from '../lib/dates'
 import { messageFor } from '../lib/errors'
 import {
   useClass,
+  useClassHomework,
   useCourse,
+  useHomeworkMutation,
   useCourses,
   useSetClassCurriculum,
   useIssuePins,
@@ -63,6 +67,9 @@ export function ClassDetail() {
   return (
     <>
       <PageHeader title={klass.data.name}>
+        <Button variant="secondary" onClick={() => navigate(`/classes/${classId}/progress`)}>
+          Progress
+        </Button>
         <Button variant="secondary" onClick={() => setPasteOpen(true)}>
           Add students
         </Button>
@@ -102,6 +109,8 @@ export function ClassDetail() {
         courseId={klass.data.course_id}
         lessonId={klass.data.current_lesson_id}
       />
+
+      <HomeworkCard classId={classId} />
 
       <Card className="mb-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -158,7 +167,9 @@ export function ClassDetail() {
               key={entry.student_id}
               className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-paper px-5 py-3 ring-1 ring-ink/10"
             >
-              <span className="font-medium text-ink">{entry.display_name}</span>
+              <Link to={`/students/${entry.student_id}`} className="font-medium text-ink hover:text-sky-deep">
+                {entry.display_name}
+              </Link>
               <div className="flex items-center gap-2">
                 {entry.student_status === 'archived' ? <Badge variant="muted">Archived</Badge> : null}
                 <Button
@@ -307,6 +318,72 @@ function CurriculumCard({
           <Notice tone="not-yet">{messageFor(setCurriculum.error)}</Notice>
         </div>
       ) : null}
+    </Card>
+  )
+}
+
+/**
+ * The class's homework: what is set, when it is due, how many have handed it in and been
+ * marked. One line each, with the next thing to do with it — set a draft, mark a set one.
+ */
+function HomeworkCard({ classId }: { classId: string }) {
+  const navigate = useNavigate()
+  const homework = useClassHomework(classId)
+  const close = useHomeworkMutation(classId, (id: string) => api.closeHomework(id))
+  const reopen = useHomeworkMutation(classId, (id: string) => api.reopenHomework(id))
+
+  return (
+    <Card className="mb-6">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="font-serif text-lg text-ink">Homework</h2>
+        <Button variant="secondary" onClick={() => navigate(`/classes/${classId}/homework/new`)}>
+          New homework
+        </Button>
+      </div>
+      {homework.isPending ? <Spinner label="Loading homework" /> : null}
+      {homework.data && homework.data.length === 0 ? (
+        <p className="text-sm text-ink-soft">None yet.</p>
+      ) : null}
+      <ul className="flex flex-col gap-2">
+        {(homework.data ?? []).map((hw) => (
+          <li
+            key={hw.id}
+            className="flex flex-wrap items-center gap-3 rounded-lg bg-cream/60 px-4 py-2.5 ring-1 ring-ink/10"
+          >
+            <span className="font-medium text-ink">{hw.title}</span>
+            {hw.status === 'draft' ? <Badge variant="active">Draft</Badge> : null}
+            {hw.status === 'closed' ? <Badge variant="muted">Closed</Badge> : null}
+            <span className="text-sm text-ink-soft">due {formatDue(hw.due_at)}</span>
+            {hw.status !== 'draft' ? (
+              <span className="text-sm text-ink-soft">
+                {hw.handed_in}/{hw.students} handed in · {hw.marked} marked
+                {hw.returned ? ` · ${hw.returned} given back` : ''}
+              </span>
+            ) : null}
+            <span className="ml-auto flex gap-1">
+              <Button variant="quiet" onClick={() => navigate(`/classes/${classId}/homework/${hw.id}`)}>
+                {hw.status === 'draft' ? 'Edit' : 'Details'}
+              </Button>
+              {hw.status !== 'draft' ? (
+                <Button variant="primary" onClick={() => navigate(`/assignments/${hw.id}/mark`)}>
+                  Mark
+                </Button>
+              ) : null}
+              {hw.status === 'open' ? (
+                <Button variant="quiet" onClick={() => close.mutate(hw.id)}>
+                  Close
+                </Button>
+              ) : null}
+              {hw.status === 'closed' ? (
+                <Button variant="quiet" onClick={() => reopen.mutate(hw.id)}>
+                  Reopen
+                </Button>
+              ) : null}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {homework.error ? <Notice tone="system-error">{messageFor(homework.error)}</Notice> : null}
     </Card>
   )
 }

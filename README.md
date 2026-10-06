@@ -134,6 +134,12 @@ erDiagram
     sets    ||--o{ assignments : "as"
     assignments ||--o{ attempts : "worked in"
     students ||--o{ attempts : makes
+    attempts ||--o{ submissions : "handed in as"
+    attempts ||--o| marks : "marked"
+    assignments ||--o{ assignment_notes : "overall note"
+    centres ||--o{ feedback_snippets : "comment bank"
+    attempts ||--o{ events : "process trace"
+    student_documents ||--o{ events : "process trace"
 ```
 
 **Everything a child does is an attempt at a tagged problem** (spec §2). A problem is an
@@ -172,7 +178,7 @@ the taxonomy must be a config edit, not a migration.
 ### Where development is now
 
 **Phase 1 is complete bar its deploy; Phase 2 is built; Phase 3 (turtle) is skipped for
-now; Phase 4 is built.** Phases 4–5 are planned in
+now; Phase 4 is built; Phase 5 steps 7–10 are built.** Phases 4–5 are planned in
 `~/Documents/Ken Nguyen/Startup/phase-4-5-plan.md`.
 
 Phase 1's plan lives in `~/Documents/Ken Nguyen/Startup/phase-1-plan.md` and runs as eleven
@@ -342,9 +348,30 @@ Load-bearing decisions, each easy to undo by accident:
 - **Teacher problem screens and the attempt page are lazy-loaded**, so `/join` does not
   carry the markdown renderer or the editor modules.
 
-Phase 5 — homework submit and mark, with a minimal event capture pulled forward from Phase 6
-— is next, and is the milestone that matters: the first release to a class. Phase 1's
-steps 10–11 (deploy, real hardware) and the Supabase Pro upgrade come before it.
+**Phase 5, steps 7–10 — event capture, homework, marking, progress — are built.**
+
+- **Every edit, run, check, error, paste, hint and hand-in is recorded**, on problems and
+  on My files (`events`; `src/events/recorder.ts`). Edits are diffs, batched every 3 s,
+  flushed with `keepalive` on `pagehide`. Ids are UUIDv7 minted in the browser and inserted
+  `ON CONFLICT DO NOTHING`, so a resent batch lands once — Phase 6's offline buffer is a
+  client-only change. Nothing reads the trace yet; Phase 7's replay will.
+- **Homework is set from the class page** — problems from the bank, a due date and time,
+  hints on or off — and appears for the class when the teacher presses Set. A child hands
+  in the whole sheet at once, after their browser has checked every problem and shown them
+  the result. Late is a flag, never a refusal; handing in again is allowed until the work
+  is given back.
+- **Marking is one question across the class**, one child at a time, ←/→ saving as it
+  goes. Runs and Correct (0–2) are pre-filled from a re-run in the teacher's browser,
+  hidden checks included; Approach (0–2) is the teacher's call. A child who never handed in
+  is still markable from their saved work. Comments draw on a centre-wide snippet bank;
+  there is an optional overall note per child.
+- **Nothing reaches a child until "Give back"**, and then only comments and sage/amber per
+  question — never the numbers — and the sheet becomes read-only.
+- **Progress**: a students × problems grid per homework and for today's ladder (with
+  "finished — ready for more"), and a per-child history page with the marks.
+
+Next: step 11 (QR on the PIN slips), then Phase 1's deploy steps and the Supabase Pro
+upgrade, then a fortnight of real use before Phase 6.
 
 ## Local development
 

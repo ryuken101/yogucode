@@ -10,6 +10,16 @@
         "title": "AssignmentMode",
         "type": "string"
       },
+      "AssignmentStatus": {
+        "enum": [
+          "draft",
+          "open",
+          "closed",
+          "archived"
+        ],
+        "title": "AssignmentStatus",
+        "type": "string"
+      },
       "AttemptOut": {
         "properties": {
           "code": {
@@ -724,6 +734,141 @@
         "title": "EnrolmentStatus",
         "type": "string"
       },
+      "EventBatchIn": {
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/EventIn"
+            },
+            "maxItems": 500,
+            "title": "Events",
+            "type": "array"
+          }
+        },
+        "required": [
+          "events"
+        ],
+        "title": "EventBatchIn",
+        "type": "object"
+      },
+      "EventBatchOut": {
+        "properties": {
+          "received": {
+            "title": "Received",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "received"
+        ],
+        "title": "EventBatchOut",
+        "type": "object"
+      },
+      "EventIn": {
+        "properties": {
+          "attempt_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "client_ts": {
+            "format": "date-time",
+            "title": "Client Ts",
+            "type": "string"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
+          "editor_session_id": {
+            "format": "uuid",
+            "title": "Editor Session Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "title": "Payload",
+            "type": "object"
+          },
+          "seq": {
+            "minimum": 0.0,
+            "title": "Seq",
+            "type": "integer"
+          },
+          "type": {
+            "$ref": "#/components/schemas/EventType"
+          }
+        },
+        "required": [
+          "id",
+          "editor_session_id",
+          "seq",
+          "type",
+          "client_ts"
+        ],
+        "title": "EventIn",
+        "type": "object"
+      },
+      "EventType": {
+        "enum": [
+          "edit",
+          "run",
+          "check",
+          "error",
+          "paste",
+          "hint",
+          "submit"
+        ],
+        "title": "EventType",
+        "type": "string"
+      },
+      "FeedbackOut": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "comment_md": {
+            "title": "Comment Md",
+            "type": "string"
+          },
+          "outcome": {
+            "enum": [
+              "good",
+              "not_yet"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "comment_md",
+          "outcome"
+        ],
+        "title": "FeedbackOut",
+        "type": "object"
+      },
       "FunctionTest": {
         "description": "Run the program, then evaluate `call` and compare it with `expected` using `==`.\n\nBoth are Python expressions: `call=\"add(2, 3)\"`, `expected=\"5\"`.",
         "properties": {
@@ -765,6 +910,137 @@
         "title": "FunctionTest",
         "type": "object"
       },
+      "GridCellOut": {
+        "properties": {
+          "late": {
+            "default": false,
+            "title": "Late",
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "not_started",
+              "started",
+              "passing",
+              "handed_in",
+              "marked",
+              "returned"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "GridCellOut",
+        "type": "object"
+      },
+      "GridColumnOut": {
+        "properties": {
+          "difficulty": {
+            "title": "Difficulty",
+            "type": "integer"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "title",
+          "difficulty"
+        ],
+        "title": "GridColumnOut",
+        "type": "object"
+      },
+      "GridOut": {
+        "properties": {
+          "assignment_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignment Id"
+          },
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/GridColumnOut"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/GridRowOut"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "title",
+          "assignment_id",
+          "columns",
+          "rows"
+        ],
+        "title": "GridOut",
+        "type": "object"
+      },
+      "GridRowOut": {
+        "properties": {
+          "cells": {
+            "items": {
+              "$ref": "#/components/schemas/GridCellOut"
+            },
+            "title": "Cells",
+            "type": "array"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "finished": {
+            "default": false,
+            "title": "Finished",
+            "type": "boolean"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "display_name",
+          "cells"
+        ],
+        "title": "GridRowOut",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -776,6 +1052,48 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HandInIn": {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/HandInResult"
+            },
+            "maxItems": 100,
+            "title": "Results",
+            "type": "array"
+          }
+        },
+        "title": "HandInIn",
+        "type": "object"
+      },
+      "HandInResult": {
+        "properties": {
+          "attempt_id": {
+            "format": "uuid",
+            "title": "Attempt Id",
+            "type": "string"
+          },
+          "passed": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Passed",
+            "type": "integer"
+          },
+          "total": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "attempt_id",
+          "passed",
+          "total"
+        ],
+        "title": "HandInResult",
         "type": "object"
       },
       "HintDoc": {
@@ -806,6 +1124,422 @@
           "body_md"
         ],
         "title": "HintDoc",
+        "type": "object"
+      },
+      "HistoryEntryOut": {
+        "properties": {
+          "assignment_id": {
+            "format": "uuid",
+            "title": "Assignment Id",
+            "type": "string"
+          },
+          "class_name": {
+            "title": "Class Name",
+            "type": "string"
+          },
+          "due_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "handed_in_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Handed In At"
+          },
+          "late": {
+            "title": "Late",
+            "type": "boolean"
+          },
+          "questions": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryQuestionOut"
+            },
+            "title": "Questions",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assignment_id",
+          "title",
+          "class_name",
+          "due_at",
+          "handed_in_at",
+          "late",
+          "questions"
+        ],
+        "title": "HistoryEntryOut",
+        "type": "object"
+      },
+      "HistoryQuestionOut": {
+        "properties": {
+          "approach": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approach"
+          },
+          "correct": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correct"
+          },
+          "released": {
+            "title": "Released",
+            "type": "boolean"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "correct",
+          "approach",
+          "released"
+        ],
+        "title": "HistoryQuestionOut",
+        "type": "object"
+      },
+      "HomeOut": {
+        "properties": {
+          "homework": {
+            "items": {
+              "$ref": "#/components/schemas/HomeworkCardOut"
+            },
+            "title": "Homework",
+            "type": "array"
+          },
+          "today": {
+            "$ref": "#/components/schemas/TodayOut"
+          }
+        },
+        "required": [
+          "today",
+          "homework"
+        ],
+        "title": "HomeOut",
+        "type": "object"
+      },
+      "HomeworkCardOut": {
+        "properties": {
+          "assignment_id": {
+            "format": "uuid",
+            "title": "Assignment Id",
+            "type": "string"
+          },
+          "changed_since_hand_in": {
+            "title": "Changed Since Hand In",
+            "type": "boolean"
+          },
+          "closed": {
+            "title": "Closed",
+            "type": "boolean"
+          },
+          "due_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "handed_in_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Handed In At"
+          },
+          "late": {
+            "title": "Late",
+            "type": "boolean"
+          },
+          "problems": {
+            "title": "Problems",
+            "type": "integer"
+          },
+          "returned": {
+            "title": "Returned",
+            "type": "boolean"
+          },
+          "started": {
+            "title": "Started",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assignment_id",
+          "title",
+          "due_at",
+          "closed",
+          "problems",
+          "started",
+          "handed_in_at",
+          "changed_since_hand_in",
+          "late",
+          "returned"
+        ],
+        "title": "HomeworkCardOut",
+        "type": "object"
+      },
+      "HomeworkIn": {
+        "properties": {
+          "due_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "hints": {
+            "default": true,
+            "title": "Hints",
+            "type": "boolean"
+          },
+          "item_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 12,
+            "title": "Item Ids",
+            "type": "array"
+          },
+          "title": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "HomeworkIn",
+        "type": "object"
+      },
+      "HomeworkOut": {
+        "properties": {
+          "class_id": {
+            "format": "uuid",
+            "title": "Class Id",
+            "type": "string"
+          },
+          "due_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "handed_in": {
+            "title": "Handed In",
+            "type": "integer"
+          },
+          "hints": {
+            "title": "Hints",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "marked": {
+            "title": "Marked",
+            "type": "integer"
+          },
+          "problems": {
+            "items": {
+              "$ref": "#/components/schemas/HomeworkProblemOut"
+            },
+            "title": "Problems",
+            "type": "array"
+          },
+          "released_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Released At"
+          },
+          "returned": {
+            "title": "Returned",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AssignmentStatus"
+          },
+          "students": {
+            "title": "Students",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "class_id",
+          "title",
+          "status",
+          "due_at",
+          "hints",
+          "released_at",
+          "problems",
+          "students",
+          "handed_in",
+          "marked",
+          "returned"
+        ],
+        "title": "HomeworkOut",
+        "type": "object"
+      },
+      "HomeworkPatch": {
+        "description": "Every field optional \u2014 an absent field means \"leave it alone\".",
+        "properties": {
+          "due_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "hints": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hints"
+          },
+          "item_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "maxItems": 12,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Ids"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "HomeworkPatch",
+        "type": "object"
+      },
+      "HomeworkProblemOut": {
+        "properties": {
+          "difficulty": {
+            "title": "Difficulty",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ItemStatus"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "difficulty",
+          "status"
+        ],
+        "title": "HomeworkProblemOut",
         "type": "object"
       },
       "ImportEntryOut": {
@@ -1239,6 +1973,347 @@
         "title": "LessonOut",
         "type": "object"
       },
+      "MarkIn": {
+        "properties": {
+          "approach": {
+            "anyOf": [
+              {
+                "maximum": 2.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approach"
+          },
+          "comment_md": {
+            "default": "",
+            "maxLength": 4000,
+            "title": "Comment Md",
+            "type": "string"
+          },
+          "correct": {
+            "maximum": 2.0,
+            "minimum": 0.0,
+            "title": "Correct",
+            "type": "integer"
+          },
+          "runs": {
+            "title": "Runs",
+            "type": "boolean"
+          },
+          "snippet_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Snippet Ids",
+            "type": "array"
+          },
+          "verified_passed": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified Passed"
+          },
+          "verified_total": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified Total"
+          }
+        },
+        "required": [
+          "runs",
+          "correct"
+        ],
+        "title": "MarkIn",
+        "type": "object"
+      },
+      "MarkOut": {
+        "properties": {
+          "approach": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approach"
+          },
+          "comment_md": {
+            "title": "Comment Md",
+            "type": "string"
+          },
+          "correct": {
+            "title": "Correct",
+            "type": "integer"
+          },
+          "released": {
+            "title": "Released",
+            "type": "boolean"
+          },
+          "runs": {
+            "title": "Runs",
+            "type": "boolean"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "verified_passed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified Passed"
+          },
+          "verified_total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified Total"
+          }
+        },
+        "required": [
+          "runs",
+          "correct",
+          "approach",
+          "comment_md",
+          "verified_passed",
+          "verified_total",
+          "released",
+          "stale"
+        ],
+        "title": "MarkOut",
+        "type": "object"
+      },
+      "MarkingEntryOut": {
+        "properties": {
+          "attempt_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "child_passed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Child Passed"
+          },
+          "child_total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Child Total"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "hints_used": {
+            "title": "Hints Used",
+            "type": "integer"
+          },
+          "late": {
+            "title": "Late",
+            "type": "boolean"
+          },
+          "mark": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MarkOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "hand_in",
+              "saved_work",
+              "not_handed_in",
+              "not_started"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "submitted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted At"
+          }
+        },
+        "required": [
+          "student_id",
+          "display_name",
+          "attempt_id",
+          "code",
+          "source",
+          "submitted_at",
+          "late",
+          "child_passed",
+          "child_total",
+          "hints_used",
+          "mark",
+          "note"
+        ],
+        "title": "MarkingEntryOut",
+        "type": "object"
+      },
+      "MarkingOverviewOut": {
+        "properties": {
+          "assignment_id": {
+            "format": "uuid",
+            "title": "Assignment Id",
+            "type": "string"
+          },
+          "due_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "questions": {
+            "items": {
+              "$ref": "#/components/schemas/QuestionOut"
+            },
+            "title": "Questions",
+            "type": "array"
+          },
+          "released_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Released At"
+          },
+          "students": {
+            "items": {
+              "$ref": "#/components/schemas/MarkingStudentOut"
+            },
+            "title": "Students",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assignment_id",
+          "title",
+          "due_at",
+          "released_at",
+          "questions",
+          "students"
+        ],
+        "title": "MarkingOverviewOut",
+        "type": "object"
+      },
+      "MarkingStudentOut": {
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "display_name"
+        ],
+        "title": "MarkingStudentOut",
+        "type": "object"
+      },
       "NextHintOut": {
         "description": "The next rung, without its text. `available` is the server's verdict right now.",
         "properties": {
@@ -1297,6 +2372,20 @@
           }
         },
         "title": "NodePatch",
+        "type": "object"
+      },
+      "NoteIn": {
+        "properties": {
+          "note": {
+            "maxLength": 2000,
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "note"
+        ],
+        "title": "NoteIn",
         "type": "object"
       },
       "PartDoc": {
@@ -1792,6 +2881,125 @@
         "title": "PublishIn",
         "type": "object"
       },
+      "QuestionMarkingOut": {
+        "properties": {
+          "assignment_id": {
+            "format": "uuid",
+            "title": "Assignment Id",
+            "type": "string"
+          },
+          "concept_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Concept Ids",
+            "type": "array"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/MarkingEntryOut"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "leaf_item_id": {
+            "format": "uuid",
+            "title": "Leaf Item Id",
+            "type": "string"
+          },
+          "prompt_md": {
+            "title": "Prompt Md",
+            "type": "string"
+          },
+          "solution_code": {
+            "title": "Solution Code",
+            "type": "string"
+          },
+          "tests": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/IoTest"
+                },
+                {
+                  "$ref": "#/components/schemas/FunctionTest"
+                }
+              ]
+            },
+            "title": "Tests",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assignment_id",
+          "leaf_item_id",
+          "title",
+          "prompt_md",
+          "solution_code",
+          "concept_ids",
+          "tests",
+          "entries"
+        ],
+        "title": "QuestionMarkingOut",
+        "type": "object"
+      },
+      "QuestionOut": {
+        "properties": {
+          "difficulty": {
+            "title": "Difficulty",
+            "type": "integer"
+          },
+          "handed_in": {
+            "title": "Handed In",
+            "type": "integer"
+          },
+          "leaf_item_id": {
+            "format": "uuid",
+            "title": "Leaf Item Id",
+            "type": "string"
+          },
+          "marked": {
+            "title": "Marked",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "leaf_item_id",
+          "title",
+          "difficulty",
+          "handed_in",
+          "marked"
+        ],
+        "title": "QuestionOut",
+        "type": "object"
+      },
+      "ReleaseOut": {
+        "properties": {
+          "marks_released": {
+            "title": "Marks Released",
+            "type": "integer"
+          },
+          "notes_released": {
+            "title": "Notes Released",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "marks_released",
+          "notes_released"
+        ],
+        "title": "ReleaseOut",
+        "type": "object"
+      },
       "RosterEntryOut": {
         "description": "A student as seen from inside a class: who they are, plus how they got there.",
         "properties": {
@@ -1913,6 +3121,267 @@
         "title": "SessionsRevokedOut",
         "type": "object"
       },
+      "SheetLeafOut": {
+        "properties": {
+          "attempt_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "changed_since_hand_in": {
+            "title": "Changed Since Hand In",
+            "type": "boolean"
+          },
+          "difficulty": {
+            "title": "Difficulty",
+            "type": "integer"
+          },
+          "feedback": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FeedbackOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "handed_in": {
+            "title": "Handed In",
+            "type": "boolean"
+          },
+          "leaf_item_id": {
+            "format": "uuid",
+            "title": "Leaf Item Id",
+            "type": "string"
+          },
+          "problem_id": {
+            "format": "uuid",
+            "title": "Problem Id",
+            "type": "string"
+          },
+          "progress": {
+            "enum": [
+              "not_started",
+              "started",
+              "passing"
+            ],
+            "title": "Progress",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "problem_id",
+          "leaf_item_id",
+          "title",
+          "difficulty",
+          "attempt_id",
+          "progress",
+          "handed_in",
+          "changed_since_hand_in",
+          "feedback"
+        ],
+        "title": "SheetLeafOut",
+        "type": "object"
+      },
+      "SheetOut": {
+        "properties": {
+          "assignment_id": {
+            "format": "uuid",
+            "title": "Assignment Id",
+            "type": "string"
+          },
+          "closed": {
+            "title": "Closed",
+            "type": "boolean"
+          },
+          "due_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "handed_in_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Handed In At"
+          },
+          "late": {
+            "title": "Late",
+            "type": "boolean"
+          },
+          "leaves": {
+            "items": {
+              "$ref": "#/components/schemas/SheetLeafOut"
+            },
+            "title": "Leaves",
+            "type": "array"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "returned": {
+            "title": "Returned",
+            "type": "boolean"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assignment_id",
+          "title",
+          "due_at",
+          "closed",
+          "returned",
+          "late",
+          "handed_in_at",
+          "note",
+          "leaves"
+        ],
+        "title": "SheetOut",
+        "type": "object"
+      },
+      "SnippetIn": {
+        "properties": {
+          "body": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Body",
+            "type": "string"
+          },
+          "concept_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concept Id"
+          }
+        },
+        "required": [
+          "body"
+        ],
+        "title": "SnippetIn",
+        "type": "object"
+      },
+      "SnippetOut": {
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "concept_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concept Id"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SnippetStatus"
+          },
+          "use_count": {
+            "title": "Use Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "body",
+          "concept_id",
+          "use_count",
+          "status"
+        ],
+        "title": "SnippetOut",
+        "type": "object"
+      },
+      "SnippetPatch": {
+        "properties": {
+          "body": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body"
+          },
+          "concept_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concept Id"
+          }
+        },
+        "title": "SnippetPatch",
+        "type": "object"
+      },
+      "SnippetStatus": {
+        "enum": [
+          "active",
+          "archived"
+        ],
+        "title": "SnippetStatus",
+        "type": "string"
+      },
       "StudentClassOut": {
         "description": "One class a student has been in, from the student's side.",
         "properties": {
@@ -2009,6 +3478,33 @@
           "classes"
         ],
         "title": "StudentDetailOut",
+        "type": "object"
+      },
+      "StudentHistoryOut": {
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "homework": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryEntryOut"
+            },
+            "title": "Homework",
+            "type": "array"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "display_name",
+          "homework"
+        ],
+        "title": "StudentHistoryOut",
         "type": "object"
       },
       "StudentIn": {
@@ -2524,6 +4020,710 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/assignments/{assignment_id}": {
+      "get": {
+        "operationId": "read_homework_assignments__assignment_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assignment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Assignment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomeworkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Homework",
+        "tags": [
+          "homework"
+        ]
+      },
+      "patch": {
+        "operationId": "update_homework_assignments__assignment_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assignment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Assignment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HomeworkPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomeworkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Homework",
+        "tags": [
+          "homework"
+        ]
+      }
+    },
+    "/assignments/{assignment_id}/close": {
+      "post": {
+        "description": "Stop further hand-ins. Children can still see the sheet and their feedback.",
+        "operationId": "close_homework_assignments__assignment_id__close_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assignment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Assignment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomeworkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Close Homework",
+        "tags": [
+          "homework"
+        ]
+      }
+    },
+    "/assignments/{assignment_id}/grid": {
+      "get": {
+        "operationId": "homework_grid_assignments__assignment_id__grid_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assignment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Assignment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GridOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Homework Grid",
+        "tags": [
+          "progress"
+        ]
+      }
+    },
+    "/assignments/{assignment_id}/marking": {
+      "get": {
+        "description": "The sheet's questions with how many are handed in and marked, and the class.",
+        "operationId": "marking_overview_assignments__assignment_id__marking_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assignment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Assignment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarkingOverviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Marking Overview",
+        "tags": [
+          "marking"
+        ]
+      }
+    },
+    "/assignments/{assignment_id}/marking/{leaf_item_id}": {
+      "get": {
+        "description": "One question, every child's answer to it, in roster order.",
+        "operationId": "mark_question_assignments__assignment_id__marking__leaf_item_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assignment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Assignment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "leaf_item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Leaf Item Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionMarkingOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mark Question",
+        "tags": [
+          "marking"
+        ]
+      }
+    },
+    "/assignments/{assignment_id}/notes/{student_id}": {
+      "put": {
+        "description": "The optional overall note to one child on this homework.",
+        "operationId": "save_note_assignments__assignment_id__notes__student_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assignment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Assignment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteIn"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Note",
+        "tags": [
+          "marking"
+        ]
+      }
+    },
+    "/assignments/{assignment_id}/release": {
+      "post": {
+        "description": "Give marked work back. Every mark and note not yet released goes out together.\n\nChildren with no mark are untouched \u2014 they can still hand in, and are released next\ntime. A child who has something back finds their sheet read-only.",
+        "operationId": "release_assignments__assignment_id__release_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assignment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Assignment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Release",
+        "tags": [
+          "marking"
+        ]
+      }
+    },
+    "/assignments/{assignment_id}/reopen": {
+      "post": {
+        "operationId": "reopen_homework_assignments__assignment_id__reopen_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assignment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Assignment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomeworkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reopen Homework",
+        "tags": [
+          "homework"
+        ]
+      }
+    },
+    "/assignments/{assignment_id}/set": {
+      "post": {
+        "description": "Give the draft to the class. It appears for them at once.",
+        "operationId": "set_homework_assignments__assignment_id__set_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assignment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Assignment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomeworkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Homework",
+        "tags": [
+          "homework"
+        ]
+      }
+    },
+    "/attempts/{attempt_id}/mark": {
+      "put": {
+        "description": "Mark one child's answer to one question. Marks the latest hand-in; marking a child\nwho never handed in takes a copy of their saved work first, so the mark always points\nat the exact code it judged.",
+        "operationId": "save_mark_attempts__attempt_id__mark_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attempt_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Attempt Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Mark",
+        "tags": [
+          "marking"
+        ]
+      }
+    },
     "/auth/me": {
       "get": {
         "description": "Who am I? The web app calls this on load to decide whether to bootstrap.\n\nThe dependency has already verified the token and resolved the principal, so this\nreads by id rather than verifying a second time.",
@@ -3385,6 +5585,138 @@
         ]
       }
     },
+    "/classes/{class_id}/homework": {
+      "get": {
+        "description": "The class's homework, newest first. Archived ones are left out.",
+        "operationId": "list_homework_classes__class_id__homework_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "class_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Class Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/HomeworkOut"
+                  },
+                  "title": "Response List Homework Classes  Class Id  Homework Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Homework",
+        "tags": [
+          "homework"
+        ]
+      },
+      "post": {
+        "description": "Start a homework as a draft. Nothing is visible to the class until it is set.",
+        "operationId": "create_homework_classes__class_id__homework_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "class_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Class Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HomeworkIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomeworkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Homework",
+        "tags": [
+          "homework"
+        ]
+      }
+    },
     "/classes/{class_id}/join-code/rotate": {
       "post": {
         "description": "Replace the class's join code, invalidating the old one immediately.\n\nThe remedy for a code that has got out \u2014 read out to the wrong room, photographed off\na whiteboard. There is no standalone revoke to pair with this: rotating leaves the\nclass joinable, whereas revoking alone would leave a class with children on its roster\nand no way in, which is not a state worth being one click away.",
@@ -3734,6 +6066,66 @@
         "summary": "Preview Roster Paste",
         "tags": [
           "roster"
+        ]
+      }
+    },
+    "/classes/{class_id}/today": {
+      "get": {
+        "description": "Today's ladder, per child. A problem counts as passing when all its parts do.",
+        "operationId": "today_grid_classes__class_id__today_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "class_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Class Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GridOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Today Grid",
+        "tags": [
+          "progress"
         ]
       }
     },
@@ -6009,6 +8401,244 @@
         ]
       }
     },
+    "/me/events": {
+      "post": {
+        "operationId": "record_events_me_events_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventBatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventBatchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Record Events",
+        "tags": [
+          "events"
+        ]
+      }
+    },
+    "/me/home": {
+      "get": {
+        "description": "Everything the home screen shows: today's ladder, and homework \u2014 due, handed in,\nor given back. Soonest due first; returned work after everything still to do.",
+        "operationId": "home_me_home_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Home",
+        "tags": [
+          "student work"
+        ]
+      }
+    },
+    "/me/homework/{assignment_id}": {
+      "get": {
+        "operationId": "read_sheet_me_homework__assignment_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assignment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Assignment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SheetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Sheet",
+        "tags": [
+          "student work"
+        ]
+      }
+    },
+    "/me/homework/{assignment_id}/hand-in": {
+      "post": {
+        "description": "Hand in the whole sheet. Allowed late; allowed again; not allowed once returned.",
+        "operationId": "hand_in_sheet_me_homework__assignment_id__hand_in_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assignment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Assignment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandInIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SheetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Hand In Sheet",
+        "tags": [
+          "student work"
+        ]
+      }
+    },
     "/me/lesson": {
       "get": {
         "description": "The child's class, today's lesson, and its ladder with their progress on each rung.",
@@ -6056,6 +8686,262 @@
         "summary": "Todays Lesson",
         "tags": [
           "student work"
+        ]
+      }
+    },
+    "/snippets": {
+      "get": {
+        "description": "The centre's live snippets, most used first.",
+        "operationId": "list_snippets_snippets_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 120,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SnippetOut"
+                  },
+                  "title": "Response List Snippets Snippets Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Snippets",
+        "tags": [
+          "marking"
+        ]
+      },
+      "post": {
+        "operationId": "create_snippet_snippets_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SnippetIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnippetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Snippet",
+        "tags": [
+          "marking"
+        ]
+      }
+    },
+    "/snippets/{snippet_id}": {
+      "patch": {
+        "operationId": "update_snippet_snippets__snippet_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "snippet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Snippet Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SnippetPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnippetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Snippet",
+        "tags": [
+          "marking"
+        ]
+      }
+    },
+    "/snippets/{snippet_id}/archive": {
+      "post": {
+        "operationId": "archive_snippet_snippets__snippet_id__archive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "snippet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Snippet Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnippetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Archive Snippet",
+        "tags": [
+          "marking"
         ]
       }
     },
@@ -6364,6 +9250,66 @@
         "summary": "Archive Student",
         "tags": [
           "roster"
+        ]
+      }
+    },
+    "/students/{student_id}/history": {
+      "get": {
+        "description": "A child's homework across every class they have been in, newest first.",
+        "operationId": "student_history_students__student_id__history_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentHistoryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Student History",
+        "tags": [
+          "progress"
         ]
       }
     },

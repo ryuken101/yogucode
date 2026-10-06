@@ -37,6 +37,20 @@ export interface CodeSurfaceProps {
    * (the teacher's problem editor), where each would steal focus from the last.
    */
   autoFocus?: boolean
+  /**
+   * Each change a person made, as a diff — what the event recorder stores (step 7).
+   * Never called for text the page itself put in (`value` changing), only for typing,
+   * pasting, undo and the like.
+   */
+  onEdit?: (changes: EditChange[]) => void
+  /** A paste, by length. Large pastes are worth knowing about in a child's process. */
+  onPaste?: (chars: number) => void
+}
+
+export interface EditChange {
+  offset: number
+  length: number
+  text: string
 }
 
 export default function MonacoSurface({
@@ -45,6 +59,8 @@ export default function MonacoSurface({
   completions = true,
   readOnly = false,
   autoFocus = true,
+  onEdit,
+  onPaste,
 }: CodeSurfaceProps) {
   const host = useRef<HTMLDivElement>(null)
   const editor = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
@@ -52,6 +68,12 @@ export default function MonacoSurface({
   // undo stack.
   const notify = useRef(onChange)
   notify.current = onChange
+  const notifyEdit = useRef(onEdit)
+  notifyEdit.current = onEdit
+  const notifyPaste = useRef(onPaste)
+  notifyPaste.current = onPaste
+  /** True while the page, not the person, is replacing the text. */
+  const applying = useRef(false)
 
   useEffect(() => {
     if (!host.current) return
@@ -60,7 +82,17 @@ export default function MonacoSurface({
       value,
       readOnly,
     })
-    created.onDidChangeModelContent(() => notify.current(created.getValue()))
+    created.onDidChangeModelContent((event) => {
+      notify.current(created.getValue())
+      if (applying.current) return
+      notifyEdit.current?.(
+        event.changes.map((c) => ({ offset: c.rangeOffset, length: c.rangeLength, text: c.text })),
+      )
+    })
+    created.onDidPaste((event) => {
+      const chars = created.getModel()?.getValueLengthInRange(event.range) ?? 0
+      notifyPaste.current?.(chars)
+    })
     editor.current = created
     if (autoFocus) created.focus()
 
@@ -78,7 +110,11 @@ export default function MonacoSurface({
   // editor keeps its layout and the child keeps their scroll position where possible.
   useEffect(() => {
     const current = editor.current
-    if (current && value !== current.getValue()) current.setValue(value)
+    if (current && value !== current.getValue()) {
+      applying.current = true
+      current.setValue(value)
+      applying.current = false
+    }
   }, [value])
 
   useEffect(() => {

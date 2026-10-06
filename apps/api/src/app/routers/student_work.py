@@ -19,28 +19,32 @@ Like documents, nothing here is audited: it is a child's own work on their own a
 """
 
 import uuid
+from datetime import UTC, datetime
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field, model_validator
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.auth.principal import CurrentStudent
-from app.classwork import get_ladder, ladder_items
+from app.classwork import get_ladder, ladder_items, open_attempt
 from app.db import get_session
+from app.homework import hand_in, is_returned, latest_submissions, set_leaves
 from app.models import (
     Assignment,
     AssignmentMode,
+    AssignmentNote,
     AssignmentStatus,
     Attempt,
     AttemptStatus,
     Item,
     Lesson,
+    Mark,
     SetItem,
+    SubmissionSource,
 )
-from app.models.base import new_uuid, utcnow
+from app.models.base import utcnow
 from app.problem_bank import FunctionTest, IoTest, LeafDoc, read_document
 from app.routers.documents import MAX_CONTENT_BYTES
 from app.scoping import get_own_attempt, get_student_assignment, get_student_class
@@ -202,52 +206,23 @@ async def _attempts_for(
     return {row.item_id: row for row in rows}
 
 
-async def _open_attempt(
-    session: AsyncSession, principal: CurrentStudent, assignment: Assignment, leaf: Item
-) -> Attempt:
-    """The child's attempt at a leaf, created with the starter code on first open.
-
-    `ON CONFLICT DO NOTHING` rather than check-then-insert: a child with the problem open
-    in two tabs opens it twice at once, and the second must find the first's row rather
-    than fail on the unique constraint.
-    """
-    await session.exec(
-        pg_insert(Attempt)  # type: ignore[call-overload]
-        .values(
-            id=new_uuid(),
-            centre_id=principal.centre_id,
-            student_id=principal.subject_id,
-            assignment_id=assignment.id,
-            item_id=leaf.id,
-            code=leaf.starter_code,
-            status=AttemptStatus.IN_PROGRESS,
-            run_count=0,
-            hints_unlocked=0,
-            created_at=utcnow(),
-            updated_at=utcnow(),
-        )
-        .on_conflict_do_nothing(constraint="uq_attempts_assignment_item_student")
-    )
-    return (
-        await session.exec(
-            select(Attempt).where(
-                Attempt.assignment_id == assignment.id,
-                Attempt.item_id == leaf.id,
-                Attempt.student_id == principal.subject_id,
-            )
-        )
-    ).one()
-
-
 async def _writable_attempt(
     session: AsyncSession, principal: CurrentStudent, attempt_id: uuid.UUID
 ) -> tuple[Attempt, Assignment]:
-    """An attempt the child may still change: theirs, in an open assignment of their class."""
+    """An attempt the child may still change: theirs, in an open assignment of their class,
+    and — for homework — not yet returned to them.
+
+    Handing in does *not* lock it: a child may carry on and hand in again until their
+    teacher returns the work (Ken's decision). Returning it does.
+    """
     attempt = await get_own_attempt(session, principal, attempt_id)
     assignment = await get_student_assignment(session, principal, attempt.assignment_id)
-    if attempt.status != AttemptStatus.IN_PROGRESS:
+    if assignment.mode == AssignmentMode.HOMEWORK and await is_returned(
+        session, principal, assignment, principal.subject_id
+    ):
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="You have handed this one in"
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Your teacher has given this one back, so it can't be changed now",
         )
     return attempt, assignment
 
@@ -258,6 +233,10 @@ async def _writable_attempt(
 @router.get("/lesson", response_model=TodayOut)
 async def todays_lesson(principal: CurrentStudent, session: SessionDep) -> TodayOut:
     """The child's class, today's lesson, and its ladder with their progress on each rung."""
+    return await _today(session, principal)
+
+
+async def _today(session: AsyncSession, principal: CurrentStudent) -> TodayOut:
     klass = await get_student_class(session, principal)
     if klass is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no class")
@@ -335,7 +314,7 @@ async def open_problem(
         if part_rows
         else [(doc, None, "")]
     )
-    attempts = [await _open_attempt(session, principal, assignment, row) for row in leaf_rows]
+    attempts = [await open_attempt(session, principal, assignment, row) for row in leaf_rows]
     await session.commit()
 
     hints_on = bool(assignment.settings.get("hints", True))
@@ -449,3 +428,231 @@ async def unlock_hint(
         next_hint=next_hint,
         attempt=AttemptOut.build(attempt),
     )
+
+
+# --- homework -----------------------------------------------------------------------
+#
+# A child sees their homework as a sheet: each problem (each part, for problems with parts),
+# how far they have got, whether they have handed in, and — once their teacher returns it —
+# a comment and a colour per question. Never a number (spec §3.7): sage for Correct 2,
+# amber for anything less.
+
+
+class FeedbackOut(BaseModel):
+    code: str
+    comment_md: str
+    outcome: Literal["good", "not_yet"]
+
+
+class SheetLeafOut(BaseModel):
+    problem_id: uuid.UUID
+    leaf_item_id: uuid.UUID
+    title: str
+    difficulty: int
+    attempt_id: uuid.UUID | None
+    progress: Literal["not_started", "started", "passing"]
+    handed_in: bool
+    changed_since_hand_in: bool
+    feedback: FeedbackOut | None
+
+
+class SheetOut(BaseModel):
+    assignment_id: uuid.UUID
+    title: str
+    due_at: datetime | None
+    closed: bool
+    returned: bool
+    late: bool
+    handed_in_at: datetime | None
+    note: str | None
+    leaves: list[SheetLeafOut]
+
+
+class HomeworkCardOut(BaseModel):
+    assignment_id: uuid.UUID
+    title: str
+    due_at: datetime | None
+    closed: bool
+    problems: int
+    started: int
+    handed_in_at: datetime | None
+    changed_since_hand_in: bool
+    late: bool
+    returned: bool
+
+
+class HomeOut(BaseModel):
+    today: TodayOut
+    homework: list[HomeworkCardOut]
+
+
+class HandInResult(BaseModel):
+    attempt_id: uuid.UUID
+    passed: int = Field(ge=0, le=100)
+    total: int = Field(ge=0, le=100)
+
+
+class HandInIn(BaseModel):
+    results: list[HandInResult] = Field(default_factory=list, max_length=100)
+
+
+async def _sheet(
+    session: AsyncSession, principal: CurrentStudent, assignment: Assignment
+) -> SheetOut:
+    leaves = await set_leaves(session, principal, assignment.set_id)
+    attempts = await _attempts_for(session, principal, assignment.id)
+    mine = [attempts[leaf.leaf.id] for leaf in leaves if leaf.leaf.id in attempts]
+    submissions = await latest_submissions(session, principal, [a.id for a in mine])
+    hand_ins = [s for s in submissions.values() if s.source == SubmissionSource.HAND_IN]
+    returned = await is_returned(session, principal, assignment, principal.subject_id)
+
+    marks: dict[uuid.UUID, Mark] = {}
+    note: str | None = None
+    if returned:
+        # Only *released* marks, and only now: a child must never see a mark their
+        # teacher is still deciding on.
+        marks = {
+            m.attempt_id: m
+            for m in (
+                await session.exec(
+                    select(Mark).where(
+                        col(Mark.attempt_id).in_([a.id for a in mine]),
+                        col(Mark.released_at).is_not(None),
+                    )
+                )
+            ).all()
+        }
+        released_note = (
+            await session.exec(
+                select(AssignmentNote).where(
+                    AssignmentNote.assignment_id == assignment.id,
+                    AssignmentNote.student_id == principal.subject_id,
+                    col(AssignmentNote.released_at).is_not(None),
+                )
+            )
+        ).one_or_none()
+        note = released_note.note if released_note and released_note.note else None
+
+    out = []
+    for leaf in leaves:
+        attempt = attempts.get(leaf.leaf.id)
+        submission = submissions.get(attempt.id) if attempt else None
+        handed = submission is not None and submission.source == SubmissionSource.HAND_IN
+        mark = marks.get(attempt.id) if attempt else None
+        passing = bool(attempt and attempt.last_total and attempt.last_passed == attempt.last_total)
+        out.append(
+            SheetLeafOut(
+                problem_id=leaf.problem.id,
+                leaf_item_id=leaf.leaf.id,
+                title=leaf.label,
+                difficulty=leaf.leaf.difficulty,
+                attempt_id=attempt.id if attempt else None,
+                progress="passing" if passing else "started" if attempt else "not_started",
+                handed_in=handed,
+                changed_since_hand_in=bool(handed and attempt and attempt.code != submission.code),
+                feedback=FeedbackOut(
+                    code=submission.code if submission else (attempt.code if attempt else ""),
+                    comment_md=mark.comment_md,
+                    outcome="good" if mark.correct == 2 else "not_yet",
+                )
+                if mark
+                else None,
+            )
+        )
+    return SheetOut(
+        assignment_id=assignment.id,
+        title=assignment.title,
+        due_at=assignment.due_at,
+        closed=assignment.status == AssignmentStatus.CLOSED,
+        returned=returned,
+        late=any(s.late for s in hand_ins),
+        handed_in_at=max((s.submitted_at for s in hand_ins), default=None),
+        note=note,
+        leaves=out,
+    )
+
+
+async def _student_homework(
+    session: AsyncSession, principal: CurrentStudent, assignment_id: uuid.UUID
+) -> Assignment:
+    assignment = await get_student_assignment(
+        session, principal, assignment_id, include_closed=True
+    )
+    if assignment.mode != AssignmentMode.HOMEWORK:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="homework not found")
+    return assignment
+
+
+@router.get("/homework/{assignment_id}", response_model=SheetOut)
+async def read_sheet(
+    assignment_id: uuid.UUID, principal: CurrentStudent, session: SessionDep
+) -> SheetOut:
+    assignment = await _student_homework(session, principal, assignment_id)
+    return await _sheet(session, principal, assignment)
+
+
+@router.post("/homework/{assignment_id}/hand-in", response_model=SheetOut)
+async def hand_in_sheet(
+    assignment_id: uuid.UUID, body: HandInIn, principal: CurrentStudent, session: SessionDep
+) -> SheetOut:
+    """Hand in the whole sheet. Allowed late; allowed again; not allowed once returned."""
+    assignment = await _student_homework(session, principal, assignment_id)
+    if assignment.status != AssignmentStatus.OPEN:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Your teacher has closed this homework",
+        )
+    if await is_returned(session, principal, assignment, principal.subject_id):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Your teacher has already given this one back",
+        )
+    await hand_in(
+        session,
+        principal,
+        assignment,
+        {r.attempt_id: (min(r.passed, r.total), r.total) for r in body.results},
+    )
+    await session.commit()
+    return await _sheet(session, principal, assignment)
+
+
+@router.get("/home", response_model=HomeOut)
+async def home(principal: CurrentStudent, session: SessionDep) -> HomeOut:
+    """Everything the home screen shows: today's ladder, and homework — due, handed in,
+    or given back. Soonest due first; returned work after everything still to do."""
+    today = await _today(session, principal)
+    klass = await get_student_class(session, principal)
+    cards: list[HomeworkCardOut] = []
+    if klass is not None:
+        rows = (
+            await session.exec(
+                select(Assignment).where(
+                    Assignment.class_id == klass.id,
+                    Assignment.centre_id == principal.centre_id,
+                    Assignment.mode == AssignmentMode.HOMEWORK,
+                    col(Assignment.status).in_([AssignmentStatus.OPEN, AssignmentStatus.CLOSED]),
+                )
+            )
+        ).all()
+        for assignment in rows:
+            sheet = await _sheet(session, principal, assignment)
+            if sheet.closed and not sheet.returned:
+                continue  # a closed sheet with nothing to give back is not news
+            cards.append(
+                HomeworkCardOut(
+                    assignment_id=assignment.id,
+                    title=assignment.title,
+                    due_at=assignment.due_at,
+                    closed=sheet.closed,
+                    problems=len(sheet.leaves),
+                    started=sum(1 for leaf in sheet.leaves if leaf.progress != "not_started"),
+                    handed_in_at=sheet.handed_in_at,
+                    changed_since_hand_in=any(leaf.changed_since_hand_in for leaf in sheet.leaves),
+                    late=sheet.late,
+                    returned=sheet.returned,
+                )
+            )
+    far = datetime.max.replace(tzinfo=UTC)
+    cards.sort(key=lambda c: (c.returned, c.due_at or far))
+    return HomeOut(today=today, homework=cards)

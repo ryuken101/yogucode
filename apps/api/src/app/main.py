@@ -8,8 +8,12 @@ from app.routers import (
     classes,
     curriculum,
     documents,
+    events,
+    homework,
     items,
     join,
+    marking,
+    progress,
     roster,
     student_work,
 )
@@ -26,6 +30,10 @@ app.include_router(documents.router)
 app.include_router(curriculum.router)
 app.include_router(items.router)
 app.include_router(student_work.router)
+app.include_router(events.router)
+app.include_router(homework.router)
+app.include_router(marking.router)
+app.include_router(progress.router)
 
 
 @app.get("/health")

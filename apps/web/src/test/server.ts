@@ -196,6 +196,9 @@ export const handlers = [
   http.get('/api/auth/student/me', () => HttpResponse.json(signedIn)),
   http.post('/api/auth/student/logout', () => new HttpResponse(null, { status: 204 })),
 
+  // The event recorder flushes on a timer from any editor screen; accept and forget.
+  http.post('/api/me/events', () => HttpResponse.json({ received: 0 }, { status: 202 })),
+
   http.get('/api/me/documents', () => HttpResponse.json(summaries())),
   http.get('/api/me/documents/:id', ({ params }) => {
     const found = documents[params.id as string]

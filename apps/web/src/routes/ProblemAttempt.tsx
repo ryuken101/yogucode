@@ -32,6 +32,7 @@ import { useStudentProblem } from '../lib/queries'
 import { toChecks } from '../problems/doc'
 import { PassingSummary, TestResultLine } from '../problems/TestResults'
 import type { TestRun } from '../runtime/protocol'
+import { useEventRecorder } from '../events/recorder'
 import { usePython } from '../runtime/usePython'
 
 type Leaf = Schemas['StudentLeafOut']
@@ -47,7 +48,6 @@ function hintProgress(next: NonNullable<Leaf['next_hint']>, runsSinceOpen: numbe
 export function ProblemAttempt() {
   const { assignmentId = '', itemId = '' } = useParams()
   const problem = useStudentProblem(assignmentId, itemId)
-  const python = usePython()
 
   const [leaves, setLeaves] = useState<Leaf[]>([])
   const [active, setActive] = useState(0)
@@ -69,6 +69,13 @@ export function ProblemAttempt() {
 
   const leaf = leaves[active]
   const autosave = useAutosave(leaf?.attempt.id ?? null, (id, code) => api.saveAttempt(id, code))
+  // The process trace for this part (step 7): every edit, run, check, error and hint.
+  const record = useEventRecorder(leaf ? { attemptId: leaf.attempt.id } : null)
+  const python = usePython({
+    onRunFinished: ({ ok, interrupted, stderr }) => {
+      if (!ok && !interrupted) record('error', { text: stderr.slice(-2000) })
+    },
+  })
 
   useEffect(() => {
     if (problem.data) setLeaves(problem.data.leaves)
@@ -110,6 +117,7 @@ export function ProblemAttempt() {
   function onRun() {
     autosave.flush()
     python.run(code)
+    record('run')
     countRun()
     void api.recordRun(leaf.attempt.id).catch(() => undefined)
   }
@@ -121,6 +129,15 @@ export function ProblemAttempt() {
     countRun()
     if (outcome) {
       const passed = outcome.results.filter((r) => r.passed).length
+      record('check', {
+        passed,
+        total: outcome.results.length,
+        compile_error: outcome.compile_error,
+        // Which checks failed and why — what a teacher replaying this will want to see.
+        failed: outcome.results
+          .filter((r) => !r.passed)
+          .map((r) => ({ name: r.name, error: r.error ?? null })),
+      })
       void api
         .recordRun(leaf.attempt.id, { passed, total: outcome.results.length })
         .catch(() => undefined)
@@ -131,6 +148,7 @@ export function ProblemAttempt() {
     setHintMessage(null)
     try {
       const updated = await api.unlockHint(leaf.attempt.id)
+      record('hint', { level: updated.hints.length })
       setLeaves((current) => current.map((l) => (l.item_id === updated.item_id ? updated : l)))
     } catch (error) {
       setHintMessage(messageFor(error))
@@ -146,9 +164,15 @@ export function ProblemAttempt() {
       {/* Left: what to do, how it is going, and help. Scrolls on its own. */}
       <div className="flex min-h-0 flex-col gap-4 overflow-y-auto rounded-lg bg-paper p-4 ring-1 ring-ink/10">
         <div>
-          <Link to="/home" className="text-sm text-sky-deep">
-            ← Today
-          </Link>
+          {data.mode === 'homework' ? (
+            <Link to={`/homework/${assignmentId}`} className="text-sm text-sky-deep">
+              ← Back to the homework
+            </Link>
+          ) : (
+            <Link to="/home" className="text-sm text-sky-deep">
+              ← Today
+            </Link>
+          )}
           <div className="mt-2 flex items-center gap-3">
             <Dots value={data.difficulty} />
             <h1 className="font-serif text-xl text-ink">{data.title}</h1>
@@ -260,6 +284,8 @@ export function ProblemAttempt() {
               latest.current[leaf.item_id] = next
               autosave.onChange(next)
             }}
+            onEdit={(changes) => record('edit', { changes })}
+            onPaste={(chars) => record('paste', { chars })}
           />
         </div>
         <div className="min-h-32 flex-1">

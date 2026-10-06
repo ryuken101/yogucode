@@ -4,6 +4,203 @@
  */
 
 export interface paths {
+    "/assignments/{assignment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Homework */
+        get: operations["read_homework_assignments__assignment_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Homework */
+        patch: operations["update_homework_assignments__assignment_id__patch"];
+        trace?: never;
+    };
+    "/assignments/{assignment_id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Close Homework
+         * @description Stop further hand-ins. Children can still see the sheet and their feedback.
+         */
+        post: operations["close_homework_assignments__assignment_id__close_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/assignments/{assignment_id}/grid": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Homework Grid */
+        get: operations["homework_grid_assignments__assignment_id__grid_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/assignments/{assignment_id}/marking": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Marking Overview
+         * @description The sheet's questions with how many are handed in and marked, and the class.
+         */
+        get: operations["marking_overview_assignments__assignment_id__marking_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/assignments/{assignment_id}/marking/{leaf_item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Mark Question
+         * @description One question, every child's answer to it, in roster order.
+         */
+        get: operations["mark_question_assignments__assignment_id__marking__leaf_item_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/assignments/{assignment_id}/notes/{student_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Save Note
+         * @description The optional overall note to one child on this homework.
+         */
+        put: operations["save_note_assignments__assignment_id__notes__student_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/assignments/{assignment_id}/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Release
+         * @description Give marked work back. Every mark and note not yet released goes out together.
+         *
+         *     Children with no mark are untouched — they can still hand in, and are released next
+         *     time. A child who has something back finds their sheet read-only.
+         */
+        post: operations["release_assignments__assignment_id__release_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/assignments/{assignment_id}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reopen Homework */
+        post: operations["reopen_homework_assignments__assignment_id__reopen_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/assignments/{assignment_id}/set": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set Homework
+         * @description Give the draft to the class. It appears for them at once.
+         */
+        post: operations["set_homework_assignments__assignment_id__set_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/attempts/{attempt_id}/mark": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Save Mark
+         * @description Mark one child's answer to one question. Marks the latest hand-in; marking a child
+         *     who never handed in takes a copy of their saved work first, so the mark always points
+         *     at the exact code it judged.
+         */
+        put: operations["save_mark_attempts__attempt_id__mark_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/me": {
         parameters: {
             query?: never;
@@ -286,6 +483,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/classes/{class_id}/homework": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Homework
+         * @description The class's homework, newest first. Archived ones are left out.
+         */
+        get: operations["list_homework_classes__class_id__homework_get"];
+        put?: never;
+        /**
+         * Create Homework
+         * @description Start a homework as a draft. Nothing is visible to the class until it is set.
+         */
+        post: operations["create_homework_classes__class_id__homework_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/classes/{class_id}/join-code/rotate": {
         parameters: {
             query?: never;
@@ -407,6 +628,26 @@ export interface paths {
          *     into two requests at all.
          */
         post: operations["preview_roster_paste_classes__class_id__roster_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classes/{class_id}/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Today Grid
+         * @description Today's ladder, per child. A problem counts as passing when all its parts do.
+         */
+        get: operations["today_grid_classes__class_id__today_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1017,6 +1258,81 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record Events */
+        post: operations["record_events_me_events_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/home": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Home
+         * @description Everything the home screen shows: today's ladder, and homework — due, handed in,
+         *     or given back. Soonest due first; returned work after everything still to do.
+         */
+        get: operations["home_me_home_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/homework/{assignment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Sheet */
+        get: operations["read_sheet_me_homework__assignment_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/homework/{assignment_id}/hand-in": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Hand In Sheet
+         * @description Hand in the whole sheet. Allowed late; allowed again; not allowed once returned.
+         */
+        post: operations["hand_in_sheet_me_homework__assignment_id__hand_in_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/lesson": {
         parameters: {
             query?: never;
@@ -1031,6 +1347,61 @@ export interface paths {
         get: operations["todays_lesson_me_lesson_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/snippets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Snippets
+         * @description The centre's live snippets, most used first.
+         */
+        get: operations["list_snippets_snippets_get"];
+        put?: never;
+        /** Create Snippet */
+        post: operations["create_snippet_snippets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/snippets/{snippet_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Snippet */
+        patch: operations["update_snippet_snippets__snippet_id__patch"];
+        trace?: never;
+    };
+    "/snippets/{snippet_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive Snippet */
+        post: operations["archive_snippet_snippets__snippet_id__archive_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1106,6 +1477,26 @@ export interface paths {
          *     still be signed in on a centre laptop.
          */
         post: operations["archive_student_students__student_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/students/{student_id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Student History
+         * @description A child's homework across every class they have been in, newest first.
+         */
+        get: operations["student_history_students__student_id__history_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1264,6 +1655,11 @@ export interface components {
          * @enum {string}
          */
         AssignmentMode: "classwork" | "homework" | "quiz";
+        /**
+         * AssignmentStatus
+         * @enum {string}
+         */
+        AssignmentStatus: "draft" | "open" | "closed" | "archived";
         /** AttemptOut */
         AttemptOut: {
             /** Code */
@@ -1579,6 +1975,62 @@ export interface components {
          * @enum {string}
          */
         EnrolmentStatus: "active" | "withdrawn";
+        /** EventBatchIn */
+        EventBatchIn: {
+            /** Events */
+            events: components["schemas"]["EventIn"][];
+        };
+        /** EventBatchOut */
+        EventBatchOut: {
+            /** Received */
+            received: number;
+        };
+        /** EventIn */
+        EventIn: {
+            /** Attempt Id */
+            attempt_id?: string | null;
+            /**
+             * Client Ts
+             * Format: date-time
+             */
+            client_ts: string;
+            /** Document Id */
+            document_id?: string | null;
+            /**
+             * Editor Session Id
+             * Format: uuid
+             */
+            editor_session_id: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Payload */
+            payload?: {
+                [key: string]: unknown;
+            };
+            /** Seq */
+            seq: number;
+            type: components["schemas"]["EventType"];
+        };
+        /**
+         * EventType
+         * @enum {string}
+         */
+        EventType: "edit" | "run" | "check" | "error" | "paste" | "hint" | "submit";
+        /** FeedbackOut */
+        FeedbackOut: {
+            /** Code */
+            code: string;
+            /** Comment Md */
+            comment_md: string;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "good" | "not_yet";
+        };
         /**
          * FunctionTest
          * @description Run the program, then evaluate `call` and compare it with `expected` using `==`.
@@ -1603,10 +2055,80 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** GridCellOut */
+        GridCellOut: {
+            /**
+             * Late
+             * @default false
+             */
+            late: boolean;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "not_started" | "started" | "passing" | "handed_in" | "marked" | "returned";
+        };
+        /** GridColumnOut */
+        GridColumnOut: {
+            /** Difficulty */
+            difficulty: number;
+            /**
+             * Item Id
+             * Format: uuid
+             */
+            item_id: string;
+            /** Title */
+            title: string;
+        };
+        /** GridOut */
+        GridOut: {
+            /** Assignment Id */
+            assignment_id: string | null;
+            /** Columns */
+            columns: components["schemas"]["GridColumnOut"][];
+            /** Rows */
+            rows: components["schemas"]["GridRowOut"][];
+            /** Title */
+            title: string | null;
+        };
+        /** GridRowOut */
+        GridRowOut: {
+            /** Cells */
+            cells: components["schemas"]["GridCellOut"][];
+            /** Display Name */
+            display_name: string;
+            /**
+             * Finished
+             * @default false
+             */
+            finished: boolean;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** HandInIn */
+        HandInIn: {
+            /** Results */
+            results?: components["schemas"]["HandInResult"][];
+        };
+        /** HandInResult */
+        HandInResult: {
+            /**
+             * Attempt Id
+             * Format: uuid
+             */
+            attempt_id: string;
+            /** Passed */
+            passed: number;
+            /** Total */
+            total: number;
         };
         /**
          * HintDoc
@@ -1625,6 +2147,142 @@ export interface components {
              * @default 120
              */
             unlock_after_seconds: number;
+        };
+        /** HistoryEntryOut */
+        HistoryEntryOut: {
+            /**
+             * Assignment Id
+             * Format: uuid
+             */
+            assignment_id: string;
+            /** Class Name */
+            class_name: string;
+            /** Due At */
+            due_at: string | null;
+            /** Handed In At */
+            handed_in_at: string | null;
+            /** Late */
+            late: boolean;
+            /** Questions */
+            questions: components["schemas"]["HistoryQuestionOut"][];
+            /** Title */
+            title: string;
+        };
+        /** HistoryQuestionOut */
+        HistoryQuestionOut: {
+            /** Approach */
+            approach: number | null;
+            /** Correct */
+            correct: number | null;
+            /** Released */
+            released: boolean;
+            /** Title */
+            title: string;
+        };
+        /** HomeOut */
+        HomeOut: {
+            /** Homework */
+            homework: components["schemas"]["HomeworkCardOut"][];
+            today: components["schemas"]["TodayOut"];
+        };
+        /** HomeworkCardOut */
+        HomeworkCardOut: {
+            /**
+             * Assignment Id
+             * Format: uuid
+             */
+            assignment_id: string;
+            /** Changed Since Hand In */
+            changed_since_hand_in: boolean;
+            /** Closed */
+            closed: boolean;
+            /** Due At */
+            due_at: string | null;
+            /** Handed In At */
+            handed_in_at: string | null;
+            /** Late */
+            late: boolean;
+            /** Problems */
+            problems: number;
+            /** Returned */
+            returned: boolean;
+            /** Started */
+            started: number;
+            /** Title */
+            title: string;
+        };
+        /** HomeworkIn */
+        HomeworkIn: {
+            /** Due At */
+            due_at?: string | null;
+            /**
+             * Hints
+             * @default true
+             */
+            hints: boolean;
+            /** Item Ids */
+            item_ids?: string[];
+            /** Title */
+            title: string;
+        };
+        /** HomeworkOut */
+        HomeworkOut: {
+            /**
+             * Class Id
+             * Format: uuid
+             */
+            class_id: string;
+            /** Due At */
+            due_at: string | null;
+            /** Handed In */
+            handed_in: number;
+            /** Hints */
+            hints: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Marked */
+            marked: number;
+            /** Problems */
+            problems: components["schemas"]["HomeworkProblemOut"][];
+            /** Released At */
+            released_at: string | null;
+            /** Returned */
+            returned: number;
+            status: components["schemas"]["AssignmentStatus"];
+            /** Students */
+            students: number;
+            /** Title */
+            title: string;
+        };
+        /**
+         * HomeworkPatch
+         * @description Every field optional — an absent field means "leave it alone".
+         */
+        HomeworkPatch: {
+            /** Due At */
+            due_at?: string | null;
+            /** Hints */
+            hints?: boolean | null;
+            /** Item Ids */
+            item_ids?: string[] | null;
+            /** Title */
+            title?: string | null;
+        };
+        /** HomeworkProblemOut */
+        HomeworkProblemOut: {
+            /** Difficulty */
+            difficulty: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            status: components["schemas"]["ItemStatus"];
+            /** Title */
+            title: string;
         };
         /** ImportEntryOut */
         ImportEntryOut: {
@@ -1812,6 +2470,105 @@ export interface components {
              */
             unit_id: string;
         };
+        /** MarkIn */
+        MarkIn: {
+            /** Approach */
+            approach?: number | null;
+            /**
+             * Comment Md
+             * @default
+             */
+            comment_md: string;
+            /** Correct */
+            correct: number;
+            /** Runs */
+            runs: boolean;
+            /** Snippet Ids */
+            snippet_ids?: string[];
+            /** Verified Passed */
+            verified_passed?: number | null;
+            /** Verified Total */
+            verified_total?: number | null;
+        };
+        /** MarkOut */
+        MarkOut: {
+            /** Approach */
+            approach: number | null;
+            /** Comment Md */
+            comment_md: string;
+            /** Correct */
+            correct: number;
+            /** Released */
+            released: boolean;
+            /** Runs */
+            runs: boolean;
+            /** Stale */
+            stale: boolean;
+            /** Verified Passed */
+            verified_passed: number | null;
+            /** Verified Total */
+            verified_total: number | null;
+        };
+        /** MarkingEntryOut */
+        MarkingEntryOut: {
+            /** Attempt Id */
+            attempt_id: string | null;
+            /** Child Passed */
+            child_passed: number | null;
+            /** Child Total */
+            child_total: number | null;
+            /** Code */
+            code: string | null;
+            /** Display Name */
+            display_name: string;
+            /** Hints Used */
+            hints_used: number;
+            /** Late */
+            late: boolean;
+            mark: components["schemas"]["MarkOut"] | null;
+            /** Note */
+            note: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "hand_in" | "saved_work" | "not_handed_in" | "not_started";
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Submitted At */
+            submitted_at: string | null;
+        };
+        /** MarkingOverviewOut */
+        MarkingOverviewOut: {
+            /**
+             * Assignment Id
+             * Format: uuid
+             */
+            assignment_id: string;
+            /** Due At */
+            due_at: string | null;
+            /** Questions */
+            questions: components["schemas"]["QuestionOut"][];
+            /** Released At */
+            released_at: string | null;
+            /** Students */
+            students: components["schemas"]["MarkingStudentOut"][];
+            /** Title */
+            title: string;
+        };
+        /** MarkingStudentOut */
+        MarkingStudentOut: {
+            /** Display Name */
+            display_name: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
         /**
          * NextHintOut
          * @description The next rung, without its text. `available` is the server's verdict right now.
@@ -1835,6 +2592,11 @@ export interface components {
             sort_order?: number | null;
             /** Title */
             title?: string | null;
+        };
+        /** NoteIn */
+        NoteIn: {
+            /** Note */
+            note: string;
         };
         /** PartDoc */
         PartDoc: {
@@ -2030,6 +2792,54 @@ export interface components {
              */
             verified_updated_at: string;
         };
+        /** QuestionMarkingOut */
+        QuestionMarkingOut: {
+            /**
+             * Assignment Id
+             * Format: uuid
+             */
+            assignment_id: string;
+            /** Concept Ids */
+            concept_ids: string[];
+            /** Entries */
+            entries: components["schemas"]["MarkingEntryOut"][];
+            /**
+             * Leaf Item Id
+             * Format: uuid
+             */
+            leaf_item_id: string;
+            /** Prompt Md */
+            prompt_md: string;
+            /** Solution Code */
+            solution_code: string;
+            /** Tests */
+            tests: (components["schemas"]["IoTest"] | components["schemas"]["FunctionTest"])[];
+            /** Title */
+            title: string;
+        };
+        /** QuestionOut */
+        QuestionOut: {
+            /** Difficulty */
+            difficulty: number;
+            /** Handed In */
+            handed_in: number;
+            /**
+             * Leaf Item Id
+             * Format: uuid
+             */
+            leaf_item_id: string;
+            /** Marked */
+            marked: number;
+            /** Title */
+            title: string;
+        };
+        /** ReleaseOut */
+        ReleaseOut: {
+            /** Marks Released */
+            marks_released: number;
+            /** Notes Released */
+            notes_released: number;
+        };
         /**
          * RosterEntryOut
          * @description A student as seen from inside a class: who they are, plus how they got there.
@@ -2082,6 +2892,93 @@ export interface components {
              */
             student_id: string;
         };
+        /** SheetLeafOut */
+        SheetLeafOut: {
+            /** Attempt Id */
+            attempt_id: string | null;
+            /** Changed Since Hand In */
+            changed_since_hand_in: boolean;
+            /** Difficulty */
+            difficulty: number;
+            feedback: components["schemas"]["FeedbackOut"] | null;
+            /** Handed In */
+            handed_in: boolean;
+            /**
+             * Leaf Item Id
+             * Format: uuid
+             */
+            leaf_item_id: string;
+            /**
+             * Problem Id
+             * Format: uuid
+             */
+            problem_id: string;
+            /**
+             * Progress
+             * @enum {string}
+             */
+            progress: "not_started" | "started" | "passing";
+            /** Title */
+            title: string;
+        };
+        /** SheetOut */
+        SheetOut: {
+            /**
+             * Assignment Id
+             * Format: uuid
+             */
+            assignment_id: string;
+            /** Closed */
+            closed: boolean;
+            /** Due At */
+            due_at: string | null;
+            /** Handed In At */
+            handed_in_at: string | null;
+            /** Late */
+            late: boolean;
+            /** Leaves */
+            leaves: components["schemas"]["SheetLeafOut"][];
+            /** Note */
+            note: string | null;
+            /** Returned */
+            returned: boolean;
+            /** Title */
+            title: string;
+        };
+        /** SnippetIn */
+        SnippetIn: {
+            /** Body */
+            body: string;
+            /** Concept Id */
+            concept_id?: string | null;
+        };
+        /** SnippetOut */
+        SnippetOut: {
+            /** Body */
+            body: string;
+            /** Concept Id */
+            concept_id: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            status: components["schemas"]["SnippetStatus"];
+            /** Use Count */
+            use_count: number;
+        };
+        /** SnippetPatch */
+        SnippetPatch: {
+            /** Body */
+            body?: string | null;
+            /** Concept Id */
+            concept_id?: string | null;
+        };
+        /**
+         * SnippetStatus
+         * @enum {string}
+         */
+        SnippetStatus: "active" | "archived";
         /**
          * StudentClassOut
          * @description One class a student has been in, from the student's side.
@@ -2127,6 +3024,18 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** StudentHistoryOut */
+        StudentHistoryOut: {
+            /** Display Name */
+            display_name: string;
+            /** Homework */
+            homework: components["schemas"]["HistoryEntryOut"][];
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
         };
         /** StudentIn */
         StudentIn: {
@@ -2345,6 +3254,383 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    read_homework_assignments__assignment_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                assignment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HomeworkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_homework_assignments__assignment_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                assignment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HomeworkPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HomeworkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    close_homework_assignments__assignment_id__close_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                assignment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HomeworkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    homework_grid_assignments__assignment_id__grid_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                assignment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GridOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    marking_overview_assignments__assignment_id__marking_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                assignment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarkingOverviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_question_assignments__assignment_id__marking__leaf_item_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                assignment_id: string;
+                leaf_item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestionMarkingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_note_assignments__assignment_id__notes__student_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                assignment_id: string;
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteIn"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    release_assignments__assignment_id__release_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                assignment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reopen_homework_assignments__assignment_id__reopen_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                assignment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HomeworkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_homework_assignments__assignment_id__set_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                assignment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HomeworkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_mark_attempts__attempt_id__mark_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                attempt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarkIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     read_current_teacher_auth_me_get: {
         parameters: {
             query?: never;
@@ -2835,6 +4121,76 @@ export interface operations {
             };
         };
     };
+    list_homework_classes__class_id__homework_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                class_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HomeworkOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_homework_classes__class_id__homework_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                class_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HomeworkIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HomeworkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     rotate_join_code_classes__class_id__join_code_rotate_post: {
         parameters: {
             query?: never;
@@ -3001,6 +4357,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RosterPreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    today_grid_classes__class_id__today_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                class_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GridOut"];
                 };
             };
             /** @description Validation Error */
@@ -4243,6 +5632,142 @@ export interface operations {
             };
         };
     };
+    record_events_me_events_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventBatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventBatchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    home_me_home_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HomeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_sheet_me_homework__assignment_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                assignment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SheetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    hand_in_sheet_me_homework__assignment_id__hand_in_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                assignment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HandInIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SheetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     todays_lesson_me_lesson_get: {
         parameters: {
             query?: never;
@@ -4261,6 +5786,144 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TodayOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_snippets_snippets_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnippetOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_snippet_snippets_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SnippetIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnippetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_snippet_snippets__snippet_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                snippet_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SnippetPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnippetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_snippet_snippets__snippet_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                snippet_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnippetOut"];
                 };
             };
             /** @description Validation Error */
@@ -4432,6 +6095,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StudentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    student_history_students__student_id__history_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentHistoryOut"];
                 };
             };
             /** @description Validation Error */

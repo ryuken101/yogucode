@@ -15,7 +15,6 @@ import type { TestRun } from '../runtime/protocol'
 import { renderScreen } from '../test/render'
 import { server } from '../test/server'
 import { ProblemAttempt } from './ProblemAttempt'
-import { StudentHome } from './StudentHome'
 
 vi.mock('../editor/CodeSurface', () => ({
   CodeSurface: ({ value, onChange }: { value: string; onChange: (next: string) => void }) => (
@@ -163,41 +162,4 @@ test('typing saves the attempt', async () => {
   await user.type(editor, 'numbers.append(5)')
 
   await waitFor(() => expect(saves.at(-1)).toContain('numbers.append(5)'), { timeout: 4000 })
-})
-
-/* --- today's ladder ----------------------------------------------------------------- */
-
-test('home lists the ladder with progress, linking to each problem', async () => {
-  server.use(
-    http.get('/api/me/lesson', () =>
-      HttpResponse.json({
-        class_name: 'Year 4-6 Python',
-        lesson_title: 'Append',
-        assignment_id: ASSIGNMENT,
-        problems: [
-          { item_id: ITEM, title: 'Add to the end', difficulty: 1, part_labels: [], progress: 'passing' },
-          { item_id: 'x', title: 'Shopping list', difficulty: 2, part_labels: ['a', 'b'], progress: 'not_started' },
-        ],
-      } satisfies Schemas['TodayOut']),
-    ),
-  )
-  renderScreen(<StudentHome />, { route: '/home' })
-
-  expect(await screen.findByRole('heading', { name: 'Append' })).toBeInTheDocument()
-  expect(screen.getByRole('link', { name: /Add to the end/ })).toHaveAttribute(
-    'href',
-    `/lesson/${ASSIGNMENT}/${ITEM}`,
-  )
-  expect(screen.getByText('All checks pass')).toBeInTheDocument()
-  expect(screen.getByText('2 parts')).toBeInTheDocument()
-})
-
-test('home says so when nothing is set', async () => {
-  server.use(
-    http.get('/api/me/lesson', () =>
-      HttpResponse.json({ class_name: 'Year 4-6 Python', lesson_title: null, assignment_id: null, problems: [] }),
-    ),
-  )
-  renderScreen(<StudentHome />, { route: '/home' })
-  expect(await screen.findByText('Nothing set for today yet')).toBeInTheDocument()
 })

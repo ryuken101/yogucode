@@ -28,10 +28,10 @@ import {
   useDocuments,
   useRenameDocument,
 } from '../lib/queries'
+import { useEventRecorder } from '../events/recorder'
 import { usePython } from '../runtime/usePython'
 
 export function Work() {
-  const { state, output, run, stop, answer } = usePython()
   const files = useDocuments()
   const create = useCreateDocument()
   const archive = useArchiveDocument()
@@ -40,6 +40,13 @@ export function Work() {
   const [activeId, setActiveId] = useState<string | null>(null)
   const active = useDocument(activeId)
   const autosave = useAutosave(activeId)
+  // My files are recorded too, by Ken's decision (Phase 5 planning): edits, runs, errors.
+  const record = useEventRecorder(activeId ? { documentId: activeId } : null)
+  const { state, output, run, stop, answer } = usePython({
+    onRunFinished: ({ ok, interrupted, stderr }) => {
+      if (!ok && !interrupted) record('error', { text: stderr.slice(-2000) })
+    },
+  })
 
   /**
    * Reopen whatever they were last editing.
@@ -88,7 +95,14 @@ export function Work() {
   return (
     <div className="flex h-full flex-col gap-2 p-3">
       <div className="flex shrink-0 flex-wrap items-center gap-2">
-        <Button variant="primary" onClick={() => run(code)} disabled={busy || loading}>
+        <Button
+          variant="primary"
+          onClick={() => {
+            run(code)
+            record('run')
+          }}
+          disabled={busy || loading}
+        >
           {busy ? 'Running…' : 'Run'}
         </Button>
         {/* Not a danger variant: stopping your own program destroys nothing. */}
@@ -154,6 +168,8 @@ export function Work() {
             key={activeId ?? 'none'}
             value={code}
             onChange={autosave.onChange}
+            onEdit={(changes) => record('edit', { changes })}
+            onPaste={(chars) => record('paste', { chars })}
           />
         )}
       </div>

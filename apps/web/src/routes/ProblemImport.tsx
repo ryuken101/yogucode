@@ -118,6 +118,20 @@ export function ProblemImport() {
           </Button>
         </div>
       ) : null}
+      {/* A re-import of a file already in the bank changes nothing, so Import has nothing
+          to do. Say so — a disabled button with no reason reads as a broken page. */}
+      {report && !report.applied && !report.error && entries.length > 0 && changes === 0 &&
+      entries.every((e) => e.action === 'unchanged') ? (
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <Notice tone="info">
+            Every problem in this file is already in the bank, unchanged — there is nothing
+            new to import.
+          </Notice>
+          <Button variant="secondary" onClick={() => navigate('/problems')}>
+            Go to the bank
+          </Button>
+        </div>
+      ) : null}
 
       {entries.length > 0 ? (
         <ul className="flex flex-col gap-2">

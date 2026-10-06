@@ -81,6 +81,24 @@ test('applying imports and points at the bank', async () => {
   expect(applied).toBe(1)
 })
 
+test('a file already in the bank says there is nothing new, rather than a dead button', async () => {
+  server.use(
+    http.post('/api/items/import', () =>
+      HttpResponse.json({
+        applied: false,
+        error: null,
+        entries: [entry({ action: 'unchanged' })],
+      } satisfies Schemas['ImportReportOut']),
+    ),
+  )
+  const { user } = renderScreen(<ProblemImport />)
+  await user.type(screen.getByLabelText('…or paste it here'), 'problems: none')
+  await user.click(screen.getByRole('button', { name: 'Preview' }))
+
+  expect(await screen.findByText(/already in the bank, unchanged/)).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Go to the bank' })).toBeInTheDocument()
+})
+
 /* --- bulk publish ------------------------------------------------------------------- */
 
 const GOOD = '018f0000-0000-7000-8000-0000000000b1'
