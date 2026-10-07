@@ -44,6 +44,12 @@ it: a child gets `JoinShell` with no navigation, no sign-out and no centre name.
 flow must keep working when Supabase is unconfigured or unreachable, because it does not
 use Supabase at all.
 
+**The bare address `/` is the children's front door** (Ken's decision, 8 Oct 2026; it
+replaced a QR code on the PIN slips). `Landing.tsx` sends a child who is still signed in
+to `/home` and a teacher with a session to `/classes`, and otherwise shows the `/join`
+flow with a "Teacher? Sign in here" link to `/sign-in`. `/join` remains as an alias. The
+slips and the class page print the site's host so children know what to type.
+
 **The class code never goes in a URL.** `/join` keeps its steps in component state. A code
 in a query string lands in browser history on a shared centre laptop, in proxy logs, and
 in the `Referer` of the next request — which is also why the API takes it in a POST body.

@@ -23,6 +23,7 @@ export interface SlipState {
 }
 
 export function SlipSheet() {
+  const host = window.location.host
   const { classId } = useParams<{ classId: string }>()
   const state = useLocation().state as SlipState | null
 
@@ -76,6 +77,11 @@ export function SlipSheet() {
           >
             <p className="font-serif text-lg text-ink">{slip.display_name}</p>
             <dl className="mt-2 text-sm text-ink">
+              {/* The one thing a child is told to type (Ken's decision): the address. */}
+              <div className="flex gap-2">
+                <dt className="text-ink-soft">Go to</dt>
+                <dd className="font-mono">{host}</dd>
+              </div>
               <div className="flex gap-2">
                 <dt className="text-ink-soft">Class</dt>
                 <dd className="font-mono">{state.className}</dd>

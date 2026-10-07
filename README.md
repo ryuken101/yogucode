@@ -28,7 +28,7 @@ region is far easier to choose now than to migrate later down the line.
 flowchart TB
     subgraph browser["Browser — centre laptop, or home for homework"]
         teacher["Teacher<br/>classes · roster · curriculum · problem bank"]
-        student["Student<br/>/join · today's ladder · editor"]
+        student["Student<br/>site address → sign-in · homework · ladder · editor"]
         pyodide["Pyodide in a Web Worker<br/>runs code and grades tests"]
     end
 
@@ -370,8 +370,13 @@ Load-bearing decisions, each easy to undo by accident:
 - **Progress**: a students × problems grid per homework and for today's ladder (with
   "finished — ready for more"), and a per-child history page with the marks.
 
-Next: step 11 (QR on the PIN slips), then Phase 1's deploy steps and the Supabase Pro
-upgrade, then a fortnight of real use before Phase 6.
+**Step 11 — the site address is the student sign-in.** Children type the bare address
+(no QR code, by Ken's decision); `/` shows the class code → name → PIN flow, or sends
+whoever is already signed in to their own start page. The PIN slips and the class page
+print the address to type.
+
+Next: Phase 1's deploy steps and the Supabase Pro upgrade, then a fortnight of real use
+before Phase 6.
 
 ## Local development
 

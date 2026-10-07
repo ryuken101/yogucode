@@ -80,9 +80,15 @@ export function ClassDetail() {
           <div>
             <h2 className="text-sm font-medium text-ink-soft">Join code</h2>
             {klass.data.join_code ? (
+<>
               <p className="font-mono text-3xl tracking-[0.35em] text-ink">
                 {klass.data.join_code}
               </p>
+              <p className="mt-1 text-sm text-ink-soft">
+                Students go to <span className="font-mono text-ink">{window.location.host}</span>{' '}
+                and type this code.
+              </p>
+              </>
             ) : (
               <p className="text-sm text-ink-soft">
                 This class has no code yet. Create one to let students join.

@@ -12,7 +12,7 @@
  */
 
 import { useState } from 'react'
-import { useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { Button } from '../components/Button'
 import { Card, PageHeader } from '../components/Card'
 import { TextInput } from '../components/Field'
@@ -92,7 +92,10 @@ export function Join() {
       <Card>
         {step.name === 'code' ? (
           <>
-            <PageHeader title="Join your class" />
+            <PageHeader title="Sign in" />
+            <p className="mb-4 text-sm text-ink-soft">
+              Type the class code your teacher gave you.
+            </p>
             <form onSubmit={findClass} className="flex flex-col gap-4">
               <TextInput
                 label="Class code"
@@ -207,6 +210,15 @@ export function Join() {
           </div>
         ) : null}
       </Card>
+      {/* The site's front door is the children's: teachers come in by this side door. */}
+      {step.name === 'code' ? (
+        <p className="mt-4 text-center text-sm text-ink-soft">
+          Teacher?{' '}
+          <Link to="/sign-in" className="text-sky-deep underline">
+            Sign in here
+          </Link>
+        </p>
+      ) : null}
     </JoinShell>
   )
 }

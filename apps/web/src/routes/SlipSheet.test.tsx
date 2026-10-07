@@ -56,3 +56,9 @@ test('the warning is amber, because reissuing is a fix and not a fault', () => {
   expect(notice.className).toContain('amber')
   expect(notice.className).not.toContain('rust')
 })
+
+test('a slip tells the child which address to type', () => {
+  renderAt(state)
+  expect(screen.getAllByText('Go to')).toHaveLength(2)
+  expect(screen.getAllByText(window.location.host)).toHaveLength(2)
+})

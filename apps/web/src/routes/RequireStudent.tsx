@@ -37,14 +37,14 @@ export function RequireStudent() {
   // Any failure is the same answer: go and sign in. A revoked session, an expired one, an
   // archived student and a stale cookie are indistinguishable to a child and have the
   // same remedy.
-  if (error || !me) return <Navigate to="/join" replace />
+  if (error || !me) return <Navigate to="/" replace />
 
   async function signOut() {
     await api.studentSignOut().catch(() => undefined)
     // The cached identity has to go, or the guard would wave the next child through as
     // the previous one.
     client.clear()
-    navigate('/join', { replace: true })
+    navigate('/', { replace: true })
   }
 
   return (

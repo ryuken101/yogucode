@@ -82,7 +82,7 @@ function renderGuarded() {
       <Route element={<RequireStudent />}>
         <Route path="/work" element={<Work />} />
       </Route>
-      <Route path="/join" element={<p>Join your class</p>} />
+      <Route path="/" element={<p>Student sign-in</p>} />
     </Routes>,
     { route: '/work' },
   )
@@ -220,11 +220,11 @@ test('a rename that does not clash raises nothing', async () => {
 
 // --- the guard -----------------------------------------------------------------------
 
-test('a signed-out visitor is sent to join, not shown an editor that cannot save', async () => {
+test('a signed-out visitor is sent to the sign-in, not shown an editor that cannot save', async () => {
   server.use(...signedOut())
   renderGuarded()
 
-  expect(await screen.findByText('Join your class')).toBeInTheDocument()
+  expect(await screen.findByText('Student sign-in')).toBeInTheDocument()
   expect(screen.queryByLabelText('Your program')).not.toBeInTheDocument()
 })
 

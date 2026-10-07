@@ -8,12 +8,13 @@
  */
 
 import { Suspense, lazy } from 'react'
-import { Navigate, Route, Routes } from 'react-router'
+import { Route, Routes } from 'react-router'
 import { Spinner } from './components/Spinner'
 import { AuthCallback } from './routes/AuthCallback'
 import { ClassDetail } from './routes/ClassDetail'
 import { ClassList } from './routes/ClassList'
 import { Join } from './routes/Join'
+import { Landing } from './routes/Landing'
 import { NotFound } from './routes/NotFound'
 import { RequireTeacher } from './routes/RequireTeacher'
 import { SignIn } from './routes/SignIn'
@@ -65,7 +66,8 @@ function Loading({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/classes" replace />} />
+      {/* The bare address is the children's sign-in; /join stays as an alias. */}
+      <Route path="/" element={<Landing />} />
       <Route path="/sign-in" element={<SignIn />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/join" element={<Join />} />
