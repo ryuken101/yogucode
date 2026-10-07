@@ -12,8 +12,10 @@ from app.routers import (
     homework,
     items,
     join,
+    live,
     marking,
     progress,
+    quiz,
     roster,
     student_work,
 )
@@ -34,6 +36,8 @@ app.include_router(events.router)
 app.include_router(homework.router)
 app.include_router(marking.router)
 app.include_router(progress.router)
+app.include_router(live.router)
+app.include_router(quiz.router)
 
 
 @app.get("/health")

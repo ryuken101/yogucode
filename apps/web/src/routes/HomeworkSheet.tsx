@@ -33,9 +33,12 @@ interface Ready {
   passed: number
   total: number
   started: boolean
+  /** Multiple choice: answered or not — never checked here, that would give it away. */
+  mcq: boolean
 }
 
-function Returned({ sheet }: { sheet: Schemas['SheetOut'] }) {
+/** Work that has been given back: the teacher's note, then each question's comment and colour. */
+export function Returned({ sheet }: { sheet: Schemas['SheetOut'] }) {
   return (
     <div className="flex flex-col gap-4">
       {sheet.note ? (
@@ -66,7 +69,11 @@ function Returned({ sheet }: { sheet: Schemas['SheetOut'] }) {
                 <Markdown>{leaf.feedback.comment_md}</Markdown>
               </div>
             ) : null}
-            {leaf.feedback ? (
+            {leaf.feedback?.answer ? (
+              <p className="text-sm text-ink">
+                Your answer: <span className="font-mono">{leaf.feedback.answer}</span>
+              </p>
+            ) : leaf.feedback ? (
               <pre className="overflow-x-auto rounded-lg bg-ink-deep p-3 font-mono text-sm text-cream">
                 {leaf.feedback.code || '(nothing written)'}
               </pre>
@@ -113,6 +120,17 @@ export function HomeworkSheet() {
       for (const problemId of new Set(data.leaves.map((l) => l.problem_id))) {
         const problem = await api.openProblem(assignmentId, problemId)
         for (const leaf of problem.leaves) {
+          if (problem.kind === 'mcq') {
+            rows.push({
+              title: titles.get(leaf.item_id) ?? problem.title,
+              attemptId: leaf.attempt.id,
+              passed: 0,
+              total: 0,
+              started: leaf.attempt.choice !== null,
+              mcq: true,
+            })
+            continue
+          }
           const run = await python.check(leaf.attempt.code, toChecks(leaf.tests))
           rows.push({
             title: titles.get(leaf.item_id) ?? problem.title,
@@ -120,6 +138,7 @@ export function HomeworkSheet() {
             passed: run ? run.results.filter((r) => r.passed).length : 0,
             total: run ? run.results.length : leaf.tests.length,
             started: !notStarted.has(leaf.item_id),
+            mcq: false,
           })
         }
       }
@@ -240,7 +259,13 @@ export function HomeworkSheet() {
                     row.started && row.total > 0 && row.passed === row.total ? 'text-sage' : 'text-ink-soft'
                   }`}
                 >
-                  {row.started ? `${row.passed} of ${row.total} passing` : 'not started'}
+                  {row.mcq
+                    ? row.started
+                      ? 'answered'
+                      : 'not answered'
+                    : row.started
+                      ? `${row.passed} of ${row.total} passing`
+                      : 'not started'}
                 </td>
               </tr>
             ))}

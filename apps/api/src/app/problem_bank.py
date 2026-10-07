@@ -27,7 +27,7 @@ from sqlmodel import col, delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.auth.principal import Principal
-from app.models import Hint, Item, ItemConcept, ItemStatus, TestCase, TestKind
+from app.models import Hint, Item, ItemConcept, ItemKind, ItemStatus, TestCase, TestKind
 from app.models.base import utcnow
 from app.scoping import list_item_parts, list_visible_concepts
 
@@ -117,16 +117,37 @@ class PartDoc(LeafDoc):
         return value
 
 
+class OptionDoc(BaseModel):
+    """One answer to a multiple-choice question.
+
+    A wrong option should name the wrong belief that leads to it — "thinks range includes
+    the end" — so a teacher can read the class's answers as a list of misconceptions
+    (spec §3.6). Optional, because a teacher may not always know; publishing warns.
+    """
+
+    text: str = Field(min_length=1, max_length=2000)
+    correct: bool = False
+    misconception: str | None = Field(default=None, max_length=300)
+
+
+MAX_OPTIONS = 8
+
+
 class ProblemDoc(LeafDoc):
+    kind: Literal["code", "mcq"] = "code"
     title: str = Field(min_length=1, max_length=MAX_TITLE_LENGTH)
     prompt_md: str = Field(default="", max_length=MAX_PROMPT_CHARS)
     parts: list[PartDoc] = Field(default_factory=list, max_length=MAX_PARTS)
+    # Multiple choice only.
+    options: list[OptionDoc] = Field(default_factory=list, max_length=MAX_OPTIONS)
 
     @model_validator(mode="after")
     def _labels_are_unique(self) -> "ProblemDoc":
         labels = [part.label for part in self.parts]
         if len(set(labels)) != len(labels):
             raise ValueError("Two parts share a label")
+        if self.kind == "mcq" and self.parts:
+            raise ValueError("A multiple-choice question has no parts")
         return self
 
 
@@ -200,8 +221,10 @@ async def read_document(
     parts = list(await list_item_parts(session, principal, item.id))
     tests, hints, tags = await _leaf_children(session, [item.id, *(p.id for p in parts)])
     doc = ProblemDoc(
+        kind=item.kind,
         title=item.title,
         prompt_md=item.prompt_md,
+        options=[OptionDoc(**option) for option in item.options],
         parts=[
             PartDoc(
                 label=part.part_label or "",
@@ -284,6 +307,8 @@ async def write_document(
     """
     item.title = doc.title.strip()
     item.prompt_md = doc.prompt_md
+    item.kind = ItemKind(doc.kind)
+    item.options = [option.model_dump() for option in doc.options] if doc.kind == "mcq" else []
     # Set by hand, not left to `onupdate`: a save that only changes a test case does not
     # touch this row, and `updated_at` is what the publish route checks a test run against.
     item.updated_at = utcnow()
@@ -329,6 +354,15 @@ def publish_problems(doc: ProblemDoc) -> list[str]:
     """
     problems: list[str] = []
 
+    if doc.kind == "mcq":
+        if len(doc.options) < 2:
+            problems.append("The question needs at least two options")
+        if sum(1 for option in doc.options if option.correct) != 1:
+            problems.append("Exactly one option should be marked correct")
+        if doc.primary_concept_id is None:
+            problems.append("The question needs a main concept")
+        return problems
+
     def check_leaf(leaf: LeafDoc, where: str) -> None:
         if not leaf.solution_code.strip():
             problems.append(f"{where} needs a reference solution")
@@ -345,6 +379,21 @@ def publish_problems(doc: ProblemDoc) -> list[str]:
     else:
         check_leaf(doc, "The problem")
     return problems
+
+
+def publish_warnings(doc: ProblemDoc) -> list[str]:
+    """What is worth fixing but does not block publishing."""
+    if doc.kind != "mcq":
+        return []
+    unexplained = [
+        option.text for option in doc.options if not option.correct and not option.misconception
+    ]
+    if unexplained:
+        return [
+            f"{len(unexplained)} wrong option{'s' if len(unexplained) != 1 else ''} "
+            "without a misconception — naming it is what makes the answers diagnostic"
+        ]
+    return []
 
 
 async def set_status(

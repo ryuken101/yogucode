@@ -43,7 +43,7 @@ function leaf(overrides: Partial<Schemas['StudentLeafOut']> = {}): Schemas['Stud
     ],
     hints: [],
     next_hint: { level: 1, available: false, runs_needed: 1, seconds_needed: 120 },
-    attempt: { id: ATTEMPT, code: 'numbers = [1, 2, 3]\n', status: 'in_progress', run_count: 0, last_passed: null, last_total: null },
+    attempt: { id: ATTEMPT, code: 'numbers = [1, 2, 3]\n', status: 'in_progress', run_count: 0, last_passed: null, last_total: null, choice: null },
     ...overrides,
   }
 }
@@ -55,7 +55,7 @@ const problem = (): Schemas['StudentProblemOut'] => ({
   prompt_md: 'Add `5` to the end.',
   difficulty: 1,
   mode: 'classwork',
-  completions: true,
+  completions: true, kind: 'code', checks: true, options: [],
   leaves: [leaf()],
 })
 

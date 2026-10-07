@@ -113,6 +113,7 @@ function ProblemRow({
       >
         <Dots value={problem.difficulty} />
         <span className="font-medium text-ink">{problem.title}</span>
+        {problem.kind === 'mcq' ? <Badge variant="muted">Multiple choice</Badge> : null}
         {problem.part_labels.length ? (
           <span className="text-xs text-ink-soft">parts {problem.part_labels.join(', ')}</span>
         ) : null}

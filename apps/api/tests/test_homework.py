@@ -150,6 +150,7 @@ async def test_set_homework_appears_on_the_childs_home(
     assert len(cards) == 1
     assert cards[0] | {"assignment_id": None, "due_at": None} == {
         "assignment_id": None,
+        "mode": "homework",
         "title": "Lists practice",
         "due_at": None,
         "closed": False,

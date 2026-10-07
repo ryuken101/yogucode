@@ -120,3 +120,23 @@ A failed save is the one thing on that screen allowed to be **rust** — it is g
 fault, and a child typing into a page that silently discards their work is the failure most
 worth shouting about. Saves are deliberately not retried: the usual cause is a revoked
 session, and retrying hides it behind a spinner.
+
+## The live classroom (`src/collab/`)
+
+Each editor's text is a Yjs document, bound to Monaco by `monacoBinding.ts`. That file is
+ours, not `y-monaco`: `y-monaco` imports the `monaco-editor` package root, which this
+file's Editor section forbids. The binding needs only the text model, so it tests against
+a fake model (`monacoBinding.test.ts`), including two people typing at once.
+
+- **One child connection per page** (`studentLive()` in `socket.ts`), opened by
+  `RequireStudent` and closed on sign-out. On every reconnect, each open editor resends
+  its full state. A teacher's connection (`useLiveClass`) sends its token first and
+  **never queues**: a flushed keystroke that beat the token would be read as a failed
+  sign-in.
+- **An edit that arrives from the teacher is flagged** (`binding.applyingRemote`), and
+  recorded as `teacher_edit` rather than as the child's own `edit`.
+- **Yjs, the live view and every page that imports them are lazy-loaded.** `/join` must
+  not carry them.
+- **Quizzes:** `RequireStudent` routes a child to `/quiz/:id` while one runs
+  (`useActiveQuiz` plus the `quiz_started` / `quiz_ended` push). The server enforces the
+  same thing, so the routing is for the child's benefit, not the security.

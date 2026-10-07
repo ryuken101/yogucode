@@ -28,6 +28,8 @@ import {
   useDocuments,
   useRenameDocument,
 } from '../lib/queries'
+import { studentLive } from '../collab/socket'
+import { useLiveDoc } from '../collab/useLiveDoc'
 import { useEventRecorder } from '../events/recorder'
 import { usePython } from '../runtime/usePython'
 
@@ -44,9 +46,19 @@ export function Work() {
   const record = useEventRecorder(activeId ? { documentId: activeId } : null)
   const { state, output, run, stop, answer } = usePython({
     onRunFinished: ({ ok, interrupted, stderr }) => {
-      if (!ok && !interrupted) record('error', { text: stderr.slice(-2000) })
+      if (!ok && !interrupted) {
+        record('error', { text: stderr.slice(-2000) })
+        studentLive().status({ kind: 'error', text: stderr.trim().split('\n').pop() ?? '' })
+      }
     },
   })
+  // The live classroom: this file's text streams to the teacher, who can type into it.
+  const target = activeId ? `document:${activeId}` : null
+  const live = useLiveDoc(target, active.data ? active.data.content : null)
+  const fileTitle = active.data?.title ?? null
+  useEffect(() => {
+    studentLive().setFocus(target && fileTitle ? { target, kind: 'file', title: fileTitle } : null)
+  }, [target, fileTitle])
 
   /**
    * Reopen whatever they were last editing.
@@ -100,6 +112,7 @@ export function Work() {
           onClick={() => {
             run(code)
             record('run')
+            studentLive().status({ kind: 'run' })
           }}
           disabled={busy || loading}
         >
@@ -168,8 +181,13 @@ export function Work() {
             key={activeId ?? 'none'}
             value={code}
             onChange={autosave.onChange}
-            onEdit={(changes) => record('edit', { changes })}
-            onPaste={(chars) => record('paste', { chars })}
+            onModel={live.bind}
+            onCursor={live.onCursor}
+            onEdit={(changes) => record(live.isRemote() ? 'teacher_edit' : 'edit', { changes })}
+            onPaste={(chars) => {
+              record('paste', { chars })
+              studentLive().status({ kind: 'paste', chars })
+            }}
           />
         )}
       </div>

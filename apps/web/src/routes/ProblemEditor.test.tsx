@@ -37,6 +37,8 @@ const concepts: Schemas['ConceptOut'][] = [
 
 function readyDoc(): Schemas['ProblemDoc'] {
   return {
+    kind: 'code',
+    options: [],
     title: 'Add to the list',
     prompt_md: 'Add 5.',
     difficulty: 1,
@@ -68,6 +70,7 @@ function problemOut(overrides: Partial<Schemas['ProblemOut']> = {}): Schemas['Pr
     document: readyDoc(),
     parts: [],
     publish_problems: [],
+    publish_warnings: [],
     ...overrides,
   }
 }

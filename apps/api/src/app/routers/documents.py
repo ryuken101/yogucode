@@ -33,6 +33,7 @@ from app.auth.principal import CurrentStudent
 from app.db import get_session
 from app.models import DocumentStatus, StudentDocument
 from app.models.base import utcnow
+from app.quiz import running_quiz_for
 from app.scoping import get_owned_document, list_student_documents
 
 router = APIRouter(prefix="/me/documents", tags=["documents"])
@@ -185,6 +186,11 @@ async def save_document(
     is only reading. The same reasoning as the no-op PATCH on classes and students.
     """
     record = await get_owned_document(session, principal, document_id)
+    if await running_quiz_for(session, principal) is not None:
+        # The quiz is the only thing a child can change while it runs (Ken's decision).
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="A quiz is running — finish it first"
+        )
 
     fields = body.model_dump(exclude_unset=True)
     changed = False

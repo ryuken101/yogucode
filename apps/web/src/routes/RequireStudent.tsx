@@ -14,17 +14,31 @@
  * obvious to press when handing the machine to the next student.
  */
 
-import { NavLink, Navigate, Outlet, useNavigate } from 'react-router'
+import { useEffect } from 'react'
+import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '../components/Button'
 import { Spinner } from '../components/Spinner'
+import { closeStudentLive, studentLive } from '../collab/socket'
 import { api } from '../lib/api'
-import { useStudentMe } from '../lib/queries'
+import { keys, useActiveQuiz, useStudentMe } from '../lib/queries'
 
 export function RequireStudent() {
   const navigate = useNavigate()
   const client = useQueryClient()
   const { data: me, isPending, error } = useStudentMe()
+  const activeQuiz = useActiveQuiz()
+  const location = useLocation()
+
+  // Keep the live connection open on every student page — it is how a quiz starting or
+  // ending reaches this child at once, not just at the next 15-second check.
+  useEffect(() => {
+    if (!me) return
+    return studentLive().onQuiz(() => {
+      void client.invalidateQueries({ queryKey: keys.activeQuiz })
+      void client.invalidateQueries({ queryKey: keys.home })
+    })
+  }, [me, client])
 
   if (isPending) {
     return (
@@ -39,8 +53,19 @@ export function RequireStudent() {
   // same remedy.
   if (error || !me) return <Navigate to="/" replace />
 
+  // While the class sits a quiz, the quiz is the only place a child can be (Ken's decision).
+  const quiz = activeQuiz.data
+  if (quiz) {
+    const allowed =
+      location.pathname === `/quiz/${quiz.assignment_id}` ||
+      location.pathname.startsWith(`/lesson/${quiz.assignment_id}/`)
+    if (!allowed) return <Navigate to={`/quiz/${quiz.assignment_id}`} replace />
+  }
+
   async function signOut() {
     await api.studentSignOut().catch(() => undefined)
+    // The live connection belongs to this child; the next one on the laptop opens their own.
+    closeStudentLive()
     // The cached identity has to go, or the guard would wave the next child through as
     // the previous one.
     client.clear()
@@ -55,7 +80,7 @@ export function RequireStudent() {
             <span className="font-medium">{me.display_name}</span>
             <span className="text-ink-soft"> · {me.class_name}</span>
           </p>
-          <nav className="flex gap-4 text-sm">
+          <nav className={`flex gap-4 text-sm ${quiz ? 'invisible' : ''}`}>
             {[
               ['/home', 'Today'],
               ['/work', 'My files'],

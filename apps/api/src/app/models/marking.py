@@ -53,6 +53,8 @@ class Submission(SQLModel, table=True):
     centre_id: uuid.UUID = Field(foreign_key="centres.id", index=True)
     attempt_id: uuid.UUID = Field(foreign_key="attempts.id")
     code: str = Field(sa_type=Text)
+    # Multiple choice: the option picked at hand-in.
+    choice: int | None = None
     # The child's browser's check result at hand-in. Informational; marking re-runs.
     passed: int | None = None
     total: int | None = None

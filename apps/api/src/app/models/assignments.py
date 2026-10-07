@@ -119,6 +119,10 @@ class Assignment(TimestampMixin, table=True):
     # (time limit, paste flagging) that classwork and homework never read.
     settings: dict[str, Any] = Field(default_factory=dict, sa_type=JSONB)
     released_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))
+    # A quiz's one clock for the class (Ken's decision): set when the teacher presses
+    # Start; `ends_at` is when everyone's work is handed in, or earlier on Stop.
+    started_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))
+    ends_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))
     created_by: uuid.UUID | None = Field(default=None, foreign_key="users.id")
 
 
@@ -137,6 +141,8 @@ class Attempt(TimestampMixin, table=True):
     assignment_id: uuid.UUID = Field(foreign_key="assignments.id", index=True)
     item_id: uuid.UUID = Field(foreign_key="items.id", index=True)
     code: str = Field(default="", sa_type=Text)
+    # Multiple choice: the index of the option picked, or None while unanswered.
+    choice: int | None = Field(default=None)
     status: AttemptStatus = Field(default=AttemptStatus.IN_PROGRESS, sa_type=String)
     run_count: int = Field(default=0)
     last_passed: int | None = Field(default=None)

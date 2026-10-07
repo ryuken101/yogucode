@@ -43,13 +43,17 @@ class EventType(StrEnum):
     PASTE = "paste"
     HINT = "hint"
     SUBMIT = "submit"
+    # A teacher typing into this child's editor (live view "help"), so replay can tell
+    # the teacher's keystrokes from the child's own.
+    TEACHER_EDIT = "teacher_edit"
 
 
 class Event(SQLModel, table=True):
     __tablename__ = "events"
     __table_args__ = (
         CheckConstraint(
-            "type IN ('edit', 'run', 'check', 'error', 'paste', 'hint', 'submit')", name="type"
+            "type IN ('edit', 'run', 'check', 'error', 'paste', 'hint', 'submit', 'teacher_edit')",
+            name="type",
         ),
         CheckConstraint("(attempt_id IS NULL) <> (document_id IS NULL)", name="one_target"),
         Index("ix_events_attempt_seq", "attempt_id", "editor_session_id", "seq"),

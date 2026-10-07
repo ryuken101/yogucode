@@ -21,7 +21,6 @@ import { SignIn } from './routes/SignIn'
 import { RequireStudent } from './routes/RequireStudent'
 import { SlipSheet } from './routes/SlipSheet'
 import { StudentHome } from './routes/StudentHome'
-import { Work } from './routes/Work'
 
 /**
  * The curriculum and problem screens are teacher-only and pull in markdown rendering and
@@ -59,6 +58,16 @@ const StudentHistory = lazy(() =>
   import('./routes/StudentHistory').then((m) => ({ default: m.StudentHistory })),
 )
 
+const Live = lazy(() => import('./routes/Live').then((m) => ({ default: m.Live })))
+// My files streams to the live view, so it carries the collaboration library; lazy, so
+// `/join` does not.
+const Work = lazy(() => import('./routes/Work').then((m) => ({ default: m.Work })))
+
+const QuizBuilder = lazy(() =>
+  import('./routes/QuizBuilder').then((m) => ({ default: m.QuizBuilder })),
+)
+const QuizRunner = lazy(() => import('./routes/QuizRunner').then((m) => ({ default: m.QuizRunner })))
+
 function Loading({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<Spinner label="Loading" />}>{children}</Suspense>
 }
@@ -74,7 +83,8 @@ export default function App() {
 
       <Route element={<RequireStudent />}>
         <Route path="/home" element={<StudentHome />} />
-        <Route path="/work" element={<Work />} />
+        <Route path="/work" element={<Loading><Work /></Loading>} />
+        <Route path="/quiz/:assignmentId" element={<Loading><QuizRunner /></Loading>} />
         <Route path="/homework/:assignmentId" element={<Loading><HomeworkSheet /></Loading>} />
         <Route
           path="/lesson/:assignmentId/:itemId"
@@ -91,6 +101,12 @@ export default function App() {
           path="/classes/:classId/homework/:assignmentId"
           element={<Loading><HomeworkBuilder /></Loading>}
         />
+        <Route path="/classes/:classId/quizzes/new" element={<Loading><QuizBuilder /></Loading>} />
+        <Route
+          path="/classes/:classId/quizzes/:quizId"
+          element={<Loading><QuizBuilder /></Loading>}
+        />
+        <Route path="/classes/:classId/live" element={<Loading><Live /></Loading>} />
         <Route path="/classes/:classId/progress" element={<Loading><Progress /></Loading>} />
         <Route path="/assignments/:assignmentId/mark" element={<Loading><MarkingStart /></Loading>} />
         <Route

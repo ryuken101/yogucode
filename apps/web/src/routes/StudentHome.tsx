@@ -25,10 +25,11 @@ import { useHome } from '../lib/queries'
 function HomeworkCard({ card }: { card: Schemas['HomeworkCardOut'] }) {
   return (
     <Link
-      to={`/homework/${card.assignment_id}`}
+      to={card.mode === 'quiz' ? `/quiz/${card.assignment_id}` : `/homework/${card.assignment_id}`}
       className="flex flex-wrap items-center gap-3 rounded-xl bg-paper px-5 py-4 ring-1 ring-ink/10 hover:ring-sky"
     >
       <span className="font-medium text-ink">{card.title}</span>
+      {card.mode === 'quiz' ? <Badge variant="muted">Quiz</Badge> : null}
       <span className="text-sm text-ink-soft">
         {card.returned ? 'Given back' : `Due ${formatDue(card.due_at)}`}
       </span>

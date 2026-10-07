@@ -20,6 +20,8 @@ import { messageFor } from '../lib/errors'
 import {
   useClass,
   useClassHomework,
+  useClassQuizzes,
+  useQuizMutation,
   useCourse,
   useHomeworkMutation,
   useCourses,
@@ -67,6 +69,9 @@ export function ClassDetail() {
   return (
     <>
       <PageHeader title={klass.data.name}>
+        <Button variant="primary" onClick={() => navigate(`/classes/${classId}/live`)}>
+          Live
+        </Button>
         <Button variant="secondary" onClick={() => navigate(`/classes/${classId}/progress`)}>
           Progress
         </Button>
@@ -117,6 +122,8 @@ export function ClassDetail() {
       />
 
       <HomeworkCard classId={classId} />
+
+      <QuizzesCard classId={classId} />
 
       <Card className="mb-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -390,6 +397,72 @@ function HomeworkCard({ classId }: { classId: string }) {
         ))}
       </ul>
       {homework.error ? <Notice tone="system-error">{messageFor(homework.error)}</Notice> : null}
+    </Card>
+  )
+}
+
+/**
+ * The class's quizzes. A draft is started from here or from its own page; starting one
+ * switches every child to it and opens the live view, where it is watched and stopped.
+ */
+function QuizzesCard({ classId }: { classId: string }) {
+  const navigate = useNavigate()
+  const quizzes = useClassQuizzes(classId)
+  const start = useQuizMutation(classId, (id: string) => api.startQuiz(id))
+  const running = (quizzes.data ?? []).some((q) => q.running)
+
+  return (
+    <Card className="mb-6">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="font-serif text-lg text-ink">Quizzes</h2>
+        <Button variant="secondary" onClick={() => navigate(`/classes/${classId}/quizzes/new`)}>
+          New quiz
+        </Button>
+      </div>
+      {quizzes.data && quizzes.data.length === 0 ? <p className="text-sm text-ink-soft">None yet.</p> : null}
+      <ul className="flex flex-col gap-2">
+        {(quizzes.data ?? []).map((quiz) => (
+          <li
+            key={quiz.id}
+            className="flex flex-wrap items-center gap-3 rounded-lg bg-cream/60 px-4 py-2.5 ring-1 ring-ink/10"
+          >
+            <span className="font-medium text-ink">{quiz.title}</span>
+            <span className="text-sm text-ink-soft">
+              {quiz.questions.length} question{quiz.questions.length === 1 ? '' : 's'} · {quiz.duration_minutes} min
+            </span>
+            {quiz.status === 'draft' ? <Badge variant="active">Draft</Badge> : null}
+            {quiz.running ? <Badge variant="good">Running</Badge> : null}
+            {quiz.status === 'closed' ? <Badge variant="muted">Finished</Badge> : null}
+            <span className="ml-auto flex gap-1">
+              <Button variant="quiet" onClick={() => navigate(`/classes/${classId}/quizzes/${quiz.id}`)}>
+                {quiz.status === 'draft' ? 'Edit' : 'Details'}
+              </Button>
+              {quiz.status === 'draft' ? (
+                <Button
+                  variant="primary"
+                  disabled={running || start.isPending || quiz.questions.length === 0}
+                  onClick={() =>
+                    start.mutate(quiz.id, { onSuccess: () => navigate(`/classes/${classId}/live`) })
+                  }
+                >
+                  Start
+                </Button>
+              ) : null}
+              {quiz.running ? (
+                <Button variant="primary" onClick={() => navigate(`/classes/${classId}/live`)}>
+                  Watch
+                </Button>
+              ) : null}
+              {quiz.status === 'closed' ? (
+                <Button variant="primary" onClick={() => navigate(`/assignments/${quiz.id}/mark`)}>
+                  Mark
+                </Button>
+              ) : null}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {start.error ? <Notice tone="not-yet">{messageFor(start.error)}</Notice> : null}
     </Card>
   )
 }

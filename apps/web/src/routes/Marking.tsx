@@ -45,13 +45,27 @@ interface Form {
   snippetIds: string[]
 }
 
-function formFor(entry: Entry, run: TestRun | null | undefined): Form {
+function formFor(
+  entry: Entry,
+  run: TestRun | null | undefined,
+  rightChoice: number | null = null,
+): Form {
   if (entry.mark) {
     return {
       runs: entry.mark.runs,
       correct: entry.mark.correct,
       approach: entry.mark.approach,
       comment: entry.mark.comment_md,
+      snippetIds: [],
+    }
+  }
+  if (rightChoice !== null) {
+    // Multiple choice: right or not, from the option picked. No "runs", no approach.
+    return {
+      runs: true,
+      correct: entry.choice === rightChoice ? 2 : 0,
+      approach: null,
+      comment: '',
       snippetIds: [],
     }
   }
@@ -134,7 +148,8 @@ export function Marking() {
     let cancelled = false
     void (async () => {
       const checks = toChecks(data.tests, { revealHidden: true })
-      const withCode = data.entries.filter((e) => e.code !== null)
+      // Multiple choice has nothing to run.
+      const withCode = data.kind === 'mcq' ? [] : data.entries.filter((e) => e.code !== null)
       setRerunning(withCode.length)
       for (const entry of withCode) {
         const run = await python.check(entry.code ?? '', checks)
@@ -214,7 +229,9 @@ export function Marking() {
   if (!data || !entry) return <Notice tone="info">Nobody in this class yet.</Notice>
 
   const run = runs[entry.student_id]
-  const form = forms[entry.student_id] ?? formFor(entry, run)
+  const isMcq = data.kind === 'mcq'
+  const rightChoice = isMcq ? data.options.findIndex((o) => o.correct) : null
+  const form = forms[entry.student_id] ?? formFor(entry, run, rightChoice)
   const setForm = (patch: Partial<Form>) =>
     setForms((current) => ({ ...current, [entry.student_id]: { ...form, ...patch } }))
   const note = notes[entry.student_id] ?? entry.note
@@ -318,7 +335,22 @@ export function Marking() {
               <Notice tone="info">Handed in again since you marked this — the code below is the new version.</Notice>
             </div>
           ) : null}
-          {entry.code === null ? (
+          {isMcq ? (
+            entry.choice === null || entry.choice === undefined ? (
+              <p className="text-ink-soft">No answer chosen.</p>
+            ) : (
+              <div className="flex flex-col gap-1">
+                <p className="font-mono text-base text-ink">{data.options[entry.choice]?.text}</p>
+                <p className="text-sm text-ink-soft">
+                  {entry.choice === rightChoice
+                    ? 'The right answer.'
+                    : data.options[entry.choice]?.misconception
+                      ? `Suggests: ${data.options[entry.choice]?.misconception}`
+                      : 'Not the right answer.'}
+                </p>
+              </div>
+            )
+          ) : entry.code === null ? (
             <p className="text-ink-soft">Not started — nothing to mark.</p>
           ) : (
             <pre className="max-h-96 overflow-auto rounded-lg bg-ink-deep p-3 font-mono text-sm text-cream">
@@ -327,6 +359,41 @@ export function Marking() {
           )}
         </Card>
 
+        {isMcq ? (
+          <Card>
+            <h2 className="mb-2 font-serif text-lg text-ink">The class’s answers</h2>
+            <ul className="flex flex-col gap-1.5 text-sm">
+              {data.options.map((option, i) => (
+                <li key={i} className="flex items-baseline gap-2">
+                  <span className="w-6 text-right font-medium text-ink">{option.chosen_by}</span>
+                  <span className="font-mono text-ink">{option.text}</span>
+                  {option.correct ? <Badge variant="good">right</Badge> : null}
+                  {!option.correct && option.misconception ? (
+                    <span className="text-ink-soft">— {option.misconception}</span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+            <div className="mt-3">
+              <Button
+                variant="secondary"
+                onClick={() =>
+                  void api
+                    .autoMark(assignmentId, itemId)
+                    .then(() =>
+                      Promise.all([
+                        client.invalidateQueries({ queryKey: keys.markingQuestion(assignmentId, itemId) }),
+                        client.invalidateQueries({ queryKey: keys.marking(assignmentId), exact: true }),
+                      ]),
+                    )
+                    .catch(setError)
+                }
+              >
+                Mark all automatically
+              </Button>
+            </div>
+          </Card>
+        ) : (
         <Card>
           <h2 className="mb-2 font-serif text-lg text-ink">Checks (re-run)</h2>
           {entry.code === null ? null : run === undefined ? (
@@ -348,11 +415,13 @@ export function Marking() {
             </p>
           ) : null}
         </Card>
+        )}
       </div>
 
       {entry.attempt_id ? (
         <Card className="mt-4">
           <div className="flex flex-wrap items-center gap-6">
+            {isMcq ? null : (
             <div className="flex items-center gap-2">
               <span className="w-20 text-sm font-medium text-ink">Runs</span>
               <button
@@ -364,8 +433,11 @@ export function Marking() {
                 {form.runs ? '✓' : '—'}
               </button>
             </div>
+            )}
             <Scale label="Correct" value={form.correct} onChange={(correct) => setForm({ correct })} />
-            <Scale label="Approach" value={form.approach} onChange={(approach) => setForm({ approach })} />
+            {isMcq ? null : (
+              <Scale label="Approach" value={form.approach} onChange={(approach) => setForm({ approach })} />
+            )}
           </div>
 
           <div className="mt-4 grid gap-4 lg:grid-cols-[3fr_2fr]">

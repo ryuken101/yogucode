@@ -11,6 +11,7 @@
  * only route that provisions. This guard never writes.
  */
 
+import { useQueryClient } from '@tanstack/react-query'
 import { Navigate, Outlet, useNavigate } from 'react-router'
 import { AppShell } from '../components/AppShell'
 import { Notice } from '../components/Notice'
@@ -21,6 +22,7 @@ import { useMe } from '../lib/queries'
 
 export function RequireTeacher() {
   const navigate = useNavigate()
+  const client = useQueryClient()
   const { data, isPending, error } = useMe({ retry: false })
 
   if (!supabaseConfigured) {
@@ -61,7 +63,12 @@ export function RequireTeacher() {
     <AppShell
       centreName={data.centre.name}
       onSignOut={() => {
-        void signOut().then(() => navigate('/sign-in', { replace: true }))
+        void signOut().then(() => {
+          // Forget who was signed in, or the sign-in page reads the cached profile, thinks
+          // the teacher is still here, and sends them straight back to their classes.
+          client.clear()
+          navigate('/sign-in', { replace: true })
+        })
       }}
     >
       <Outlet />

@@ -99,6 +99,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/assignments/{assignment_id}/marking/{leaf_item_id}/auto": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Auto Mark
+         * @description Mark every answered, unmarked multiple-choice answer to one question: Correct 2 for
+         *     the right option, 0 for any other. A teacher can still change any of them, or add a
+         *     comment, afterwards. Code questions are never marked automatically — approach is a
+         *     human call.
+         */
+        post: operations["auto_mark_assignments__assignment_id__marking__leaf_item_id__auto_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/assignments/{assignment_id}/notes/{student_id}": {
         parameters: {
             query?: never;
@@ -550,6 +573,24 @@ export interface paths {
          *     children who have no PIN yet, so it is safe to run again after adding one student.
          */
         post: operations["issue_class_pins_classes__class_id__pins_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classes/{class_id}/quizzes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Quizzes */
+        get: operations["list_quizzes_classes__class_id__quizzes_get"];
+        put?: never;
+        /** Create Quiz */
+        post: operations["create_quiz_classes__class_id__quizzes_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1118,6 +1159,26 @@ export interface paths {
         patch: operations["save_attempt_me_attempts__attempt_id__patch"];
         trace?: never;
     };
+    "/me/attempts/{attempt_id}/choice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Choose
+         * @description Pick an answer to a multiple-choice question. Changeable until handed in or time is up.
+         */
+        put: operations["choose_me_attempts__attempt_id__choice_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/attempts/{attempt_id}/hints": {
         parameters: {
             query?: never;
@@ -1347,6 +1408,87 @@ export interface paths {
         get: operations["todays_lesson_me_lesson_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/quiz": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Active Quiz
+         * @description The quiz this child's class is sitting now, or null. Their pages route to it.
+         */
+        get: operations["active_quiz_me_quiz_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/quizzes/{quiz_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Quiz */
+        get: operations["read_quiz_quizzes__quiz_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Quiz
+         * @description Edit a draft. A quiz that has started is not changed under the children sitting it.
+         */
+        patch: operations["update_quiz_quizzes__quiz_id__patch"];
+        trace?: never;
+    };
+    "/quizzes/{quiz_id}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Quiz
+         * @description Start the clock. Every child in the class is switched to the quiz at once.
+         */
+        post: operations["start_quiz_quizzes__quiz_id__start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/quizzes/{quiz_id}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stop Quiz
+         * @description End the quiz for everyone — after a few seconds' grace, so last keystrokes save.
+         */
+        post: operations["stop_quiz_quizzes__quiz_id__stop_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1650,6 +1792,21 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** ActiveQuizOut */
+        ActiveQuizOut: {
+            /**
+             * Assignment Id
+             * Format: uuid
+             */
+            assignment_id: string;
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /** Title */
+            title: string;
+        };
         /**
          * AssignmentMode
          * @enum {string}
@@ -1662,6 +1819,8 @@ export interface components {
         AssignmentStatus: "draft" | "open" | "closed" | "archived";
         /** AttemptOut */
         AttemptOut: {
+            /** Choice */
+            choice: number | null;
             /** Code */
             code: string;
             /**
@@ -1687,6 +1846,11 @@ export interface components {
          * @enum {string}
          */
         AttemptStatus: "in_progress" | "submitted";
+        /** AutoMarkOut */
+        AutoMarkOut: {
+            /** Marked */
+            marked: number;
+        };
         /** BulkEnrolIn */
         BulkEnrolIn: {
             /** Entries */
@@ -1728,6 +1892,11 @@ export interface components {
             name: string;
             /** Slug */
             slug: string;
+        };
+        /** ChoiceIn */
+        ChoiceIn: {
+            /** Choice */
+            choice: number;
         };
         /**
          * ClassCurriculumIn
@@ -2018,9 +2187,11 @@ export interface components {
          * EventType
          * @enum {string}
          */
-        EventType: "edit" | "run" | "check" | "error" | "paste" | "hint" | "submit";
+        EventType: "edit" | "run" | "check" | "error" | "paste" | "hint" | "submit" | "teacher_edit";
         /** FeedbackOut */
         FeedbackOut: {
+            /** Answer */
+            answer?: string | null;
             /** Code */
             code: string;
             /** Comment Md */
@@ -2202,6 +2373,7 @@ export interface components {
             handed_in_at: string | null;
             /** Late */
             late: boolean;
+            mode: components["schemas"]["AssignmentMode"];
             /** Problems */
             problems: number;
             /** Returned */
@@ -2366,6 +2538,11 @@ export interface components {
             reset_existing: boolean;
         };
         /**
+         * ItemKind
+         * @enum {string}
+         */
+        ItemKind: "code" | "mcq";
+        /**
          * ItemStatus
          * @enum {string}
          */
@@ -2517,6 +2694,8 @@ export interface components {
             child_passed: number | null;
             /** Child Total */
             child_total: number | null;
+            /** Choice */
+            choice?: number | null;
             /** Code */
             code: string | null;
             /** Display Name */
@@ -2597,6 +2776,39 @@ export interface components {
         NoteIn: {
             /** Note */
             note: string;
+        };
+        /**
+         * OptionCountOut
+         * @description One answer to a multiple-choice question, and how many children chose it.
+         */
+        OptionCountOut: {
+            /** Chosen By */
+            chosen_by: number;
+            /** Correct */
+            correct: boolean;
+            /** Misconception */
+            misconception: string | null;
+            /** Text */
+            text: string;
+        };
+        /**
+         * OptionDoc
+         * @description One answer to a multiple-choice question.
+         *
+         *     A wrong option should name the wrong belief that leads to it — "thinks range includes
+         *     the end" — so a teacher can read the class's answers as a list of misconceptions
+         *     (spec §3.6). Optional, because a teacher may not always know; publishing warns.
+         */
+        OptionDoc: {
+            /**
+             * Correct
+             * @default false
+             */
+            correct: boolean;
+            /** Misconception */
+            misconception?: string | null;
+            /** Text */
+            text: string;
         };
         /** PartDoc */
         PartDoc: {
@@ -2697,6 +2909,14 @@ export interface components {
             difficulty: number;
             /** Hints */
             hints?: components["schemas"]["HintDoc"][];
+            /**
+             * Kind
+             * @default code
+             * @enum {string}
+             */
+            kind: "code" | "mcq";
+            /** Options */
+            options?: components["schemas"]["OptionDoc"][];
             /** Parts */
             parts?: components["schemas"]["PartDoc"][];
             /** Primary Concept Id */
@@ -2733,6 +2953,8 @@ export interface components {
             parts: components["schemas"]["PartRef"][];
             /** Publish Problems */
             publish_problems: string[];
+            /** Publish Warnings */
+            publish_warnings: string[];
             /** Source Key */
             source_key: string | null;
             status: components["schemas"]["ItemStatus"];
@@ -2760,6 +2982,7 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            kind: components["schemas"]["ItemKind"];
             /** Part Labels */
             part_labels: string[];
             /** Primary Concept Id */
@@ -2803,11 +3026,14 @@ export interface components {
             concept_ids: string[];
             /** Entries */
             entries: components["schemas"]["MarkingEntryOut"][];
+            kind: components["schemas"]["ItemKind"];
             /**
              * Leaf Item Id
              * Format: uuid
              */
             leaf_item_id: string;
+            /** Options */
+            options: components["schemas"]["OptionCountOut"][];
             /** Prompt Md */
             prompt_md: string;
             /** Solution Code */
@@ -2830,6 +3056,77 @@ export interface components {
             leaf_item_id: string;
             /** Marked */
             marked: number;
+            /** Title */
+            title: string;
+        };
+        /** QuizIn */
+        QuizIn: {
+            /**
+             * Checks
+             * @default false
+             */
+            checks: boolean;
+            /**
+             * Duration Minutes
+             * @default 20
+             */
+            duration_minutes: number;
+            /** Item Ids */
+            item_ids?: string[];
+            /** Title */
+            title: string;
+        };
+        /** QuizOut */
+        QuizOut: {
+            /** Checks */
+            checks: boolean;
+            /**
+             * Class Id
+             * Format: uuid
+             */
+            class_id: string;
+            /** Duration Minutes */
+            duration_minutes: number;
+            /** Ends At */
+            ends_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Questions */
+            questions: components["schemas"]["QuizQuestionOut"][];
+            /** Released At */
+            released_at: string | null;
+            /** Running */
+            running: boolean;
+            /** Started At */
+            started_at: string | null;
+            status: components["schemas"]["AssignmentStatus"];
+            /** Title */
+            title: string;
+        };
+        /** QuizPatch */
+        QuizPatch: {
+            /** Checks */
+            checks?: boolean | null;
+            /** Duration Minutes */
+            duration_minutes?: number | null;
+            /** Item Ids */
+            item_ids?: string[] | null;
+            /** Title */
+            title?: string | null;
+        };
+        /** QuizQuestionOut */
+        QuizQuestionOut: {
+            /** Difficulty */
+            difficulty: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            kind: components["schemas"]["ItemKind"];
             /** Title */
             title: string;
         };
@@ -3115,6 +3412,8 @@ export interface components {
              * Format: uuid
              */
             assignment_id: string;
+            /** Checks */
+            checks: boolean;
             /** Completions */
             completions: boolean;
             /** Difficulty */
@@ -3124,9 +3423,12 @@ export interface components {
              * Format: uuid
              */
             item_id: string;
+            kind: components["schemas"]["ItemKind"];
             /** Leaves */
             leaves: components["schemas"]["StudentLeafOut"][];
             mode: components["schemas"]["AssignmentMode"];
+            /** Options */
+            options: string[];
             /** Prompt Md */
             prompt_md: string;
             /** Title */
@@ -3444,6 +3746,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QuestionMarkingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    auto_mark_assignments__assignment_id__marking__leaf_item_id__auto_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                assignment_id: string;
+                leaf_item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoMarkOut"];
                 };
             };
             /** @description Validation Error */
@@ -4248,6 +4584,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PinSlipOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_quizzes_classes__class_id__quizzes_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                class_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuizOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_quiz_classes__class_id__quizzes_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                class_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuizIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuizOut"];
                 };
             };
             /** @description Validation Error */
@@ -5358,6 +5764,43 @@ export interface operations {
             };
         };
     };
+    choose_me_attempts__attempt_id__choice_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                attempt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChoiceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttemptOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     unlock_hint_me_attempts__attempt_id__hints_post: {
         parameters: {
             query?: never;
@@ -5786,6 +6229,173 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TodayOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    active_quiz_me_quiz_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActiveQuizOut"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_quiz_quizzes__quiz_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                quiz_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuizOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_quiz_quizzes__quiz_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                quiz_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuizPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuizOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_quiz_quizzes__quiz_id__start_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                quiz_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuizOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stop_quiz_quizzes__quiz_id__stop_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                quiz_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuizOut"];
                 };
             };
             /** @description Validation Error */

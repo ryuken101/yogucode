@@ -39,7 +39,9 @@ import {
   type LeafDoc,
   type ProblemDoc,
 } from '../problems/doc'
+import { ConceptPicker } from '../problems/ConceptPicker'
 import { LeafEditor } from '../problems/LeafEditor'
+import { McqEditor } from '../problems/McqEditor'
 import { runPassed, verifyProblem, type Verification } from '../problems/verify'
 import { usePython } from '../runtime/usePython'
 
@@ -91,6 +93,9 @@ export function ProblemEditor() {
     verification !== null && !dirty && loaded !== undefined && verification.updatedAt === loaded.updated_at
   const allPass = verified && leaves.every((leaf) => runPassed(verification.runs[leaf.key]))
   const gaps = loaded && !dirty ? loaded.publish_problems : []
+  const warnings = loaded && !dirty ? loaded.publish_warnings : []
+  // A multiple-choice question has nothing to run: publishing needs only a clean save.
+  const isMcq = doc?.kind === 'mcq'
 
   if (itemId && problem.isPending) return <Spinner label="Loading problem" />
   if (problem.error) return <Notice tone="system-error">{messageFor(problem.error)}</Notice>
@@ -224,6 +229,37 @@ export function ProblemEditor() {
 
       <Card className="mb-6">
         <div className="flex flex-col gap-4">
+          {!itemId ? (
+            <div role="radiogroup" aria-label="Kind of question" className="flex gap-2">
+              {(['code', 'mcq'] as const).map((kind) => (
+                <button
+                  key={kind}
+                  type="button"
+                  role="radio"
+                  aria-checked={doc.kind === kind}
+                  onClick={() =>
+                    setDoc({
+                      ...doc,
+                      kind,
+                      parts: kind === 'mcq' ? [] : doc.parts,
+                      options:
+                        kind === 'mcq' && (doc.options ?? []).length === 0
+                          ? [
+                              { text: '', correct: true, misconception: null },
+                              { text: '', correct: false, misconception: null },
+                            ]
+                          : doc.options,
+                    })
+                  }
+                  className={`rounded-lg px-3 py-1.5 text-sm ring-1 ${
+                    doc.kind === kind ? 'bg-sky-pale ring-sky' : 'bg-paper ring-ink/15'
+                  }`}
+                >
+                  {kind === 'code' ? 'Code problem' : 'Multiple choice'}
+                </button>
+              ))}
+            </div>
+          ) : null}
           <TextInput
             label="Title"
             value={doc.title}
@@ -264,7 +300,38 @@ export function ProblemEditor() {
         </div>
       </Card>
 
-      {concepts.data ? (
+      {concepts.data && isMcq ? (
+        <Card className="mb-6">
+          <div className="flex flex-col gap-5">
+            <div className="flex flex-wrap items-start gap-6">
+              <div>
+                <p className="mb-1.5 text-sm font-medium text-ink">Difficulty</p>
+                <DotsPicker
+                  value={doc.difficulty}
+                  disabled={!editable}
+                  onChange={(difficulty) => setDoc({ ...doc, difficulty })}
+                />
+              </div>
+              <div className="min-w-0 flex-1">
+                <ConceptPicker
+                  concepts={concepts.data}
+                  selected={doc.concept_ids ?? []}
+                  primary={doc.primary_concept_id ?? null}
+                  disabled={!editable}
+                  onChange={(concept_ids, primary_concept_id) =>
+                    setDoc({ ...doc, concept_ids, primary_concept_id })
+                  }
+                />
+              </div>
+            </div>
+            <McqEditor
+              options={doc.options ?? []}
+              disabled={!editable}
+              onChange={(options) => setDoc({ ...doc, options })}
+            />
+          </div>
+        </Card>
+      ) : concepts.data ? (
         leaves.map((leaf) => (
           <Card key={leaf.key || 'whole'} className="mb-6">
             {leaf.key ? (
@@ -324,7 +391,7 @@ export function ProblemEditor() {
         <Spinner label="Loading concepts" />
       )}
 
-      {editable ? (
+      {editable && !isMcq ? (
         <div className="mb-6 flex flex-wrap gap-2">
           {(doc.parts ?? []).length === 0 ? (
             <Button variant="secondary" onClick={splitIntoParts}>
@@ -351,16 +418,20 @@ export function ProblemEditor() {
             <Button variant="secondary" disabled={busy || !dirty} onClick={() => void persist()}>
               {create.isPending || save.isPending ? 'Saving…' : dirty ? 'Save draft' : 'Saved'}
             </Button>
-            <Button
-              variant="secondary"
-              disabled={busy || pythonUnavailable}
-              onClick={() => void checkSolution()}
-            >
-              {checking ? 'Checking…' : 'Check solution'}
-            </Button>
+            {isMcq ? null : (
+              <Button
+                variant="secondary"
+                disabled={busy || pythonUnavailable}
+                onClick={() => void checkSolution()}
+              >
+                {checking ? 'Checking…' : 'Check solution'}
+              </Button>
+            )}
             <Button
               variant="primary"
-              disabled={!allPass || gaps.length > 0 || publish.isPending || !loaded}
+              disabled={
+                (!isMcq && !allPass) || dirty || gaps.length > 0 || publish.isPending || !loaded
+              }
               onClick={() => loaded && publish.mutate(loaded.updated_at)}
             >
               Publish
@@ -371,7 +442,11 @@ export function ProblemEditor() {
               </Button>
             ) : null}
             <span className="text-sm text-ink-soft">
-              {pythonUnavailable
+              {isMcq
+                ? dirty
+                  ? 'Save the question, then publish.'
+                  : ''
+                : pythonUnavailable
                 ? 'Python is not available in this browser, so the solution cannot be checked.'
                 : verified
                   ? allPass
@@ -380,6 +455,9 @@ export function ProblemEditor() {
                   : 'Check the solution against its tests before publishing.'}
             </span>
           </div>
+          {warnings.length > 0 ? (
+            <p className="mt-3 text-sm text-ink-soft">{warnings.join(' · ')}</p>
+          ) : null}
           {gaps.length > 0 ? (
             <ul className="mt-3 list-disc pl-5 text-sm text-ink">
               {gaps.map((gap) => (

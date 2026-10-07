@@ -35,3 +35,9 @@ export function fromLocalInput(value: string): string | null {
   if (!value) return null
   return new Date(value).toISOString()
 }
+
+/** "14:32" — the minutes and seconds left on a quiz's clock, never below zero. */
+export function timeLeft(endsAt: string, now = Date.now()): string {
+  const seconds = Math.max(0, Math.ceil((new Date(endsAt).getTime() - now) / 1000))
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
+}

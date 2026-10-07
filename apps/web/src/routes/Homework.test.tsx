@@ -54,10 +54,10 @@ function sheet(overrides: Partial<Schemas['SheetOut']> = {}): Schemas['SheetOut'
 function opened(problemId: string, attemptId: string, code: string): Schemas['StudentProblemOut'] {
   return {
     assignment_id: HW, item_id: problemId, title: '', prompt_md: '', difficulty: 1,
-    mode: 'homework', completions: true,
+    mode: 'homework', completions: true, kind: 'code', checks: true, options: [],
     leaves: [{
       item_id: problemId, label: null, prompt_md: '', tests: [test1], hints: [], next_hint: null,
-      attempt: { id: attemptId, code, status: 'in_progress', run_count: 0, last_passed: null, last_total: null },
+      attempt: { id: attemptId, code, status: 'in_progress', run_count: 0, last_passed: null, last_total: null, choice: null },
     }],
   }
 }
@@ -160,7 +160,7 @@ test('marking pre-fills Runs and Correct from the re-run and saves when moving o
     ),
     http.get(`/api/assignments/${HW}/marking/${P1}`, () =>
       HttpResponse.json({
-        assignment_id: HW, leaf_item_id: P1, title: 'Add to the end', prompt_md: '', solution_code: '',
+        assignment_id: HW, leaf_item_id: P1, kind: 'code', options: [], title: 'Add to the end', prompt_md: '', solution_code: '',
         concept_ids: [], tests: [test1, { ...test1, name: 'hidden one', hidden: true }],
         entries: [
           entry({}),

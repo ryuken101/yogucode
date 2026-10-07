@@ -47,6 +47,8 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
+        // The live classroom's sockets (/api/live/...) ride the same proxy.
+        ws: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
     },

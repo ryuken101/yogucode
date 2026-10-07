@@ -105,15 +105,15 @@ const GOOD = '018f0000-0000-7000-8000-0000000000b1'
 const BAD = '018f0000-0000-7000-8000-0000000000b2'
 
 function summary(id: string, title: string): Schemas['ProblemSummaryOut'] {
-  return { id, title, difficulty: 1, status: 'draft', version: 1, concept_ids: [], primary_concept_id: null, part_labels: [], test_count: 1, updated_at: '2026-10-04T00:00:00Z' }
+  return { id, kind: 'code', title, difficulty: 1, status: 'draft', version: 1, concept_ids: [], primary_concept_id: null, part_labels: [], test_count: 1, updated_at: '2026-10-04T00:00:00Z' }
 }
 
 function problem(id: string, solution: string): Schemas['ProblemOut'] {
   return {
     id, status: 'draft', version: 1, supersedes_id: null, source_key: null,
-    updated_at: `2026-10-04T00:00:00.${id.slice(-1)}Z`, parts: [], publish_problems: [],
+    updated_at: `2026-10-04T00:00:00.${id.slice(-1)}Z`, parts: [], publish_problems: [], publish_warnings: [],
     document: {
-      title: id, prompt_md: '', difficulty: 1, concept_ids: [], primary_concept_id: null,
+      kind: 'code', options: [], title: id, prompt_md: '', difficulty: 1, concept_ids: [], primary_concept_id: null,
       starter_code: '', solution_code: solution, hints: [], parts: [],
       tests: [{ kind: 'io', name: 't', hidden: true, stdin: '', expected: '1', match: 'exact' }],
     },

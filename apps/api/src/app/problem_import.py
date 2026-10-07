@@ -43,6 +43,7 @@ from app.problem_bank import (
     FunctionTest,
     HintDoc,
     IoTest,
+    OptionDoc,
     PartDoc,
     ProblemDoc,
     publish_problems,
@@ -83,6 +84,12 @@ class FileTest(_Strict):
         return self
 
 
+class FileOption(_Strict):
+    text: str
+    correct: bool = False
+    misconception: str | None = None
+
+
 class FileHint(_Strict):
     text: str
     after_runs: int = 1
@@ -109,6 +116,9 @@ class FileProblem(FileLeaf):
     title: str
     prompt: str = ""
     parts: list[FilePart] = Field(default_factory=list)
+    # A problem with `options:` is multiple choice; one is `correct: true`, and each wrong
+    # one should name its `misconception`.
+    options: list[FileOption] = Field(default_factory=list)
 
 
 class ProblemFile(_Strict):
@@ -162,6 +172,8 @@ def to_document(entry: FileProblem, concept_ids: dict[str, uuid.UUID]) -> Proble
     """One file entry as the document the editor would save. Raises ProblemFileError."""
     try:
         return ProblemDoc(
+            kind="mcq" if entry.options else "code",
+            options=[OptionDoc(**option.model_dump()) for option in entry.options],
             title=entry.title,
             prompt_md=entry.prompt,
             parts=[

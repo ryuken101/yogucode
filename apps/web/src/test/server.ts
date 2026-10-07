@@ -6,7 +6,7 @@
  * a shape the API no longer sends.
  */
 
-import { http, HttpResponse } from 'msw'
+import { http, HttpResponse, ws } from 'msw'
 import { setupServer } from 'msw/node'
 import type { Schemas } from '../lib/api'
 
@@ -158,7 +158,14 @@ function summaries(): Schemas['DocumentSummaryOut'][] {
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
 }
 
+/**
+ * The live classroom's sockets (`src/collab/socket.ts`). Accepted and left quiet by
+ * default; tests about live behaviour add their own handler.
+ */
+export const liveSockets = ws.link('*/api/live/*')
+
 export const handlers = [
+  liveSockets.addEventListener('connection', () => {}),
   http.post('/api/join/lookup', async ({ request }) => {
     const body = (await request.json()) as Schemas['JoinLookupIn']
     if (body.code.trim().toUpperCase() !== CODE) {
@@ -198,6 +205,9 @@ export const handlers = [
 
   // The event recorder flushes on a timer from any editor screen; accept and forget.
   http.post('/api/me/events', () => HttpResponse.json({ received: 0 }, { status: 202 })),
+
+  // No quiz running unless a test says so.
+  http.get('/api/me/quiz', () => HttpResponse.json(null)),
 
   http.get('/api/me/documents', () => HttpResponse.json(summaries())),
   http.get('/api/me/documents/:id', ({ params }) => {

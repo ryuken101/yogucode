@@ -158,6 +158,7 @@ async def hand_in(
             centre_id=principal.centre_id,
             attempt_id=attempt.id,
             code=attempt.code,
+            choice=attempt.choice,
             passed=passed,
             total=total,
             late=late,

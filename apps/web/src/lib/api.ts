@@ -175,6 +175,10 @@ export const api = {
     request<Schemas['MarkingOverviewOut']>(`/assignments/${assignmentId}/marking`),
   markingQuestion: (assignmentId: string, itemId: string) =>
     request<Schemas['QuestionMarkingOut']>(`/assignments/${assignmentId}/marking/${itemId}`),
+  autoMark: (assignmentId: string, itemId: string) =>
+    request<Schemas['AutoMarkOut']>(`/assignments/${assignmentId}/marking/${itemId}/auto`, {
+      method: 'POST',
+    }),
   saveMark: (attemptId: string, body: Schemas['MarkIn']) =>
     request<Schemas['MarkOut']>(`/attempts/${attemptId}/mark`, { method: 'PUT', body }),
   saveNote: (assignmentId: string, studentId: string, note: string) =>
@@ -193,6 +197,19 @@ export const api = {
   todayGrid: (classId: string) => request<Schemas['GridOut']>(`/classes/${classId}/today`),
   studentHistory: (studentId: string) =>
     request<Schemas['StudentHistoryOut']>(`/students/${studentId}/history`),
+
+  /* --- teacher: quizzes ------------------------------------------------------------ */
+
+  listQuizzes: (classId: string) => request<Schemas['QuizOut'][]>(`/classes/${classId}/quizzes`),
+  readQuiz: (quizId: string) => request<Schemas['QuizOut']>(`/quizzes/${quizId}`),
+  createQuiz: (classId: string, body: Schemas['QuizIn']) =>
+    request<Schemas['QuizOut']>(`/classes/${classId}/quizzes`, { method: 'POST', body }),
+  updateQuiz: (quizId: string, body: Schemas['QuizPatch']) =>
+    request<Schemas['QuizOut']>(`/quizzes/${quizId}`, { method: 'PATCH', body }),
+  startQuiz: (quizId: string) =>
+    request<Schemas['QuizOut']>(`/quizzes/${quizId}/start`, { method: 'POST' }),
+  stopQuiz: (quizId: string) =>
+    request<Schemas['QuizOut']>(`/quizzes/${quizId}/stop`, { method: 'POST' }),
 
   /* --- teacher: problem bank ----------------------------------------------------- */
 
@@ -306,6 +323,7 @@ export const api = {
 
   today: () => request<Schemas['TodayOut']>('/me/lesson', { anonymous: true }),
   home: () => request<Schemas['HomeOut']>('/me/home', { anonymous: true }),
+  activeQuiz: () => request<Schemas['ActiveQuizOut'] | null>('/me/quiz', { anonymous: true }),
   sheet: (assignmentId: string) =>
     request<Schemas['SheetOut']>(`/me/homework/${assignmentId}`, { anonymous: true }),
   handIn: (assignmentId: string, results: Schemas['HandInResult'][]) =>
@@ -323,6 +341,12 @@ export const api = {
     request<Schemas['AttemptOut']>(`/me/attempts/${attemptId}`, {
       method: 'PATCH',
       body: { code } satisfies Schemas['AttemptSaveIn'],
+      anonymous: true,
+    }),
+  choose: (attemptId: string, choice: number) =>
+    request<Schemas['AttemptOut']>(`/me/attempts/${attemptId}/choice`, {
+      method: 'PUT',
+      body: { choice } satisfies Schemas['ChoiceIn'],
       anonymous: true,
     }),
   recordRun: (attemptId: string, result: Schemas['RunIn'] = {}) =>

@@ -39,6 +39,7 @@ from app.models import (
     Attempt,
     AttemptStatus,
     Item,
+    ItemKind,
     Lesson,
     Mark,
     SetItem,
@@ -46,6 +47,7 @@ from app.models import (
 )
 from app.models.base import utcnow
 from app.problem_bank import FunctionTest, IoTest, LeafDoc, read_document
+from app.quiz import is_running, running_quiz_for
 from app.routers.documents import MAX_CONTENT_BYTES
 from app.scoping import get_own_attempt, get_student_assignment, get_student_class
 
@@ -81,12 +83,14 @@ class AttemptOut(BaseModel):
     run_count: int
     last_passed: int | None
     last_total: int | None
+    choice: int | None
 
     @classmethod
     def build(cls, attempt: Attempt) -> "AttemptOut":
         return cls(
             id=attempt.id,
             code=attempt.code,
+            choice=attempt.choice,
             status=attempt.status,
             run_count=attempt.run_count,
             last_passed=attempt.last_passed,
@@ -121,12 +125,22 @@ class StudentLeafOut(BaseModel):
 class StudentProblemOut(BaseModel):
     assignment_id: uuid.UUID
     item_id: uuid.UUID
+    kind: ItemKind
     title: str
     prompt_md: str
     difficulty: int
     mode: AssignmentMode
     completions: bool
+    # Whether this child may press Check — off during a quiz unless the teacher allowed it.
+    checks: bool
+    # Multiple choice: the answers' texts, in order — never which is right, never the
+    # misconceptions. Those are for the teacher.
+    options: list[str]
     leaves: list[StudentLeafOut]
+
+
+class ChoiceIn(BaseModel):
+    choice: int = Field(ge=0, lt=8)
 
 
 class AttemptSaveIn(BaseModel):
@@ -217,6 +231,7 @@ async def _writable_attempt(
     """
     attempt = await get_own_attempt(session, principal, attempt_id)
     assignment = await get_student_assignment(session, principal, attempt.assignment_id)
+    await _quiz_lock(session, principal, assignment)
     if assignment.mode == AssignmentMode.HOMEWORK and await is_returned(
         session, principal, assignment, principal.subject_id
     ):
@@ -225,6 +240,20 @@ async def _writable_attempt(
             detail="Your teacher has given this one back, so it can't be changed now",
         )
     return attempt, assignment
+
+
+async def _quiz_lock(
+    session: AsyncSession, principal: CurrentStudent, assignment: Assignment
+) -> None:
+    """While the class sits a quiz, the quiz is the only work a child can open or change;
+    once its time is up, not even that (Ken's decision: only the quiz is reachable)."""
+    running = await running_quiz_for(session, principal)
+    if running is not None and running.id != assignment.id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="A quiz is running — finish it first"
+        )
+    if assignment.mode == AssignmentMode.QUIZ and not is_running(assignment):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Time's up for this quiz")
 
 
 # --- routes -------------------------------------------------------------------------
@@ -306,6 +335,7 @@ async def open_problem(
     clock the hint ladder's minutes are measured from.
     """
     assignment = await get_student_assignment(session, principal, assignment_id)
+    await _quiz_lock(session, principal, assignment)
     item = await _item_in_assignment(session, principal, assignment, item_id)
     doc, part_rows = await read_document(session, principal, item)
     leaf_rows = part_rows or [item]
@@ -335,6 +365,9 @@ async def open_problem(
     return StudentProblemOut(
         assignment_id=assignment.id,
         item_id=item.id,
+        kind=item.kind,
+        checks=bool(assignment.settings.get("checks", True)),
+        options=[option.text for option in doc.options],
         title=item.title,
         prompt_md=doc.prompt_md,
         difficulty=item.difficulty,
@@ -352,6 +385,25 @@ async def save_attempt(
     attempt, _ = await _writable_attempt(session, principal, attempt_id)
     if body.code != attempt.code:
         attempt.code = body.code
+        session.add(attempt)
+        await session.commit()
+        await session.refresh(attempt)
+    return AttemptOut.build(attempt)
+
+
+@router.put("/attempts/{attempt_id}/choice", response_model=AttemptOut)
+async def choose(
+    attempt_id: uuid.UUID, body: ChoiceIn, principal: CurrentStudent, session: SessionDep
+) -> AttemptOut:
+    """Pick an answer to a multiple-choice question. Changeable until handed in or time is up."""
+    attempt, _ = await _writable_attempt(session, principal, attempt_id)
+    item = await session.get(Item, attempt.item_id)
+    if item is None or item.kind != ItemKind.MCQ or body.choice >= len(item.options):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="No such answer"
+        )
+    if attempt.choice != body.choice:
+        attempt.choice = body.choice
         session.add(attempt)
         await session.commit()
         await session.refresh(attempt)
@@ -440,6 +492,8 @@ async def unlock_hint(
 
 class FeedbackOut(BaseModel):
     code: str
+    # Multiple choice: the answer they picked, in words.
+    answer: str | None = None
     comment_md: str
     outcome: Literal["good", "not_yet"]
 
@@ -470,6 +524,7 @@ class SheetOut(BaseModel):
 
 class HomeworkCardOut(BaseModel):
     assignment_id: uuid.UUID
+    mode: AssignmentMode
     title: str
     due_at: datetime | None
     closed: bool
@@ -494,6 +549,12 @@ class HandInResult(BaseModel):
 
 class HandInIn(BaseModel):
     results: list[HandInResult] = Field(default_factory=list, max_length=100)
+
+
+def _answer_text(item: Item, choice: int | None) -> str | None:
+    if item.kind != ItemKind.MCQ or choice is None or not 0 <= choice < len(item.options):
+        return None
+    return str(item.options[choice].get("text", ""))
 
 
 async def _sheet(
@@ -539,7 +600,13 @@ async def _sheet(
         submission = submissions.get(attempt.id) if attempt else None
         handed = submission is not None and submission.source == SubmissionSource.HAND_IN
         mark = marks.get(attempt.id) if attempt else None
-        passing = bool(attempt and attempt.last_total and attempt.last_passed == attempt.last_total)
+        # A multiple-choice answer is never shown as "passing": that would give it away.
+        passing = bool(
+            attempt
+            and leaf.leaf.kind != ItemKind.MCQ
+            and attempt.last_total
+            and attempt.last_passed == attempt.last_total
+        )
         out.append(
             SheetLeafOut(
                 problem_id=leaf.problem.id,
@@ -552,6 +619,7 @@ async def _sheet(
                 changed_since_hand_in=bool(handed and attempt and attempt.code != submission.code),
                 feedback=FeedbackOut(
                     code=submission.code if submission else (attempt.code if attempt else ""),
+                    answer=_answer_text(leaf.leaf, submission.choice if submission else None),
                     comment_md=mark.comment_md,
                     outcome="good" if mark.correct == 2 else "not_yet",
                 )
@@ -578,7 +646,8 @@ async def _student_homework(
     assignment = await get_student_assignment(
         session, principal, assignment_id, include_closed=True
     )
-    if assignment.mode != AssignmentMode.HOMEWORK:
+    # A quiz's sheet is read the same way: its questions while it runs, its feedback after.
+    if assignment.mode not in (AssignmentMode.HOMEWORK, AssignmentMode.QUIZ):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="homework not found")
     return assignment
 
@@ -597,6 +666,9 @@ async def hand_in_sheet(
 ) -> SheetOut:
     """Hand in the whole sheet. Allowed late; allowed again; not allowed once returned."""
     assignment = await _student_homework(session, principal, assignment_id)
+    if assignment.mode != AssignmentMode.HOMEWORK:
+        # A quiz is handed in by its clock, for everyone at once.
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A quiz hands itself in")
     if assignment.status != AssignmentStatus.OPEN:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -630,7 +702,7 @@ async def home(principal: CurrentStudent, session: SessionDep) -> HomeOut:
                 select(Assignment).where(
                     Assignment.class_id == klass.id,
                     Assignment.centre_id == principal.centre_id,
-                    Assignment.mode == AssignmentMode.HOMEWORK,
+                    col(Assignment.mode).in_([AssignmentMode.HOMEWORK, AssignmentMode.QUIZ]),
                     col(Assignment.status).in_([AssignmentStatus.OPEN, AssignmentStatus.CLOSED]),
                 )
             )
@@ -639,9 +711,12 @@ async def home(principal: CurrentStudent, session: SessionDep) -> HomeOut:
             sheet = await _sheet(session, principal, assignment)
             if sheet.closed and not sheet.returned:
                 continue  # a closed sheet with nothing to give back is not news
+            if assignment.mode == AssignmentMode.QUIZ and not sheet.returned:
+                continue  # a quiz appears here only once it has been given back
             cards.append(
                 HomeworkCardOut(
                     assignment_id=assignment.id,
+                    mode=assignment.mode,
                     title=assignment.title,
                     due_at=assignment.due_at,
                     closed=sheet.closed,

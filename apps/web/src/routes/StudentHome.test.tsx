@@ -27,6 +27,7 @@ const today: Schemas['TodayOut'] = {
 function card(overrides: Partial<Schemas['HomeworkCardOut']>): Schemas['HomeworkCardOut'] {
   return {
     assignment_id: '018f0000-0000-7000-8000-0000000000f1',
+    mode: 'homework',
     title: 'Lists practice',
     due_at: '2099-10-16T05:00:00Z',
     closed: false,

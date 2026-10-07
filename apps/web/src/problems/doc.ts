@@ -42,7 +42,7 @@ export function emptyLeaf(): Required<LeafDoc> {
 }
 
 export function emptyProblem(): ProblemDoc {
-  return { title: '', prompt_md: '', parts: [], ...emptyLeaf() }
+  return { kind: 'code', title: '', prompt_md: '', parts: [], options: [], ...emptyLeaf() }
 }
 
 export function emptyPart(label: string): PartDoc {

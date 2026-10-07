@@ -43,6 +43,10 @@ export function PublishDrafts({ drafts }: { drafts: Schemas['ProblemSummaryOut']
         const problem = await api.readProblem(draft.id)
         if (problem.publish_problems.length) {
           outcome = { id: draft.id, title: draft.title, published: false, reason: problem.publish_problems[0] }
+        } else if (problem.document.kind === 'mcq') {
+          // Nothing to run: a complete multiple-choice question publishes as saved.
+          await api.publishProblem(problem.id, problem.updated_at)
+          outcome = { id: draft.id, title: draft.title, published: true }
         } else {
           const verification = await verifyProblem(python.check, problem)
           if (allLeavesPass(problem, verification)) {

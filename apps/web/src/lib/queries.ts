@@ -36,6 +36,9 @@ export const keys = {
   ladder: (lessonId: string) => ['ladder', lessonId] as const,
   today: ['today'] as const,
   home: ['home'] as const,
+  activeQuiz: ['active-quiz'] as const,
+  quizzes: (classId: string) => ['quizzes', classId] as const,
+  quiz: (quizId: string) => ['quiz', quizId] as const,
   sheet: (assignmentId: string) => ['sheet', assignmentId] as const,
   homework: (classId: string) => ['homework', classId] as const,
   homeworkOne: (assignmentId: string) => ['homework-one', assignmentId] as const,
@@ -400,4 +403,46 @@ export function useTodayGrid(classId: string) {
 
 export function useStudentHistory(studentId: string) {
   return useQuery({ queryKey: keys.history(studentId), queryFn: () => api.studentHistory(studentId) })
+}
+
+/* --- quizzes ------------------------------------------------------------------------ */
+
+export function useClassQuizzes(classId: string) {
+  return useQuery({ queryKey: keys.quizzes(classId), queryFn: () => api.listQuizzes(classId) })
+}
+
+export function useQuiz(quizId: string | null) {
+  return useQuery({
+    queryKey: keys.quiz(quizId ?? ''),
+    queryFn: () => api.readQuiz(quizId ?? ''),
+    enabled: Boolean(quizId),
+  })
+}
+
+/** A change to one quiz: refresh it and its class's list. */
+export function useQuizMutation<T>(
+  classId: string,
+  mutationFn: (input: T) => Promise<Schemas['QuizOut']>,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn,
+    onSuccess: (quiz) => {
+      client.setQueryData(keys.quiz(quiz.id), quiz)
+      return client.invalidateQueries({ queryKey: keys.quizzes(classId) })
+    },
+  })
+}
+
+/**
+ * The quiz this child's class is sitting, or null. Checked every 15 seconds as a safety
+ * net; the live connection's push (`quiz_started`, `quiz_ended`) is what makes it prompt.
+ */
+export function useActiveQuiz() {
+  return useQuery({
+    queryKey: keys.activeQuiz,
+    queryFn: api.activeQuiz,
+    refetchInterval: 15_000,
+    staleTime: 0,
+  })
 }

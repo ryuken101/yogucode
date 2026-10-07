@@ -16,9 +16,9 @@ docs/        product spec
 
 ## System architecture
 
-A React app talks to a FastAPI service over plain REST; the service owns a single
-Postgres database. There are no microservices, no queues, no Redis and no server-side
-code execution — student Python runs in the browser under Pyodide from Phase 2, which
+A React app talks to a FastAPI service over plain REST, plus one WebSocket per open
+page for the live classroom; the service owns a single Postgres database. There are no
+microservices, no queues, no Redis and no server-side code execution — student Python runs in the browser under Pyodide from Phase 2, which
 removes sandboxing, resource limits and per-execution cost from the problem entirely.
 
 Everything is hosted in or near Sydney. The data is Australian children's records, and
@@ -38,7 +38,8 @@ flowchart TB
 
     subgraph apisvc["apps/api · FastAPI + SQLModel — Fly.io syd"]
         seam["get_current_principal()<br/><b>one seam, two verifiers</b>"]
-        routes["Routers — classes · roster · join · auth<br/>curriculum · items · student work"]
+        routes["Routers — classes · roster · join · auth<br/>curriculum · items · student work<br/>homework · marking · quiz"]
+        hub["Live hub — WebSocket relay<br/>one room per class, in memory"]
     end
 
     auth["Supabase Auth<br/>magic link → JWT"]
@@ -49,6 +50,7 @@ flowchart TB
     teacher --> shell
     student --> shell
     shell -. "Run · Check" .-> pyodide
+    shell <-- "WebSocket: code as typed,<br/>teacher help, quiz start/stop" --> hub
     shell -- "Bearer JWT" --> seam
     shell -- "opaque session cookie<br/>httpOnly · Secure · SameSite=Lax" --> seam
     seam -. "verify signature<br/>against JWKS" .-> auth
@@ -375,8 +377,37 @@ Load-bearing decisions, each easy to undo by accident:
 whoever is already signed in to their own start page. The PIN slips and the class page
 print the address to type.
 
-Next: Phase 1's deploy steps and the Supabase Pro upgrade, then a fortnight of real use
-before Phase 6.
+**Live view and quizzes (Phase 10 and Phase 7) are built — before the first deploy, by
+Ken's choice.**
+
+- **Live view** (`/classes/:id/live`): a tile per child showing their code keystroke by
+  keystroke, with stuck signals (same error ×4, quiet for 5 minutes, a large paste, all
+  passing). Click a tile to open it; **Help** lets the teacher type into the child's
+  editor while the child types too, each seeing the other's cursor.
+- **How it works:** every editor's text is a Yjs document (a CRDT) owned by the child's
+  browser. Updates go over a WebSocket to an in-memory hub (`app/live/hub.py`, one room per
+  class), which relays them and keeps a log so a teacher arriving late can rebuild them.
+  The server never interprets an update, and persistence is still the child's own
+  autosave. Our own Monaco↔Yjs binding (`src/collab/monacoBinding.ts`) avoids `y-monaco`,
+  which imports the whole Monaco package. A teacher's socket sends its Supabase token as
+  the first message; a child's uses the session cookie. Both go through `app.scoping`.
+- **Multiple-choice questions**: each wrong option names the misconception it reveals,
+  and marking shows how many chose each — "6 chose 'range includes the end'". They mark
+  themselves on request.
+- **Quizzes**: built from the bank (code and multiple choice), with a length and a Check
+  toggle. **Start** switches every child in the class to the quiz at once; while it runs,
+  it is the only work a child can open or change (enforced by the server). Autocomplete
+  and hints are off, and pastes are flagged on the live view. One clock for the class:
+  at the end — or a few seconds after **Stop**, so last keystrokes save — everyone's work
+  is handed in automatically, exactly once (a timer, plus finalise-on-read after a
+  restart). Marking and giving back are the homework screens.
+- **Deploy consequence:** WebSockets cannot go through a Vercel rewrite, and the child's
+  SameSite=Lax cookie must reach the socket. So production needs the web app and the API
+  on **one registrable domain** (e.g. `app.<domain>` and `api.<domain>`), and the API on
+  **one Fly machine** until Redis pub/sub exists.
+
+Next: Phase 1's deploy steps (now needing a domain) and the Supabase Pro upgrade, then a
+fortnight of real use.
 
 ## Local development
 

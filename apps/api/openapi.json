@@ -1,6 +1,31 @@
 {
   "components": {
     "schemas": {
+      "ActiveQuizOut": {
+        "properties": {
+          "assignment_id": {
+            "format": "uuid",
+            "title": "Assignment Id",
+            "type": "string"
+          },
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assignment_id",
+          "title",
+          "ends_at"
+        ],
+        "title": "ActiveQuizOut",
+        "type": "object"
+      },
       "AssignmentMode": {
         "enum": [
           "classwork",
@@ -22,6 +47,17 @@
       },
       "AttemptOut": {
         "properties": {
+          "choice": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Choice"
+          },
           "code": {
             "title": "Code",
             "type": "string"
@@ -67,7 +103,8 @@
           "status",
           "run_count",
           "last_passed",
-          "last_total"
+          "last_total",
+          "choice"
         ],
         "title": "AttemptOut",
         "type": "object"
@@ -93,6 +130,19 @@
         ],
         "title": "AttemptStatus",
         "type": "string"
+      },
+      "AutoMarkOut": {
+        "properties": {
+          "marked": {
+            "title": "Marked",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "marked"
+        ],
+        "title": "AutoMarkOut",
+        "type": "object"
       },
       "BulkEnrolIn": {
         "properties": {
@@ -188,6 +238,21 @@
           "slug"
         ],
         "title": "CentreOut",
+        "type": "object"
+      },
+      "ChoiceIn": {
+        "properties": {
+          "choice": {
+            "exclusiveMaximum": 8.0,
+            "minimum": 0.0,
+            "title": "Choice",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "choice"
+        ],
+        "title": "ChoiceIn",
         "type": "object"
       },
       "ClassCurriculumIn": {
@@ -837,13 +902,25 @@
           "error",
           "paste",
           "hint",
-          "submit"
+          "submit",
+          "teacher_edit"
         ],
         "title": "EventType",
         "type": "string"
       },
       "FeedbackOut": {
         "properties": {
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer"
+          },
           "code": {
             "title": "Code",
             "type": "string"
@@ -1294,6 +1371,9 @@
             "title": "Late",
             "type": "boolean"
           },
+          "mode": {
+            "$ref": "#/components/schemas/AssignmentMode"
+          },
           "problems": {
             "title": "Problems",
             "type": "integer"
@@ -1313,6 +1393,7 @@
         },
         "required": [
           "assignment_id",
+          "mode",
           "title",
           "due_at",
           "closed",
@@ -1716,6 +1797,14 @@
         },
         "title": "IssuePinsIn",
         "type": "object"
+      },
+      "ItemKind": {
+        "enum": [
+          "code",
+          "mcq"
+        ],
+        "title": "ItemKind",
+        "type": "string"
       },
       "ItemStatus": {
         "enum": [
@@ -2152,6 +2241,17 @@
             ],
             "title": "Child Total"
           },
+          "choice": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Choice"
+          },
           "code": {
             "anyOf": [
               {
@@ -2386,6 +2486,75 @@
           "note"
         ],
         "title": "NoteIn",
+        "type": "object"
+      },
+      "OptionCountOut": {
+        "description": "One answer to a multiple-choice question, and how many children chose it.",
+        "properties": {
+          "chosen_by": {
+            "title": "Chosen By",
+            "type": "integer"
+          },
+          "correct": {
+            "title": "Correct",
+            "type": "boolean"
+          },
+          "misconception": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Misconception"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "correct",
+          "misconception",
+          "chosen_by"
+        ],
+        "title": "OptionCountOut",
+        "type": "object"
+      },
+      "OptionDoc": {
+        "description": "One answer to a multiple-choice question.\n\nA wrong option should name the wrong belief that leads to it \u2014 \"thinks range includes\nthe end\" \u2014 so a teacher can read the class's answers as a list of misconceptions\n(spec \u00a73.6). Optional, because a teacher may not always know; publishing warns.",
+        "properties": {
+          "correct": {
+            "default": false,
+            "title": "Correct",
+            "type": "boolean"
+          },
+          "misconception": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Misconception"
+          },
+          "text": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "OptionDoc",
         "type": "object"
       },
       "PartDoc": {
@@ -2644,6 +2813,23 @@
             "title": "Hints",
             "type": "array"
           },
+          "kind": {
+            "default": "code",
+            "enum": [
+              "code",
+              "mcq"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/OptionDoc"
+            },
+            "maxItems": 8,
+            "title": "Options",
+            "type": "array"
+          },
           "parts": {
             "items": {
               "$ref": "#/components/schemas/PartDoc"
@@ -2741,6 +2927,13 @@
             "title": "Publish Problems",
             "type": "array"
           },
+          "publish_warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Publish Warnings",
+            "type": "array"
+          },
           "source_key": {
             "anyOf": [
               {
@@ -2786,7 +2979,8 @@
           "updated_at",
           "document",
           "parts",
-          "publish_problems"
+          "publish_problems",
+          "publish_warnings"
         ],
         "title": "ProblemOut",
         "type": "object"
@@ -2810,6 +3004,9 @@
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ItemKind"
           },
           "part_labels": {
             "items": {
@@ -2853,6 +3050,7 @@
         },
         "required": [
           "id",
+          "kind",
           "title",
           "difficulty",
           "status",
@@ -2903,10 +3101,20 @@
             "title": "Entries",
             "type": "array"
           },
+          "kind": {
+            "$ref": "#/components/schemas/ItemKind"
+          },
           "leaf_item_id": {
             "format": "uuid",
             "title": "Leaf Item Id",
             "type": "string"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/OptionCountOut"
+            },
+            "title": "Options",
+            "type": "array"
           },
           "prompt_md": {
             "title": "Prompt Md",
@@ -2938,11 +3146,13 @@
         "required": [
           "assignment_id",
           "leaf_item_id",
+          "kind",
           "title",
           "prompt_md",
           "solution_code",
           "concept_ids",
           "tests",
+          "options",
           "entries"
         ],
         "title": "QuestionMarkingOut",
@@ -2980,6 +3190,220 @@
           "marked"
         ],
         "title": "QuestionOut",
+        "type": "object"
+      },
+      "QuizIn": {
+        "properties": {
+          "checks": {
+            "default": false,
+            "title": "Checks",
+            "type": "boolean"
+          },
+          "duration_minutes": {
+            "default": 20,
+            "maximum": 180.0,
+            "minimum": 1.0,
+            "title": "Duration Minutes",
+            "type": "integer"
+          },
+          "item_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Item Ids",
+            "type": "array"
+          },
+          "title": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "QuizIn",
+        "type": "object"
+      },
+      "QuizOut": {
+        "properties": {
+          "checks": {
+            "title": "Checks",
+            "type": "boolean"
+          },
+          "class_id": {
+            "format": "uuid",
+            "title": "Class Id",
+            "type": "string"
+          },
+          "duration_minutes": {
+            "title": "Duration Minutes",
+            "type": "integer"
+          },
+          "ends_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ends At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "questions": {
+            "items": {
+              "$ref": "#/components/schemas/QuizQuestionOut"
+            },
+            "title": "Questions",
+            "type": "array"
+          },
+          "released_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Released At"
+          },
+          "running": {
+            "title": "Running",
+            "type": "boolean"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AssignmentStatus"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "class_id",
+          "title",
+          "status",
+          "running",
+          "duration_minutes",
+          "checks",
+          "started_at",
+          "ends_at",
+          "released_at",
+          "questions"
+        ],
+        "title": "QuizOut",
+        "type": "object"
+      },
+      "QuizPatch": {
+        "properties": {
+          "checks": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checks"
+          },
+          "duration_minutes": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Minutes"
+          },
+          "item_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "maxItems": 20,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Ids"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "QuizPatch",
+        "type": "object"
+      },
+      "QuizQuestionOut": {
+        "properties": {
+          "difficulty": {
+            "title": "Difficulty",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ItemKind"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "kind",
+          "difficulty"
+        ],
+        "title": "QuizQuestionOut",
         "type": "object"
       },
       "ReleaseOut": {
@@ -3695,6 +4119,10 @@
             "title": "Assignment Id",
             "type": "string"
           },
+          "checks": {
+            "title": "Checks",
+            "type": "boolean"
+          },
           "completions": {
             "title": "Completions",
             "type": "boolean"
@@ -3708,6 +4136,9 @@
             "title": "Item Id",
             "type": "string"
           },
+          "kind": {
+            "$ref": "#/components/schemas/ItemKind"
+          },
           "leaves": {
             "items": {
               "$ref": "#/components/schemas/StudentLeafOut"
@@ -3717,6 +4148,13 @@
           },
           "mode": {
             "$ref": "#/components/schemas/AssignmentMode"
+          },
+          "options": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Options",
+            "type": "array"
           },
           "prompt_md": {
             "title": "Prompt Md",
@@ -3730,11 +4168,14 @@
         "required": [
           "assignment_id",
           "item_id",
+          "kind",
           "title",
           "prompt_md",
           "difficulty",
           "mode",
           "completions",
+          "checks",
+          "options",
           "leaves"
         ],
         "title": "StudentProblemOut",
@@ -4390,6 +4831,76 @@
           }
         },
         "summary": "Mark Question",
+        "tags": [
+          "marking"
+        ]
+      }
+    },
+    "/assignments/{assignment_id}/marking/{leaf_item_id}/auto": {
+      "post": {
+        "description": "Mark every answered, unmarked multiple-choice answer to one question: Correct 2 for\nthe right option, 0 for any other. A teacher can still change any of them, or add a\ncomment, afterwards. Code questions are never marked automatically \u2014 approach is a\nhuman call.",
+        "operationId": "auto_mark_assignments__assignment_id__marking__leaf_item_id__auto_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assignment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Assignment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "leaf_item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Leaf Item Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoMarkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Auto Mark",
         "tags": [
           "marking"
         ]
@@ -5848,6 +6359,136 @@
         "summary": "Issue Class Pins",
         "tags": [
           "roster"
+        ]
+      }
+    },
+    "/classes/{class_id}/quizzes": {
+      "get": {
+        "operationId": "list_quizzes_classes__class_id__quizzes_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "class_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Class Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/QuizOut"
+                  },
+                  "title": "Response List Quizzes Classes  Class Id  Quizzes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Quizzes",
+        "tags": [
+          "quiz"
+        ]
+      },
+      "post": {
+        "operationId": "create_quiz_classes__class_id__quizzes_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "class_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Class Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuizIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuizOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Quiz",
+        "tags": [
+          "quiz"
         ]
       }
     },
@@ -7903,6 +8544,76 @@
         ]
       }
     },
+    "/me/attempts/{attempt_id}/choice": {
+      "put": {
+        "description": "Pick an answer to a multiple-choice question. Changeable until handed in or time is up.",
+        "operationId": "choose_me_attempts__attempt_id__choice_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attempt_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Attempt Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChoiceIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttemptOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Choose",
+        "tags": [
+          "student work"
+        ]
+      }
+    },
     "/me/attempts/{attempt_id}/hints": {
       "post": {
         "description": "Unlock the next rung, if the child has earned it. Rungs open in order.",
@@ -8686,6 +9397,311 @@
         "summary": "Todays Lesson",
         "tags": [
           "student work"
+        ]
+      }
+    },
+    "/me/quiz": {
+      "get": {
+        "description": "The quiz this child's class is sitting now, or null. Their pages route to it.",
+        "operationId": "active_quiz_me_quiz_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ActiveQuizOut"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Active Quiz Me Quiz Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Active Quiz",
+        "tags": [
+          "quiz"
+        ]
+      }
+    },
+    "/quizzes/{quiz_id}": {
+      "get": {
+        "operationId": "read_quiz_quizzes__quiz_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quiz_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Quiz Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuizOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Quiz",
+        "tags": [
+          "quiz"
+        ]
+      },
+      "patch": {
+        "description": "Edit a draft. A quiz that has started is not changed under the children sitting it.",
+        "operationId": "update_quiz_quizzes__quiz_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quiz_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Quiz Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuizPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuizOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Quiz",
+        "tags": [
+          "quiz"
+        ]
+      }
+    },
+    "/quizzes/{quiz_id}/start": {
+      "post": {
+        "description": "Start the clock. Every child in the class is switched to the quiz at once.",
+        "operationId": "start_quiz_quizzes__quiz_id__start_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quiz_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Quiz Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuizOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Quiz",
+        "tags": [
+          "quiz"
+        ]
+      }
+    },
+    "/quizzes/{quiz_id}/stop": {
+      "post": {
+        "description": "End the quiz for everyone \u2014 after a few seconds' grace, so last keystrokes save.",
+        "operationId": "stop_quiz_quizzes__quiz_id__stop_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quiz_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Quiz Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuizOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stop Quiz",
+        "tags": [
+          "quiz"
         ]
       }
     },

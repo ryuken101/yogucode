@@ -19,3 +19,16 @@ code,
 pre {
   font-family: var(--font-mono);
 }
+
+/* Another person's cursor in a shared editor (src/collab/remoteCaret.ts). */
+.remote-caret {
+  position: relative;
+}
+.remote-caret::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -1px;
+  border-left: 2px solid var(--color-terracotta);
+}

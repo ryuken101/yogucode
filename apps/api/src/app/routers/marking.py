@@ -35,6 +35,7 @@ from app.models import (
     Attempt,
     EnrolmentStatus,
     FeedbackSnippet,
+    ItemKind,
     Mark,
     SnippetStatus,
     Student,
@@ -107,16 +108,31 @@ class MarkingEntryOut(BaseModel):
     hints_used: int
     mark: MarkOut | None
     note: str
+    # Multiple choice: the option picked (latest hand-in, else as it stands).
+    choice: int | None = None
+
+
+class OptionCountOut(BaseModel):
+    """One answer to a multiple-choice question, and how many children chose it."""
+
+    text: str
+    correct: bool
+    misconception: str | None
+    chosen_by: int
 
 
 class QuestionMarkingOut(BaseModel):
     assignment_id: uuid.UUID
     leaf_item_id: uuid.UUID
+    kind: ItemKind
     title: str
     prompt_md: str
     solution_code: str
     concept_ids: list[uuid.UUID]
     tests: list[IoTest | FunctionTest]
+    # Multiple choice: every option with its count — spec §3.6's "six chose 'range is
+    # inclusive'", which is a reteaching plan rather than a score.
+    options: list[OptionCountOut]
     entries: list[MarkingEntryOut]
 
 
@@ -178,8 +194,9 @@ def _not_found(what: str) -> HTTPException:
 async def _homework(
     session: AsyncSession, principal: Principal, assignment_id: uuid.UUID
 ) -> Assignment:
+    """Homework or a quiz — both are marked, and given back, the same way."""
     assignment = await get_owned_assignment(session, principal, assignment_id)
-    if assignment.mode != AssignmentMode.HOMEWORK:
+    if assignment.mode not in (AssignmentMode.HOMEWORK, AssignmentMode.QUIZ):
         raise _not_found("homework")
     return assignment
 
@@ -320,12 +337,13 @@ async def mark_question(
         submission = submissions.get(attempt.id) if attempt else None
         mark = marks.get(attempt.id) if attempt else None
         if attempt is None:
-            source, code = "not_started", None
+            source, code, choice = "not_started", None, None
         elif submission is None:
-            source, code = "not_handed_in", attempt.code
+            source, code, choice = "not_handed_in", attempt.code, attempt.choice
         else:
             # Read back from the database as a plain string, not the enum.
-            source, code = SubmissionSource(submission.source).value, submission.code
+            source = SubmissionSource(submission.source).value
+            code, choice = submission.code, submission.choice
         entries.append(
             MarkingEntryOut(
                 student_id=student.id,
@@ -351,11 +369,28 @@ async def mark_question(
                 if mark
                 else None,
                 note=notes.get(student.id, ""),
+                choice=choice,
             )
         )
+    counts = [0] * len(leaf_doc.options) if leaf.leaf.kind == ItemKind.MCQ else []
+    for entry in entries:
+        if entry.choice is not None and 0 <= entry.choice < len(counts):
+            counts[entry.choice] += 1
     return QuestionMarkingOut(
         assignment_id=assignment.id,
         leaf_item_id=leaf.leaf.id,
+        kind=leaf.leaf.kind,
+        options=[
+            OptionCountOut(
+                text=option.text,
+                correct=option.correct,
+                misconception=option.misconception,
+                chosen_by=counts[i],
+            )
+            for i, option in enumerate(leaf_doc.options)
+        ]
+        if counts
+        else [],
         title=leaf.label,
         prompt_md=prompt,
         solution_code=leaf_doc.solution_code,
@@ -383,6 +418,7 @@ async def save_mark(
             centre_id=principal.centre_id,
             attempt_id=attempt.id,
             code=attempt.code,
+            choice=attempt.choice,
             source=SubmissionSource.SAVED_WORK,
         )
         session.add(submission)
@@ -443,6 +479,76 @@ async def save_mark(
         released=mark.released_at is not None,
         stale=False,
     )
+
+
+class AutoMarkOut(BaseModel):
+    marked: int
+
+
+@router.post("/assignments/{assignment_id}/marking/{leaf_item_id}/auto", response_model=AutoMarkOut)
+async def auto_mark(
+    assignment_id: uuid.UUID,
+    leaf_item_id: uuid.UUID,
+    principal: CurrentTeacher,
+    session: SessionDep,
+) -> AutoMarkOut:
+    """Mark every answered, unmarked multiple-choice answer to one question: Correct 2 for
+    the right option, 0 for any other. A teacher can still change any of them, or add a
+    comment, afterwards. Code questions are never marked automatically — approach is a
+    human call."""
+    assignment = await _homework(session, principal, assignment_id)
+    leaf = await _leaf(session, principal, assignment, leaf_item_id)
+    if leaf.leaf.kind != ItemKind.MCQ:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Only multiple choice marks itself"
+        )
+    right = next((i for i, o in enumerate(leaf.leaf.options) if o.get("correct")), None)
+    attempts = [
+        a for a in await _attempts(session, principal, assignment) if a.item_id == leaf.leaf.id
+    ]
+    submissions = await latest_submissions(session, principal, [a.id for a in attempts])
+    existing = await _marks(session, [a.id for a in attempts])
+    marked = 0
+    for attempt in attempts:
+        if attempt.id in existing:
+            continue
+        submission = submissions.get(attempt.id)
+        choice = submission.choice if submission else attempt.choice
+        if choice is None:
+            continue
+        if submission is None:
+            submission = Submission(
+                centre_id=principal.centre_id,
+                attempt_id=attempt.id,
+                code=attempt.code,
+                choice=attempt.choice,
+                source=SubmissionSource.SAVED_WORK,
+            )
+            session.add(submission)
+            await session.flush()
+        session.add(
+            Mark(
+                centre_id=principal.centre_id,
+                attempt_id=attempt.id,
+                submission_id=submission.id,
+                marker_id=principal.subject_id,
+                runs=True,
+                correct=2 if choice == right else 0,
+            )
+        )
+        marked += 1
+    session.add(
+        audit_entry(
+            principal,
+            "mark.auto",
+            "assignment",
+            assignment.id,
+            leaf_item_id=str(leaf.leaf.id),
+            marked=marked,
+        )
+    )
+    await session.commit()
+    return AutoMarkOut(marked=marked)
 
 
 @router.put("/assignments/{assignment_id}/notes/{student_id}", response_model=NoteIn)

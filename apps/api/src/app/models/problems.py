@@ -41,6 +41,9 @@ from app.models.base import TimestampMixin, new_uuid
 
 class ItemKind(StrEnum):
     CODE = "code"
+    # Multiple choice (Phase 7 quizzes, also usable in homework). Each wrong option names
+    # the misconception it reveals — spec §3.6's "six students think range is inclusive".
+    MCQ = "mcq"
 
 
 class ItemStatus(StrEnum):
@@ -58,7 +61,7 @@ class TestKind(StrEnum):
 class Item(TimestampMixin, table=True):
     __tablename__ = "items"
     __table_args__ = (
-        CheckConstraint("kind IN ('code')", name="kind"),
+        CheckConstraint("kind IN ('code', 'mcq')", name="kind"),
         CheckConstraint(
             "status IN ('draft', 'published', 'superseded', 'archived')", name="status"
         ),
@@ -97,6 +100,13 @@ class Item(TimestampMixin, table=True):
     difficulty: int = Field(default=1)
     starter_code: str = Field(default="", sa_type=Text)
     solution_code: str = Field(default="", sa_type=Text)
+    # Multiple choice only: [{"text", "correct", "misconception"}], in display order.
+    options: list[dict[str, Any]] = Field(
+        default_factory=list,
+        sa_type=JSONB,
+        # Existing rows (every code problem) get an empty list rather than NULL.
+        sa_column_kwargs={"server_default": text("'[]'::jsonb")},
+    )
     status: ItemStatus = Field(default=ItemStatus.DRAFT, sa_type=String)
     version: int = Field(default=1)
     supersedes_id: uuid.UUID | None = Field(default=None, foreign_key="items.id")

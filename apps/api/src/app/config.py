@@ -46,6 +46,15 @@ class Settings(BaseSettings):
     # picked up without a redeploy. Rate-limited so forged kids cannot be used to
     # hammer the JWKS endpoint.
     jwks_min_refresh_interval_seconds: int = 60
+
+    # Quizzes (routers/quiz.py). Stop means "end in this many seconds", so every child's
+    # last keystrokes autosave before their work is handed in.
+    quiz_stop_grace_seconds: int = 3
+    # Whether the API finalises a quiz on a timer at its end. Off in tests: the timer opens
+    # its own database session, which in a test would not be the rolled-back test one.
+    # The lazy path — any read after the end finalises — covers it there, and in
+    # production after a restart.
+    quiz_timer: bool = True
     jwks_request_timeout_seconds: float = 5.0
 
     @property

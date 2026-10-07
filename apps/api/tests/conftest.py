@@ -205,6 +205,10 @@ def test_settings() -> Settings:
         # served over plain http — silently, so a round-trip sign-in test would fail
         # looking like a session bug. Off here; on everywhere real.
         cookie_secure=False,
+        # The quiz timer would open a session outside the test's transaction; the lazy
+        # finalise-on-read path is what the tests exercise instead.
+        quiz_timer=False,
+        quiz_stop_grace_seconds=0,
     )
 
 

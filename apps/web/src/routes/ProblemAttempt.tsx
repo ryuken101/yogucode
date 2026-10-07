@@ -17,9 +17,10 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useNavigate, useParams } from 'react-router'
 import { Button } from '../components/Button'
 import { Console } from '../components/Console'
+import { McqAttempt } from '../components/McqAttempt'
 import { Dots } from '../components/Dots'
 import { Markdown } from '../components/Markdown'
 import { Notice } from '../components/Notice'
@@ -32,6 +33,8 @@ import { useStudentProblem } from '../lib/queries'
 import { toChecks } from '../problems/doc'
 import { PassingSummary, TestResultLine } from '../problems/TestResults'
 import type { TestRun } from '../runtime/protocol'
+import { studentLive } from '../collab/socket'
+import { useLiveDoc } from '../collab/useLiveDoc'
 import { useEventRecorder } from '../events/recorder'
 import { usePython } from '../runtime/usePython'
 
@@ -43,6 +46,29 @@ function hintProgress(next: NonNullable<Leaf['next_hint']>, runsSinceOpen: numbe
   if (next.available || runs === 0 || seconds === 0) return null
   const minutes = Math.ceil(seconds / 60)
   return `after ${runs} more run${runs === 1 ? '' : 's'}, or in about ${minutes} minute${minutes === 1 ? '' : 's'}`
+}
+
+/** Back to wherever this problem was opened from: the homework, the quiz, or Today. */
+function BackLink({ mode, assignmentId }: { mode: string; assignmentId: string }) {
+  if (mode === 'homework') {
+    return (
+      <Link to={`/homework/${assignmentId}`} className="text-sm text-sky-deep">
+        ← Back to the homework
+      </Link>
+    )
+  }
+  if (mode === 'quiz') {
+    return (
+      <Link to={`/quiz/${assignmentId}`} className="text-sm text-sky-deep">
+        ← Back to the quiz
+      </Link>
+    )
+  }
+  return (
+    <Link to="/home" className="text-sm text-sky-deep">
+      ← Today
+    </Link>
+  )
 }
 
 export function ProblemAttempt() {
@@ -67,15 +93,50 @@ export function ProblemAttempt() {
     return () => clearInterval(timer)
   }, [])
 
+  const navigate = useNavigate()
   const leaf = leaves[active]
   const autosave = useAutosave(leaf?.attempt.id ?? null, (id, code) => api.saveAttempt(id, code))
   // The process trace for this part (step 7): every edit, run, check, error and hint.
   const record = useEventRecorder(leaf ? { attemptId: leaf.attempt.id } : null)
   const python = usePython({
     onRunFinished: ({ ok, interrupted, stderr }) => {
-      if (!ok && !interrupted) record('error', { text: stderr.slice(-2000) })
+      if (!ok && !interrupted) {
+        record('error', { text: stderr.slice(-2000) })
+        studentLive().status({ kind: 'error', text: stderr.trim().split('\n').pop() ?? '' })
+      }
     },
   })
+  // A quiz ending: save now, before the hand-in snapshot; when it has ended, go to the
+  // quiz page, which says the work has been handed in.
+  const quizMode = problem.data?.mode === 'quiz'
+  useEffect(
+    () =>
+      studentLive().onQuiz((message) => {
+        autosave.flush()
+        if (quizMode && message.type === 'quiz_ended') navigate(`/quiz/${assignmentId}`)
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [quizMode, assignmentId],
+  )
+  // The live classroom: this part's code streams to the teacher, who can type into it.
+  const liveTarget = leaf ? `attempt:${leaf.attempt.id}` : null
+  const live = useLiveDoc(
+    liveTarget,
+    leaf ? (latest.current[leaf.item_id] ?? leaf.attempt.code) : null,
+  )
+  const title = problem.data
+    ? `${problem.data.title}${leaf?.label ? ` (${leaf.label})` : ''}`
+    : null
+  useEffect(() => {
+    if (!liveTarget || !title || !problem.data) return
+    studentLive().setFocus({
+      target: liveTarget,
+      kind: 'problem',
+      title,
+      mode: problem.data.mode,
+      assignment_id: problem.data.assignment_id,
+    })
+  }, [liveTarget, title, problem.data])
 
   useEffect(() => {
     if (problem.data) setLeaves(problem.data.leaves)
@@ -95,6 +156,30 @@ export function ProblemAttempt() {
       </div>
     )
   }
+  // Multiple choice: no editor, no Python — pick an answer.
+  if (problem.data?.kind === 'mcq' && leaves[0]) {
+    const answer = leaves[0]
+    return (
+      <div className="mx-auto flex max-w-2xl flex-col gap-4 px-6 py-8">
+        <BackLink mode={problem.data.mode} assignmentId={assignmentId} />
+        <div className="flex items-center gap-3">
+          <Dots value={problem.data.difficulty} />
+          <h1 className="font-serif text-xl text-ink">{problem.data.title}</h1>
+        </div>
+        <Markdown>{problem.data.prompt_md}</Markdown>
+        <McqAttempt
+          options={problem.data.options}
+          initial={answer.attempt.choice}
+          onChoose={async (choice) => {
+            await api.choose(answer.attempt.id, choice)
+            record('edit', { choice })
+            studentLive().status({ kind: 'choice', target: `attempt:${answer.attempt.id}` })
+          }}
+        />
+      </div>
+    )
+  }
+
   if (python.state.status === 'unsupported') {
     return (
       <div className="mx-auto max-w-2xl px-6 py-16">
@@ -118,6 +203,7 @@ export function ProblemAttempt() {
     autosave.flush()
     python.run(code)
     record('run')
+    studentLive().status({ kind: 'run', target: liveTarget })
     countRun()
     void api.recordRun(leaf.attempt.id).catch(() => undefined)
   }
@@ -129,6 +215,13 @@ export function ProblemAttempt() {
     countRun()
     if (outcome) {
       const passed = outcome.results.filter((r) => r.passed).length
+      studentLive().status({
+        kind: 'check',
+        target: liveTarget,
+        passed,
+        total: outcome.results.length,
+        compile_error: outcome.compile_error,
+      })
       record('check', {
         passed,
         total: outcome.results.length,
@@ -149,6 +242,7 @@ export function ProblemAttempt() {
     try {
       const updated = await api.unlockHint(leaf.attempt.id)
       record('hint', { level: updated.hints.length })
+      studentLive().status({ kind: 'hint', target: liveTarget, level: updated.hints.length })
       setLeaves((current) => current.map((l) => (l.item_id === updated.item_id ? updated : l)))
     } catch (error) {
       setHintMessage(messageFor(error))
@@ -164,15 +258,7 @@ export function ProblemAttempt() {
       {/* Left: what to do, how it is going, and help. Scrolls on its own. */}
       <div className="flex min-h-0 flex-col gap-4 overflow-y-auto rounded-lg bg-paper p-4 ring-1 ring-ink/10">
         <div>
-          {data.mode === 'homework' ? (
-            <Link to={`/homework/${assignmentId}`} className="text-sm text-sky-deep">
-              ← Back to the homework
-            </Link>
-          ) : (
-            <Link to="/home" className="text-sm text-sky-deep">
-              ← Today
-            </Link>
-          )}
+          <BackLink mode={data.mode} assignmentId={assignmentId} />
           <div className="mt-2 flex items-center gap-3">
             <Dots value={data.difficulty} />
             <h1 className="font-serif text-xl text-ink">{data.title}</h1>
@@ -205,7 +291,11 @@ export function ProblemAttempt() {
 
         <section aria-label="Checks" className="flex flex-col gap-2">
           <h2 className="font-serif text-lg text-ink">Checks</h2>
-          {run === undefined ? (
+          {!data.checks ? (
+            <p className="text-sm text-ink-soft">
+              Checks are off for this quiz — use Run to try your code yourself.
+            </p>
+          ) : run === undefined ? (
             <p className="text-sm text-ink-soft">
               Press <strong>Check</strong> to see how your code does on {leaf.tests.length}{' '}
               check{leaf.tests.length === 1 ? '' : 's'}.
@@ -256,9 +346,11 @@ export function ProblemAttempt() {
           <Button variant="secondary" onClick={python.stop} disabled={!busy}>
             Stop
           </Button>
-          <Button variant="secondary" onClick={() => void onCheck()} disabled={busy || loading}>
-            {python.state.status === 'checking' ? 'Checking…' : 'Check'}
-          </Button>
+          {data.checks ? (
+            <Button variant="secondary" onClick={() => void onCheck()} disabled={busy || loading}>
+              {python.state.status === 'checking' ? 'Checking…' : 'Check'}
+            </Button>
+          ) : null}
           {python.state.status === 'loading' ? <Spinner label={python.state.detail} /> : null}
           {python.state.status === 'asking' ? (
             <span className="text-sm text-amber">Your program is waiting for you to type.</span>
@@ -284,8 +376,13 @@ export function ProblemAttempt() {
               latest.current[leaf.item_id] = next
               autosave.onChange(next)
             }}
-            onEdit={(changes) => record('edit', { changes })}
-            onPaste={(chars) => record('paste', { chars })}
+            onModel={live.bind}
+            onCursor={live.onCursor}
+            onEdit={(changes) => record(live.isRemote() ? 'teacher_edit' : 'edit', { changes })}
+            onPaste={(chars) => {
+              record('paste', { chars })
+              studentLive().status({ kind: 'paste', target: liveTarget, chars })
+            }}
           />
         </div>
         <div className="min-h-32 flex-1">

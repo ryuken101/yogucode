@@ -45,6 +45,13 @@ export interface CodeSurfaceProps {
   onEdit?: (changes: EditChange[]) => void
   /** A paste, by length. Large pastes are worth knowing about in a child's process. */
   onPaste?: (chars: number) => void
+  /**
+   * The editor's text model, once, after it is created — for the live classroom's Yjs
+   * binding (`src/collab`). Return a cleanup; it runs when the editor goes.
+   */
+  onModel?: (model: monaco.editor.ITextModel) => (() => void) | undefined
+  /** The cursor moved — its offset in the text. For showing it to the other person. */
+  onCursor?: (offset: number) => void
 }
 
 export interface EditChange {
@@ -61,6 +68,8 @@ export default function MonacoSurface({
   autoFocus = true,
   onEdit,
   onPaste,
+  onModel,
+  onCursor,
 }: CodeSurfaceProps) {
   const host = useRef<HTMLDivElement>(null)
   const editor = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
@@ -72,6 +81,8 @@ export default function MonacoSurface({
   notifyEdit.current = onEdit
   const notifyPaste = useRef(onPaste)
   notifyPaste.current = onPaste
+  const notifyCursor = useRef(onCursor)
+  notifyCursor.current = onCursor
   /** True while the page, not the person, is replacing the text. */
   const applying = useRef(false)
 
@@ -95,8 +106,15 @@ export default function MonacoSurface({
     })
     editor.current = created
     if (autoFocus) created.focus()
+    created.onDidChangeCursorPosition((event) => {
+      const current = created.getModel()
+      if (current) notifyCursor.current?.(current.getOffsetAt(event.position))
+    })
+    const model = created.getModel()
+    const unbind = model && onModel ? onModel(model) : undefined
 
     return () => {
+      unbind?.()
       created.getModel()?.dispose()
       created.dispose()
       editor.current = null

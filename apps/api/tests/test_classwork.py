@@ -230,6 +230,7 @@ async def test_work_autosaves_and_a_check_records_progress(
         "run_count": 1,
         "last_passed": 2,
         "last_total": 2,
+        "choice": None,
     }
     lesson = (await client.get("/me/lesson")).json()
     assert lesson["problems"][0]["progress"] == "passing"

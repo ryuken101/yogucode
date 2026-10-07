@@ -26,12 +26,13 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.audit import audit_entry
 from app.auth.principal import CurrentTeacher, Principal
 from app.db import get_session
-from app.models import Item, ItemConcept, ItemStatus, TestCase
+from app.models import Item, ItemConcept, ItemKind, ItemStatus, TestCase
 from app.problem_bank import (
     ProblemDoc,
     UnavailableConcept,
     check_concepts,
     publish_problems,
+    publish_warnings,
     read_document,
     set_status,
     write_document,
@@ -64,12 +65,15 @@ class ProblemOut(BaseModel):
     # Why it cannot be published yet; empty when it can. Sent on every read so the editor
     # can show the gaps without a failed publish to discover them.
     publish_problems: list[str]
+    # Worth fixing, but not blocking — a wrong option with no misconception named.
+    publish_warnings: list[str]
 
 
 class ProblemSummaryOut(BaseModel):
     """A row in the bank list — no code, no tests, no hints."""
 
     id: uuid.UUID
+    kind: ItemKind
     title: str
     difficulty: int
     status: ItemStatus
@@ -140,6 +144,7 @@ async def _out(session: AsyncSession, principal: Principal, item: Item) -> Probl
         document=doc,
         parts=[PartRef(id=p.id, label=p.part_label or "") for p in parts],
         publish_problems=publish_problems(doc),
+        publish_warnings=publish_warnings(doc),
     )
 
 
@@ -159,7 +164,12 @@ async def create_problem(
         await check_concepts(session, principal, body)
     except UnavailableConcept as exc:
         raise _unavailable_concept() from exc
-    item = Item(centre_id=principal.centre_id, title=body.title, created_by=principal.subject_id)
+    item = Item(
+        centre_id=principal.centre_id,
+        title=body.title,
+        kind=body.kind,
+        created_by=principal.subject_id,
+    )
     session.add(item)
     await session.flush()
     await write_document(session, principal, item, body)
@@ -258,6 +268,7 @@ async def list_problems(
     return [
         ProblemSummaryOut(
             id=item.id,
+            kind=item.kind,
             title=item.title,
             difficulty=item.difficulty,
             status=item.status,
