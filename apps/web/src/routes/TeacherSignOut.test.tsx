@@ -20,7 +20,8 @@ vi.mock('../lib/supabase', () => ({
   signOut: async () => {
     session.signedIn = false
   },
-  sendMagicLink: async () => undefined,
+  signIn: async () => undefined,
+  sendPasswordReset: async () => undefined,
 }))
 
 test('signing out lands on the sign-in page and stays there', async () => {
@@ -46,6 +47,6 @@ test('signing out lands on the sign-in page and stays there', async () => {
 
   await user.click(await screen.findByRole('button', { name: 'Sign out' }))
 
-  expect(await screen.findByLabelText('Email address')).toBeInTheDocument()
+  expect(await screen.findByLabelText('Email')).toBeInTheDocument()
   expect(screen.queryByText('Classes page')).not.toBeInTheDocument()
 })

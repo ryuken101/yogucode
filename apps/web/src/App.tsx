@@ -17,7 +17,9 @@ import { Join } from './routes/Join'
 import { Landing } from './routes/Landing'
 import { NotFound } from './routes/NotFound'
 import { RequireTeacher } from './routes/RequireTeacher'
+import { ResetPassword } from './routes/ResetPassword'
 import { SignIn } from './routes/SignIn'
+import { SignUp } from './routes/SignUp'
 import { RequireStudent } from './routes/RequireStudent'
 import { SlipSheet } from './routes/SlipSheet'
 import { StudentHome } from './routes/StudentHome'
@@ -58,6 +60,7 @@ const StudentHistory = lazy(() =>
   import('./routes/StudentHistory').then((m) => ({ default: m.StudentHistory })),
 )
 
+const Teachers = lazy(() => import('./routes/Teachers').then((m) => ({ default: m.Teachers })))
 const Live = lazy(() => import('./routes/Live').then((m) => ({ default: m.Live })))
 // My files streams to the live view, so it carries the collaboration library; lazy, so
 // `/join` does not.
@@ -78,6 +81,8 @@ export default function App() {
       {/* The bare address is the children's sign-in; /join stays as an alias. */}
       <Route path="/" element={<Landing />} />
       <Route path="/sign-in" element={<SignIn />} />
+      <Route path="/sign-up" element={<SignUp />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/join" element={<Join />} />
 
@@ -115,6 +120,7 @@ export default function App() {
         />
         <Route path="/students/:studentId" element={<Loading><StudentHistory /></Loading>} />
         <Route path="/curriculum" element={<Loading><Curriculum /></Loading>} />
+        <Route path="/teachers" element={<Loading><Teachers /></Loading>} />
         <Route path="/problems" element={<Loading><ProblemBank /></Loading>} />
         {/* One key for both: saving a new problem navigates from /new to /:itemId, and a
             remount there would drop the solution check that was running. */}

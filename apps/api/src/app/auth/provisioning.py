@@ -1,7 +1,15 @@
-"""First-sign-in provisioning for teachers.
+"""First-sign-in provisioning for teachers, and who is allowed one.
+
+**Who may have an account** (Ken's decision, 10 Oct 2026): an address with a pending
+invite from the owner's Teachers page, or one in `TEACHER_EMAIL_ALLOWLIST` — which is now
+only the bootstrap list, so the first owner can always get in. Supabase will create an
+account for anyone (the anon key is public and sign-up is open there); this module is
+where that account becomes a teacher, or doesn't. After provisioning, access is the
+`users` row: active means in, disabled (removed by the owner) means out, on the next
+request.
 
 One academy, one centre. The centre named in config is created by whoever signs in
-first, and every allowlisted teacher after that joins the same one. A second teacher
+first, and every invited teacher after that joins the same one. A second teacher
 signing in must never produce a second tenant — they would silently be unable to see
 each other's classes, and merging afterwards means moving rows across the tenancy
 boundary this whole design exists to keep intact.
@@ -12,6 +20,9 @@ letting the database decide — the unique constraints on `centres.slug` and
 `users.supabase_user_id` are the arbiter — rather than by checking first and hoping.
 """
 
+import uuid
+
+from fastapi import HTTPException, status
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import func, select
@@ -19,7 +30,58 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.auth.supabase_jwt import TeacherClaims
 from app.config import Settings
-from app.models import ActorType, AuditLog, Centre, User, UserRole
+from app.models import (
+    ActorType,
+    AuditLog,
+    Centre,
+    InviteStatus,
+    TeacherInvite,
+    User,
+    UserRole,
+    UserStatus,
+    utcnow,
+)
+
+# Written for the teacher who just clicked their verification link, not for a developer.
+NOT_INVITED = (
+    "This email hasn’t been invited yet. Ask your centre’s owner to add you on their "
+    "Teachers page, then sign in again."
+)
+
+
+def normalise_email(email: str) -> str:
+    return email.strip().lower()
+
+
+async def pending_invite(
+    session: AsyncSession, centre_id: uuid.UUID, email: str
+) -> TeacherInvite | None:
+    return (
+        await session.exec(
+            select(TeacherInvite).where(
+                TeacherInvite.centre_id == centre_id,
+                TeacherInvite.email == normalise_email(email),
+                TeacherInvite.status == InviteStatus.PENDING,
+            )
+        )
+    ).one_or_none()
+
+
+async def may_create_account(session: AsyncSession, settings: Settings, email: str) -> bool:
+    """Whether this address may become a teacher: bootstrap list, or a pending invite."""
+    if settings.is_teacher_email_allowed(email):
+        return True
+    centre = (
+        await session.exec(select(Centre).where(Centre.slug == settings.centre_slug))
+    ).one_or_none()
+    return centre is not None and await pending_invite(session, centre.id, email) is not None
+
+
+async def _accept(session: AsyncSession, invite: TeacherInvite | None) -> None:
+    if invite is not None:
+        invite.status = InviteStatus.ACCEPTED
+        invite.accepted_at = utcnow()
+        session.add(invite)
 
 
 async def get_or_create_centre(session: AsyncSession, settings: Settings) -> Centre:
@@ -49,7 +111,30 @@ async def provision_teacher(
         await session.exec(select(User).where(User.supabase_user_id == claims.supabase_user_id))
     ).one_or_none()
     if existing is not None:
+        if existing.status == UserStatus.DISABLED:
+            # Removed by the owner, and since invited again: the invite brings them back
+            # with their history, rather than as a stranger with a second profile.
+            invite = await pending_invite(session, existing.centre_id, existing.email)
+            if invite is not None:
+                existing.status = UserStatus.ACTIVE
+                session.add(existing)
+                await _accept(session, invite)
+                session.add(
+                    AuditLog(
+                        centre_id=existing.centre_id,
+                        actor_type=ActorType.USER,
+                        actor_id=existing.id,
+                        action="teacher.reactivated",
+                        target_type="user",
+                        target_id=existing.id,
+                        payload={"email": existing.email, "invite_id": str(invite.id)},
+                    )
+                )
+                await session.flush()
         return existing, False
+
+    if not await may_create_account(session, settings, claims.email):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=NOT_INVITED)
 
     centre = await get_or_create_centre(session, settings)
 
@@ -67,7 +152,7 @@ async def provision_teacher(
     user = User(
         supabase_user_id=claims.supabase_user_id,
         centre_id=centre.id,
-        email=claims.email,
+        email=normalise_email(claims.email),
         display_name=claims.display_name or claims.email.partition("@")[0],
         role=role,
     )
@@ -84,6 +169,8 @@ async def provision_teacher(
         ).one()
         return user, False
 
+    invite = await pending_invite(session, centre.id, claims.email)
+    await _accept(session, invite)
     session.add(
         AuditLog(
             centre_id=centre.id,
@@ -92,7 +179,11 @@ async def provision_teacher(
             action="teacher.provisioned",
             target_type="user",
             target_id=user.id,
-            payload={"email": user.email, "role": str(user.role)},
+            payload={
+                "email": user.email,
+                "role": UserRole(user.role).value,
+                "invite_id": str(invite.id) if invite else None,
+            },
         )
     )
     await session.flush()

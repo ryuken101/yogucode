@@ -1738,6 +1738,46 @@
         "title": "ImportReportOut",
         "type": "object"
       },
+      "InviteIn": {
+        "properties": {
+          "email": {
+            "maxLength": 320,
+            "minLength": 3,
+            "title": "Email",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "title": "InviteIn",
+        "type": "object"
+      },
+      "InviteOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "created_at"
+        ],
+        "title": "InviteOut",
+        "type": "object"
+      },
       "IoTest": {
         "description": "Feed `stdin` to the program, compare what it prints with `expected`.\n\n`exact` ignores trailing whitespace on each line and trailing blank lines \u2014 a child\nfailing a test over a stray space learns nothing about Python. `contains` passes when\n`expected` appears anywhere in the output.",
         "properties": {
@@ -3699,6 +3739,19 @@
         "title": "SheetOut",
         "type": "object"
       },
+      "SignupAllowedOut": {
+        "properties": {
+          "allowed": {
+            "title": "Allowed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "allowed"
+        ],
+        "title": "SignupAllowedOut",
+        "type": "object"
+      },
       "SnippetIn": {
         "properties": {
           "body": {
@@ -4247,6 +4300,63 @@
           "centre"
         ],
         "title": "TeacherProfileOut",
+        "type": "object"
+      },
+      "TeacherRowOut": {
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_you": {
+            "title": "Is You",
+            "type": "boolean"
+          },
+          "role": {
+            "$ref": "#/components/schemas/UserRole"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "display_name",
+          "role",
+          "is_you"
+        ],
+        "title": "TeacherRowOut",
+        "type": "object"
+      },
+      "TeachersOut": {
+        "properties": {
+          "invites": {
+            "items": {
+              "$ref": "#/components/schemas/InviteOut"
+            },
+            "title": "Invites",
+            "type": "array"
+          },
+          "teachers": {
+            "items": {
+              "$ref": "#/components/schemas/TeacherRowOut"
+            },
+            "title": "Teachers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "teachers",
+          "invites"
+        ],
+        "title": "TeachersOut",
         "type": "object"
       },
       "TitleIn": {
@@ -5280,6 +5390,50 @@
           }
         },
         "summary": "Read Current Teacher",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/signup-allowed": {
+      "get": {
+        "description": "Whether this address has been invited. A yes or a no, and nothing else.\n\nNo sign-in needed: the person asking does not have an account yet. It says nothing\nabout who invited them, when, or whether they already have an account.",
+        "operationId": "signup_allowed_auth_signup_allowed_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "email",
+            "required": true,
+            "schema": {
+              "maxLength": 320,
+              "title": "Email",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignupAllowedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Signup Allowed",
         "tags": [
           "auth"
         ]
@@ -10506,6 +10660,219 @@
         "summary": "Unarchive Student",
         "tags": [
           "roster"
+        ]
+      }
+    },
+    "/teachers": {
+      "get": {
+        "description": "Active teachers, then invites nobody has used yet.",
+        "operationId": "list_teachers_teachers_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeachersOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Teachers",
+        "tags": [
+          "teachers"
+        ]
+      }
+    },
+    "/teachers/invites": {
+      "post": {
+        "operationId": "invite_teacher_teachers_invites_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Invite Teacher",
+        "tags": [
+          "teachers"
+        ]
+      }
+    },
+    "/teachers/invites/{invite_id}/revoke": {
+      "post": {
+        "operationId": "revoke_invite_teachers_invites__invite_id__revoke_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "invite_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Invite Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Invite",
+        "tags": [
+          "teachers"
+        ]
+      }
+    },
+    "/teachers/{user_id}/remove": {
+      "post": {
+        "operationId": "remove_teacher_teachers__user_id__remove_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Teacher",
+        "tags": [
+          "teachers"
         ]
       }
     },

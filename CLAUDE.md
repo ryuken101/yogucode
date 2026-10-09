@@ -45,8 +45,14 @@ ALEMBIC_DATABASE_URL=postgresql+asyncpg://localhost/coding_tool_test \
 
 This is the part that is expensive to get wrong, and it spans several files once built.
 
-**Teachers** authenticate through Supabase Auth (magic link); the API verifies the JWT
-against the project's JWKS endpoint. **Students** never touch Supabase. They get an
+**Teachers** authenticate through Supabase Auth (email + password, email verified by link);
+the API verifies the JWT against the project's JWKS endpoint. **A Supabase account is not
+a teacher** — sign-up there is open to anyone. Only an address the owner invited
+(`teacher_invites`, the owner-only `routers/teachers.py`) or one in the bootstrap
+`TEACHER_EMAIL_ALLOWLIST` provisions a `users` row (`auth/provisioning.py`); after that
+the active `users` row is the per-request gate, so the owner's Remove revokes on the next
+request. Supabase's "Confirm email" must stay on: it is what proves an invitee owns the
+address. **Students** never touch Supabase. They get an
 app-issued opaque session token — `secrets.token_urlsafe(32)`, only its SHA-256 hash
 stored in `student_sessions`, delivered as an httpOnly/Secure/SameSite=Lax cookie.
 Opaque rather than JWT **because it must be revocable**: a teacher kicking a session

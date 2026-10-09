@@ -46,6 +46,7 @@ from app.models.students import (
     StudentSession,
     StudentStatus,
 )
+from app.models.teacher_invites import InviteStatus, TeacherInvite
 from app.models.users import User, UserRole, UserStatus
 
 __all__ = [
@@ -77,6 +78,7 @@ __all__ = [
     "Item",
     "ItemConcept",
     "ItemKind",
+    "InviteStatus",
     "ItemStatus",
     "Lesson",
     "LessonConcept",
@@ -92,6 +94,7 @@ __all__ = [
     "StudentStatus",
     "Submission",
     "SubmissionSource",
+    "TeacherInvite",
     "TestCase",
     "TestKind",
     "TimestampMixin",

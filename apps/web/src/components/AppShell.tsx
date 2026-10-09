@@ -14,11 +14,13 @@ import { navPill } from './navPill'
 
 interface Props {
   centreName?: string
+  /** The owner also manages who teaches here. */
+  isOwner?: boolean
   onSignOut?: () => void
   children: ReactNode
 }
 
-export function AppShell({ centreName, onSignOut, children }: Props) {
+export function AppShell({ centreName, isOwner = false, onSignOut, children }: Props) {
   return (
     <div className="min-h-dvh bg-cream">
       <header className="border-b border-line bg-surface">
@@ -37,6 +39,7 @@ export function AppShell({ centreName, onSignOut, children }: Props) {
                 ['/classes', 'Classes'],
                 ['/curriculum', 'Curriculum'],
                 ['/problems', 'Problems'],
+                ...(isOwner ? [['/teachers', 'Teachers']] : []),
               ].map(([to, label]) => (
                 <NavLink key={to} to={to} className={navPill}>
                   {label}

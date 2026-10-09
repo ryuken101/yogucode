@@ -44,10 +44,10 @@ flowchart TB
         hub["Live hub — WebSocket relay<br/>one room per class, in memory"]
     end
 
-    auth["Supabase Auth<br/>magic link → JWT"]
+    auth["Supabase Auth<br/>email + password → JWT"]
     db[("Supabase Postgres · ap-southeast-2<br/>via Supavisor, transaction mode")]
 
-    teacher -- "1 magic link" --> auth
+    teacher -- "1 email + password" --> auth
     auth -- "2 JWT" --> teacher
     teacher --> shell
     student --> shell
@@ -65,7 +65,8 @@ flowchart TB
 A Year 4 student has no email address and cannot be relied on to remember a password, so
 teachers and students authenticate by different routes that converge on one object.
 
-**Teachers** sign in through Supabase Auth by magic link. The browser holds the JWT; the
+**Teachers** sign in through Supabase Auth with an email and a password (since 10 Oct
+2026; it replaced the magic link). The browser holds the JWT; the
 API verifies it against the project's JWKS endpoint. Only asymmetric algorithms are
 accepted — the legacy HS256 shared secret is deliberately not implemented, because
 accepting both families is where JWT algorithm-confusion bugs live. The key cache
@@ -73,16 +74,24 @@ refreshes on an unknown `kid` as well as on a timer, which is how a key rotation
 picked up without a redeploy, and those refreshes are rate-limited so a forged `kid`
 cannot be used to drive traffic at Supabase.
 
-Sign-in is gated by an email allowlist in config — without it, anyone who can request a
-magic link on a public staging URL would provision a tenant. The allowlist is checked on
-every request rather than only at signup, so removing an address actually revokes access.
+**Teachers join by invitation.** Supabase will create an account for anyone (the anon
+key is public), so an account is not a teacher. The owner invites an email on the
+**Teachers** page (`teacher_invites`); only an invited address — or one in
+`TEACHER_EMAIL_ALLOWLIST`, now just the bootstrap list that lets the first owner in —
+provisions a `users` row. Sign-up asks `GET /auth/signup-allowed` first so an uninvited
+teacher is told to ask before an email is sent, but provisioning is the real gate. The
+teacher verifies their email by link (Supabase "Confirm email" must be on — it is what
+proves they own the invited address), and "Forgot password?" emails a reset link. After
+that, access is the `users` row, checked on every request: the owner's **Remove**
+disables it and the teacher is out on their next click; inviting them again restores the
+same profile.
 
 **One academy is one centre.** The centre named in config is created by whoever signs in
-first, who becomes its owner; every allowlisted teacher after that joins the same centre
+first, who becomes its owner; every invited teacher after that joins the same centre
 as a teacher. A second teacher signing in must never produce a second tenant — they would
 silently be unable to see each other's classes, and merging afterwards means moving rows
 across the very boundary this design exists to keep intact. Provisioning happens only in
-`POST /auth/teacher/session`, called once by the web app after the magic-link callback;
+`POST /auth/teacher/session`, called by the web app at `/auth/callback` after sign-in;
 the auth dependency itself never writes.
 
 **Students** never touch Supabase. A teacher builds the roster, sets each student's PIN
@@ -422,6 +431,12 @@ row-level security with no policies, so Supabase's public API can read nothing e
 its Data API is switched on. Deploy with
 `fly deploy --remote-only --ha=false --build-arg VITE_SUPABASE_URL=… --build-arg VITE_SUPABASE_ANON_KEY=…`.
 
+**Teacher accounts (10 Oct 2026).** Email + password replaced the magic link. Teachers
+join by the owner's invite on the Teachers page (`/teachers`), sign up at `/sign-up`
+(name, email, password; email verified by link), reset at `/reset-password`. The owner can
+cancel invites and remove teachers. No service key on the server: inviting sends no
+email — the owner copies the sign-up link to the teacher.
+
 **Rebranded as Yogucode (10 Oct 2026).** Ken's domain is yogucode.com (GoDaddy). The Fly
 app keeps its name, `magikid-code` — Fly apps cannot be renamed and nobody sees it once the
 domain is on.
@@ -456,8 +471,15 @@ emails and Resend is its SMTP server.
 3. Supabase → Authentication → Emails → SMTP Settings: host `smtp.resend.com`, port `465`,
    user `resend`, password = the API key (dashboard only — never the repo or a chat),
    sender `no-reply@yogucode.com`, name `Yogucode`.
-4. Supabase → Email Templates: paste `docs/email-templates/magic-link.html` (and
-   `confirm-signup.html` when password sign-up arrives); subjects are in each file's comment.
+4. Supabase → Email Templates: paste `docs/email-templates/confirm-signup.html` into
+   "Confirm signup" and `reset-password.html` into "Reset Password"; subjects are in each
+   file's comment.
+
+**Supabase settings for password sign-in** (Authentication → Sign In / Providers → Email):
+Email provider on, **Confirm email on** (required — without it anyone could sign up with an
+invited address they don't own), minimum password length **10**. URL Configuration →
+Redirect URLs must include `https://yogucode.com/auth/callback` and
+`https://yogucode.com/reset-password`.
 
 Free Resend is 3,000 emails a month, 100 a day.
 

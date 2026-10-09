@@ -52,6 +52,14 @@ not a way to make a failure go away.
 Students never talk to Supabase directly; `@supabase/supabase-js` is for teacher auth
 only, and the `service_role` key must never appear in this app.
 
+**Teacher auth screens** (email + password since 10 Oct 2026): `/sign-in` (with "Forgot
+password?"), `/sign-up` (asks `signupAllowed` before creating a Supabase account),
+`/reset-password`, and `/auth/callback`, where every sign-in finishes and the only place
+that provisions. `lib/supabase.ts` maps Supabase's error codes to `AuthProblem`s: a wrong
+password, an unverified email or an expired link is `not-yet`; only Supabase being
+unreachable is `system-error`. `/teachers` is the owner's page (nav link shown only to
+the owner; the API 403s everyone else).
+
 ## Two audiences, one app
 
 Teacher routes sit behind `RequireTeacher`, which supplies `AppShell`. `/join` is outside

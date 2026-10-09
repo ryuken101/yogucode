@@ -1,14 +1,19 @@
 """Sign-in routes.
 
 `POST /auth/teacher/session` is the only route that provisions. The web app calls it
-once after the magic-link callback; everything else assumes a `users` row exists and
-returns 403 `profile_not_provisioned` if it does not.
+after a teacher's first verified sign-in (the email-confirmation link lands on
+/auth/callback); everything else assumes a `users` row exists and returns 403
+`profile_not_provisioned` if it does not.
+
+`GET /auth/signup-allowed` lets the sign-up page say "ask your centre to add you" before
+an account is created in Supabase. It is a courtesy, not the gate: provisioning checks
+again, because anyone can create a Supabase account without going through our page.
 """
 
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -17,10 +22,11 @@ from app.auth.principal import (
     SettingsDep,
     VerifierDep,
     bearer_token,
+    load_teacher,
     unauthorised,
     verify_teacher_token,
 )
-from app.auth.provisioning import provision_teacher
+from app.auth.provisioning import may_create_account, provision_teacher
 from app.db import get_session
 from app.models import Centre, User, UserRole
 from app.schemas import CentreOut
@@ -62,14 +68,37 @@ async def start_teacher_session(
     if token is None:
         raise unauthorised("not signed in")
 
-    claims = await verify_teacher_token(token, verifier, settings)
-    user, _created = await provision_teacher(session, claims, settings)
+    claims = await verify_teacher_token(token, verifier)
+    await provision_teacher(session, claims, settings)
     await session.commit()
+    # The same check every request makes: a teacher the owner removed (and has not invited
+    # back) is refused here too, rather than handed a profile that 403s a moment later.
+    user = await load_teacher(session, claims)
 
     centre = await session.get(Centre, user.centre_id)
     if centre is None:  # pragma: no cover — provisioning guarantees it
         raise unauthorised("centre missing for this profile")
     return TeacherProfileOut.build(user, centre)
+
+
+class SignupAllowedOut(BaseModel):
+    allowed: bool
+
+
+@router.get("/signup-allowed", response_model=SignupAllowedOut)
+async def signup_allowed(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    settings: SettingsDep,
+    email: Annotated[str, Query(max_length=320)],
+) -> SignupAllowedOut:
+    """Whether this address has been invited. A yes or a no, and nothing else.
+
+    No sign-in needed: the person asking does not have an account yet. It says nothing
+    about who invited them, when, or whether they already have an account.
+    """
+    if "@" not in email:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="not an email")
+    return SignupAllowedOut(allowed=await may_create_account(session, settings, email))
 
 
 @router.get("/me", response_model=TeacherProfileOut)

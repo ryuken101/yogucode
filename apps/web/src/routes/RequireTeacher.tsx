@@ -3,9 +3,9 @@
  *
  * Two gates, in order, because they fail differently. First: is there a Supabase session
  * at all? That is local and instant, and its absence means "sign in", not "you are not
- * allowed". Second: does the API recognise this teacher? That catches an address removed
- * from the allowlist and an account disabled since the token was issued — the allowlist
- * is checked on every request precisely so removing someone actually revokes them.
+ * allowed". Second: does the API recognise this teacher? That catches a teacher the owner
+ * has removed since the token was issued — the account is checked on every request
+ * precisely so removing someone actually revokes them.
  *
  * `profile_not_provisioned` sends the teacher back through /auth/callback, which is the
  * only route that provisions. This guard never writes.
@@ -49,10 +49,11 @@ export function RequireTeacher() {
       return <Navigate to="/auth/callback" replace />
     }
     if (error instanceof ApiError && error.status === 403) {
-      // Verified by Supabase, refused by us: not on the allowlist, or disabled.
+      // Verified by Supabase, refused by us: removed by the owner. A decision someone
+      // made, which the teacher can ask about — not a fault.
       return (
         <AppShell>
-          <Notice tone="system-error">{error.message}</Notice>
+          <Notice tone="not-yet">{error.message}</Notice>
         </AppShell>
       )
     }
@@ -62,6 +63,7 @@ export function RequireTeacher() {
   return (
     <AppShell
       centreName={data.centre.name}
+      isOwner={data.role === 'owner'}
       onSignOut={() => {
         void signOut().then(() => {
           // Forget who was signed in, or the sign-in page reads the cached profile, thinks

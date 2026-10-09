@@ -92,18 +92,14 @@ export function Lockup({ size = 32, className = '' }: { size?: number; className
   )
 }
 
-/**
- * The front-page welcome: the cup, the wordmark and the tagline. Above the class-code
- * card at the bare address (Ken's choice, 10 Oct 2026) and on the teacher sign-in.
- */
-export function Welcome({ tagline = 'Code, but make it fun.' }: { tagline?: string }) {
+/** The front-page welcome: the cup and the wordmark, above the sign-in card. */
+export function Welcome() {
   return (
     <div className="mb-8 flex flex-col items-center gap-3 text-center text-grape">
       <CupMark size={96} />
       <span className="text-5xl">
         <Wordmark />
       </span>
-      <p className="text-lg text-muted">{tagline}</p>
     </div>
   )
 }

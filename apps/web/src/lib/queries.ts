@@ -21,6 +21,7 @@ import { ApiError } from './errors'
 
 export const keys = {
   me: ['me'] as const,
+  teachers: ['teachers'] as const,
   classes: ['classes'] as const,
   class: (classId: string) => ['class', classId] as const,
   roster: (classId: string) => ['roster', classId] as const,
@@ -143,6 +144,24 @@ export function useRenameStudent(classId: string) {
     onSuccess: () => client.invalidateQueries({ queryKey: keys.roster(classId) }),
   })
 }
+
+/* --- owner: teachers ---------------------------------------------------------------- */
+
+export function useTeachers() {
+  return useQuery({ queryKey: keys.teachers, queryFn: api.listTeachers, retry: false })
+}
+
+function useTeachersMutation<T, R>(mutationFn: (arg: T) => Promise<R>) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn,
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.teachers }),
+  })
+}
+
+export const useInviteTeacher = () => useTeachersMutation(api.inviteTeacher)
+export const useRevokeInvite = () => useTeachersMutation(api.revokeInvite)
+export const useRemoveTeacher = () => useTeachersMutation(api.removeTeacher)
 
 /* --- student: identity and files ---------------------------------------------------- */
 

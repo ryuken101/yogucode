@@ -18,6 +18,7 @@ from app.routers import (
     quiz,
     roster,
     student_work,
+    teachers,
 )
 
 app = FastAPI(title="Yogucode API")
@@ -38,6 +39,7 @@ app.include_router(marking.router)
 app.include_router(progress.router)
 app.include_router(live.router)
 app.include_router(quiz.router)
+app.include_router(teachers.router)
 
 
 @app.get("/health")

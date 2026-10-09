@@ -75,16 +75,14 @@ def bearer_token(authorization: str | None) -> str | None:
     return token.strip()
 
 
-async def verify_teacher_token(
-    token: str,
-    verifier: SupabaseJWKSVerifier,
-    settings: Settings,
-) -> TeacherClaims:
-    """Verify a Supabase token and check the email against the allowlist.
+async def verify_teacher_token(token: str, verifier: SupabaseJWKSVerifier) -> TeacherClaims:
+    """Verify a Supabase token: signed by the project, unexpired, for a signed-in user.
 
-    The allowlist is checked on every request, not only at provisioning: removing an
-    address from config should actually revoke access, rather than only prevent a new
-    signup.
+    Who the token belongs to is not decided here. A verified token proves only that
+    Supabase knows this person — and Supabase sign-up is open to anyone. Becoming a
+    teacher needs an invite (`app.auth.provisioning`); staying one needs an active
+    `users` row, which `load_teacher` checks on every request, so the owner removing a
+    teacher takes effect on their next click.
     """
     try:
         claims = await verifier.verify(token)
@@ -101,11 +99,6 @@ async def verify_teacher_token(
             detail="cannot verify sign-in right now",
         ) from exc
 
-    if not settings.is_teacher_email_allowed(claims.email):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="this address is not permitted to sign in",
-        )
     return claims
 
 
@@ -122,7 +115,10 @@ async def load_teacher(session: AsyncSession, claims: TeacherClaims) -> User:
         )
     if user.status != UserStatus.ACTIVE:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="this account is disabled"
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "This account has been removed from the centre. Ask the owner if that’s a mistake."
+            ),
         )
     return user
 
@@ -141,7 +137,7 @@ async def get_current_principal(
     """Resolve a teacher JWT or a student session cookie into one Principal."""
     token = bearer_token(authorization)
     if token is not None:
-        claims = await verify_teacher_token(token, verifier, settings)
+        claims = await verify_teacher_token(token, verifier)
         user = await load_teacher(session, claims)
         return Principal(
             kind="teacher",

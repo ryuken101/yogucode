@@ -86,11 +86,30 @@ export interface ProblemFilters {
 export const api = {
   /* --- teacher: identity --------------------------------------------------------- */
 
-  /** The only route that provisions. Called once after the magic-link callback. */
+  /** The only route that provisions. Called after a teacher's first verified sign-in. */
   startTeacherSession: () =>
     request<Schemas['TeacherProfileOut']>('/auth/teacher/session', { method: 'POST' }),
   me: () => request<Schemas['TeacherProfileOut']>('/auth/me'),
   centre: () => request<Schemas['CentreOut']>('/centre'),
+  /**
+   * Has this address been invited? Asked before creating a Supabase account, so an
+   * uninvited teacher hears "ask your centre" instead of verifying an email for nothing.
+   */
+  signupAllowed: (email: string) =>
+    request<Schemas['SignupAllowedOut']>(
+      `/auth/signup-allowed?email=${encodeURIComponent(email.trim())}`,
+      { anonymous: true },
+    ),
+
+  /* --- owner: the Teachers page --------------------------------------------------- */
+
+  listTeachers: () => request<Schemas['TeachersOut']>('/teachers'),
+  inviteTeacher: (email: string) =>
+    request<Schemas['InviteOut']>('/teachers/invites', { method: 'POST', body: { email } }),
+  revokeInvite: (inviteId: string) =>
+    request<void>(`/teachers/invites/${inviteId}/revoke`, { method: 'POST' }),
+  removeTeacher: (userId: string) =>
+    request<void>(`/teachers/${userId}/remove`, { method: 'POST' }),
 
   /* --- teacher: classes ---------------------------------------------------------- */
 

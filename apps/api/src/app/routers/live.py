@@ -10,7 +10,7 @@
   it.
 - **A teacher** cannot send an `Authorization` header from a browser WebSocket, so the
   first message carries the Supabase token. It is verified with the same verifier and
-  allowlist as every teacher request (`verify_teacher_token`, `load_teacher`), and the
+  active-account check as every teacher request (`verify_teacher_token`, `load_teacher`), and the
   class they ask to watch goes through `get_owned_class` — another centre's class is
   refused like a 404.
 
@@ -180,7 +180,7 @@ async def teacher_socket(
         return await _close(websocket, UNAUTHENTICATED)
 
     try:
-        claims = await verify_teacher_token(str(first.get("token") or ""), verifier, settings)
+        claims = await verify_teacher_token(str(first.get("token") or ""), verifier)
         user = await load_teacher(session, claims)
         principal = Principal(
             kind="teacher", subject_id=user.id, centre_id=user.centre_id, role=user.role

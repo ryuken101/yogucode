@@ -247,6 +247,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/signup-allowed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Signup Allowed
+         * @description Whether this address has been invited. A yes or a no, and nothing else.
+         *
+         *     No sign-in needed: the person asking does not have an account yet. It says nothing
+         *     about who invited them, when, or whether they already have an account.
+         */
+        get: operations["signup_allowed_auth_signup_allowed_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/student/logout": {
         parameters: {
             query?: never;
@@ -1717,6 +1740,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/teachers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Teachers
+         * @description Active teachers, then invites nobody has used yet.
+         */
+        get: operations["list_teachers_teachers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/teachers/invites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Invite Teacher */
+        post: operations["invite_teacher_teachers_invites_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/teachers/invites/{invite_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revoke Invite */
+        post: operations["revoke_invite_teachers_invites__invite_id__revoke_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/teachers/{user_id}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Remove Teacher */
+        post: operations["remove_teacher_teachers__user_id__remove_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/units/{unit_id}": {
         parameters: {
             query?: never;
@@ -2493,6 +2587,26 @@ export interface components {
             /** Error */
             error: string | null;
         };
+        /** InviteIn */
+        InviteIn: {
+            /** Email */
+            email: string;
+        };
+        /** InviteOut */
+        InviteOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Email */
+            email: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+        };
         /**
          * IoTest
          * @description Feed `stdin` to the program, compare what it prints with `expected`.
@@ -3242,6 +3356,11 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** SignupAllowedOut */
+        SignupAllowedOut: {
+            /** Allowed */
+            allowed: boolean;
+        };
         /** SnippetIn */
         SnippetIn: {
             /** Body */
@@ -3464,6 +3583,28 @@ export interface components {
              */
             id: string;
             role: components["schemas"]["UserRole"];
+        };
+        /** TeacherRowOut */
+        TeacherRowOut: {
+            /** Display Name */
+            display_name: string;
+            /** Email */
+            email: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is You */
+            is_you: boolean;
+            role: components["schemas"]["UserRole"];
+        };
+        /** TeachersOut */
+        TeachersOut: {
+            /** Invites */
+            invites: components["schemas"]["InviteOut"][];
+            /** Teachers */
+            teachers: components["schemas"]["TeacherRowOut"][];
         };
         /** TitleIn */
         TitleIn: {
@@ -3985,6 +4126,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TeacherProfileOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    signup_allowed_auth_signup_allowed_get: {
+        parameters: {
+            query: {
+                email: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignupAllowedOut"];
                 };
             };
             /** @description Validation Error */
@@ -6838,6 +7010,134 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["StudentOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_teachers_teachers_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeachersOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    invite_teacher_teachers_invites_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_invite_teachers_invites__invite_id__revoke_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                invite_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_teacher_teachers__user_id__remove_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

@@ -9,7 +9,7 @@
  * which is "not yet", not a system failure.
  */
 
-import { useId } from 'react'
+import { useId, useState } from 'react'
 import type { InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react'
 
 const BOX =
@@ -83,6 +83,49 @@ export function Select({
         {children}
       </select>
       {hint ? <p className="text-sm text-not-yet-ink">{hint}</p> : null}
+    </div>
+  )
+}
+
+/**
+ * A password with a Show button. One field, not "type it twice": seeing what you typed
+ * catches the typo a second box exists to catch, without making you type it twice.
+ */
+export function PasswordInput({
+  label,
+  hint,
+  ...rest
+}: Common & Omit<InputHTMLAttributes<HTMLInputElement>, 'type'>) {
+  const id = useId()
+  const [shown, setShown] = useState(false)
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={id} className="text-sm font-medium text-grape">
+        {label}
+      </label>
+      <div className="relative">
+        <input
+          id={id}
+          {...rest}
+          type={shown ? 'text' : 'password'}
+          className={`${BOX} pr-16`}
+          aria-describedby={hint ? `${id}-hint` : undefined}
+        />
+        <button
+          type="button"
+          onClick={() => setShown((s) => !s)}
+          aria-pressed={shown}
+          aria-label={shown ? 'Hide password' : 'Show password'}
+          className="absolute inset-y-0 right-0 rounded-r-lg px-3 text-sm font-medium text-muted hover:text-grape focus-visible:outline-2 focus-visible:outline-grape"
+        >
+          {shown ? 'Hide' : 'Show'}
+        </button>
+      </div>
+      {hint ? (
+        <p id={`${id}-hint`} className="text-sm text-not-yet-ink">
+          {hint}
+        </p>
+      ) : null}
     </div>
   )
 }

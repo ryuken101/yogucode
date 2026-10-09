@@ -26,7 +26,7 @@ vi.mock('./supabase', () => ({
   currentAccessToken,
   supabaseConfigured: true,
   getSupabase: vi.fn(),
-  sendMagicLink: vi.fn(),
+  signIn: vi.fn(),
   signOut: vi.fn(),
 }))
 

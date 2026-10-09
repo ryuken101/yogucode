@@ -1,4 +1,4 @@
-"""The teacher allowlist is a security control, so it gets tests before it gets a caller.
+"""The bootstrap allowlist: who may become a teacher without an invite (the first owner).
 
 Sign-in is gated on this in step 3. Without it, anyone who can request a magic link on
 the staging URL provisions a centre.

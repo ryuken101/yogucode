@@ -118,11 +118,12 @@ async def test_display_name_falls_back_to_the_email_local_part(client, make_toke
 async def test_an_address_outside_the_allowlist_cannot_provision(
     client, make_token, session: AsyncSession
 ) -> None:
-    """Without this, anyone who can request a magic link creates a tenant."""
+    """Supabase sign-up is open to anyone; without this, any account becomes a tenant."""
     response = await client.post(
         "/auth/teacher/session", headers=auth(make_token(email="stranger@gmail.com"))
     )
     assert response.status_code == 403
+    assert "invited" in response.json()["detail"], "said for a person, not a developer"
 
     user_count = (await session.exec(select(func.count()).select_from(User))).one()
     centre_count = (await session.exec(select(func.count()).select_from(Centre))).one()
@@ -130,15 +131,18 @@ async def test_an_address_outside_the_allowlist_cannot_provision(
     assert centre_count == 0
 
 
-async def test_removing_an_address_from_the_allowlist_revokes_access(
+async def test_the_allowlist_only_bootstraps_and_does_not_hold_access(
     client, make_token, test_settings
 ) -> None:
-    """The allowlist is checked per request, so config is a revocation lever."""
+    """TEACHER_EMAIL_ALLOWLIST lets the first owner in; after that the users row decides.
+
+    Revoking is the owner's Remove button now (test_teachers.py), not a config edit.
+    """
     token = make_token(email="ken@example.com")
     assert (await client.post("/auth/teacher/session", headers=auth(token))).status_code == 200
 
     test_settings.teacher_email_allowlist = "someone-else@example.com"
-    assert (await client.get("/auth/me", headers=auth(token))).status_code == 403
+    assert (await client.get("/auth/me", headers=auth(token))).status_code == 200
 
 
 # --- /auth/me and the seam ---------------------------------------------------------
