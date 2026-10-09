@@ -414,6 +414,12 @@ domain needed (one can be added later). `Dockerfile` and `fly.toml` are at the r
 `crossOriginIsolated` is true, Python runs, and the live socket connects. Supabase moves
 to Pro a day or two before the first real class.
 
+**Deployed (10 Oct 2026)** at <https://magikid-code.fly.dev>: one machine in Sydney,
+Supabase migrated to head and seeded with the concept taxonomy. Every table has
+row-level security with no policies, so Supabase's public API can read nothing even if
+its Data API is switched on. Deploy with
+`fly deploy --remote-only --ha=false --build-arg VITE_SUPABASE_URL=… --build-arg VITE_SUPABASE_ANON_KEY=…`.
+
 ## Local development
 
 Requires [uv](https://docs.astral.sh/uv/), Node 22+, and PostgreSQL 16.

@@ -27,6 +27,9 @@ primary_region = "syd"
   CENTRE_SLUG = "castle-hill"
   CENTRE_NAME = "Magikid Castle Hill"
 
+# Exactly ONE machine (`fly deploy --ha=false`; `fly scale count 1`). The live classroom's
+# hub and the quiz timers live in this process's memory: two machines would split a class.
+
 [http_service]
   internal_port = 8080
   force_https = true

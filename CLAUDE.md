@@ -136,7 +136,13 @@ website, adding the cross-origin isolation headers to every response. The `Docke
 `fly.toml` at the repo root deploy it as **one Fly.io app** (`magikid-code`, Sydney, always
 on, one uvicorn worker — the live hub and quiz timers live in process memory).
 `release_command` runs `alembic upgrade head` against Supabase on each deploy, upgrade
-only. Never run a downgrade against production. Secrets (`DATABASE_URL`, `SUPABASE_URL`,
+only. Never run a downgrade against production. **Exactly one machine**: the first
+`fly deploy` creates two "for high availability", which would split a class across two
+in-memory hubs — deploy with `--ha=false` and keep `fly scale count 1`. Every table has
+**row-level security on with no policies** (migration `cce4cbf9b9f0`,
+`test_every_table_has_row_level_security`): Supabase serves the public schema to its
+`anon` role, and RLS is what keeps children's records unreadable with the public key.
+A new table's migration must enable it. Secrets (`DATABASE_URL`, `SUPABASE_URL`,
 `TEACHER_EMAIL_ALLOWLIST`) are Fly secrets that Ken sets himself; they never go in the repo
 or in a chat.
 
