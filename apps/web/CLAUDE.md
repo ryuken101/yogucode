@@ -3,23 +3,38 @@
 Frontend conventions. The root `CLAUDE.md` carries the cross-cutting rules; this file
 loads only when working under `apps/web`.
 
-## The palette rule, and where it is enforced
+## The brand, the palette rule, and where it is enforced
 
-`src/theme.css` holds the product-spec §8 palette as Tailwind v4 theme tokens (v4 was
-chosen for its CSS-first config). One rule is load-bearing and easy to violate by habit:
-**never red for a student's incorrect answer** — amber means "not yet", sage means
-correct, rust is reserved for system errors. Cream background, not white. Serif headings,
-sans UI, mono code.
+The look is the **Yogucode brand** (Ken's choice, 10 Oct 2026, from the "Yogucode Brand"
+design system; it supersedes product-spec §8's sky and cream). `src/theme.css` holds it as
+Tailwind v4 theme tokens: `grape` text and primary buttons, `cream` ground, `surface` (white)
+cards with `line` hairlines, `strawberry` in small doses, `lemon` as a spark; `muted` is the
+brand's muted darkened to pass 4.5:1 on cream. Fredoka (self-hosted,
+`@fontsource-variable/fredoka` — no Google Fonts requests from children's browsers) for
+everything, system mono for code. Large radii (cards `rounded-3xl`, buttons and panels
+`rounded-2xl`), pill badges, hairlines rather than shadows.
+
+`src/components/Brand.tsx` has the marks — `CupMark` (the brand SVG verbatim; also
+`public/favicon.svg`), `Wordmark` (`<yogucode>`: letters take the text colour, o's and
+brackets always strawberry), `Lockup` and the front-page `Welcome`. Never redraw the cup or
+recolour the o's. `public/yogucode-cup.png` exists for emails, which can't show SVG.
+
+One rule is load-bearing and easy to violate by habit: **never red for a student's
+incorrect answer.** The state colours are named by role — `not-yet` (lemon fill;
+`not-yet-ink` for text on light ground), `good` (mint; `good-ink` for text), and
+`system-error` (raspberry), reserved for the app failing. **Strawberry is never a state**:
+pink-red on a wrong answer is still red.
 
 That rule is encoded in components rather than left to each screen. `Badge` and `Notice`
 take semantic tones (`not-yet`, `good`, `muted`, `system-error`), and the only way to
-reach rust is to type the words `system-error`, which is long enough to make you think.
-`Button` has **no danger variant**: nothing in this product deletes, and the two actions
+reach the error colour is to type the words `system-error`, which is long enough to make
+you think. `Button` has **no danger variant**: nothing in this product deletes, and the two actions
 that feel destructive — rotating a join code, signing a student out — confirm in a
 `Dialog` with words instead of being coloured red.
 
-`src/components/palette.test.tsx` and the colour assertions in `src/routes/Join.test.tsx`
-fail the build if this slips. Deleting them is not a way to make a failure go away.
+`src/components/palette.test.tsx` (including "strawberry is never a state") and the colour
+assertions in `src/routes/Join.test.tsx` fail the build if this slips. Deleting them is
+not a way to make a failure go away.
 
 ## Structure
 
@@ -106,10 +121,11 @@ TypeScript, CSS, HTML and JSON language workers — about 9 MB of build output t
 Python. The odd-looking paths are explained in `monaco-subpaths.d.ts`; the package's
 `exports` map rewrites `./*` to `./esm/vs/*`.
 
-`src/editor/theme.ts` is the §8 answer to "don't drop a default dark VS Code theme into a
-cream page": dark, but derived from `ink` with syntax colours from the product palette.
-There is no red in it — a student's unfinished code is not an error, and mistakes appear in
-the terminal in amber after they press Run.
+`src/editor/theme.ts` (`yogucode-night`) is the brand's dark theme rather than a default
+VS Code one: a `night` (deep grape) ground, strawberry keywords, lemon strings, mint
+built-ins, every colour at least 4.5:1. There is no error colour in it — a student's
+unfinished code is not an error, and mistakes appear in the terminal in lemon (`not-yet`)
+after they press Run.
 
 **Monaco is uncontrolled after mount.** `value` is the initial document; the editor owns
 the text thereafter, which is what keeps typing off the network. Anything mocking
@@ -121,9 +137,9 @@ the text thereafter, which is what keeps typing off the network. Anything mockin
 switch and on `pagehide`. There is no Save button, because a nine-year-old will not press
 one and §3.1's promise is "no lost files between weeks", not "if you remember".
 
-A failed save is the one thing on that screen allowed to be **rust** — it is genuinely our
-fault, and a child typing into a page that silently discards their work is the failure most
-worth shouting about. Saves are deliberately not retried: the usual cause is a revoked
+A failed save is the one thing on that screen allowed to be **`system-error`** — it is
+genuinely our fault, and a child typing into a page that silently discards their work is
+the failure most worth shouting about. Saves are deliberately not retried: the usual cause is a revoked
 session, and retrying hides it behind a spinner.
 
 ## The live classroom (`src/collab/`)

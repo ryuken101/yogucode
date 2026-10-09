@@ -53,15 +53,15 @@ test('every verdict gets a row the teacher can read', async () => {
   expect(screen.getByText('Cannot use')).toBeInTheDocument()
 })
 
-test('a mis-paste is amber, never rust — it is not a system error', async () => {
+test('a mis-paste is not-yet, never system-error — it is not a system error', async () => {
   const { user } = open()
   await preview(user)
 
   for (const label of ['Which one?', 'Listed twice', 'Cannot use']) {
-    expect(screen.getByText(label).className).toContain('amber')
-    expect(screen.getByText(label).className).not.toContain('rust')
+    expect(screen.getByText(label).className).toContain('not-yet')
+    expect(screen.getByText(label).className).not.toContain('system-error')
   }
-  expect(document.body.innerHTML).not.toContain('rust')
+  expect(document.body.innerHTML).not.toContain('system-error')
 })
 
 test('unresolved rows block the commit and say how many', async () => {
@@ -135,7 +135,7 @@ test('an all-or-nothing refusal keeps the dialog open and names the rows', async
   expect(onClose).not.toHaveBeenCalled()
 })
 
-test('a refusal is amber — the teacher can fix it, so it is not a fault', async () => {
+test('a refusal is not-yet — the teacher can fix it, so it is not a fault', async () => {
   server.use(cleanPreview(), bulkRefused())
   const { user } = open()
 
@@ -144,6 +144,6 @@ test('a refusal is amber — the teacher can fix it, so it is not a fault', asyn
   await user.click(await screen.findByRole('button', { name: 'Add 2' }))
 
   const message = await screen.findByText(/nothing was added/)
-  expect(message.className).toContain('amber')
-  expect(message.className).not.toContain('rust')
+  expect(message.className).toContain('not-yet')
+  expect(message.className).not.toContain('system-error')
 })

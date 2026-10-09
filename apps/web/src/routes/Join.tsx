@@ -6,9 +6,10 @@
  * history on a shared centre laptop, in proxy logs, and in the Referer header of
  * whatever loads next.
  *
- * Every message a child can see here is amber or sage, never rust. A wrong PIN is "not
- * yet", not an error — product-spec §8, and the reason the palette exists at all. Rust
- * appears only when the server could not be reached, which is genuinely our fault.
+ * Every message a child can see here is `not-yet` (lemon) or `good` (mint), never the
+ * error colour. A wrong PIN is "not yet", not an error — the reason the palette rule exists
+ * at all. `system-error` appears only when the server could not be reached, which is
+ * genuinely our fault.
  */
 
 import { useState } from 'react'
@@ -17,6 +18,7 @@ import { Button } from '../components/Button'
 import { Card, PageHeader } from '../components/Card'
 import { TextInput } from '../components/Field'
 import { JoinShell } from '../components/AppShell'
+import { Welcome } from '../components/Brand'
 import { Notice } from '../components/Notice'
 import type { Schemas } from '../lib/api'
 import { api } from '../lib/api'
@@ -34,9 +36,9 @@ export function Join() {
   const [code, setCode] = useState('')
   const [pin, setPin] = useState('')
   const [busy, setBusy] = useState(false)
-  /** Something the child can fix: a wrong code, a wrong PIN, a lockout. Always amber. */
+  /** Something the child can fix: a wrong code, a wrong PIN, a lockout. Always not-yet. */
   const [notYet, setNotYet] = useState<string | null>(null)
-  /** Our fault: the API is unreachable. The only place rust is allowed. */
+  /** Our fault: the API is unreachable. The only place system-error is allowed. */
   const [broken, setBroken] = useState<string | null>(null)
 
   function fail(error: unknown, notYetMessage: string) {
@@ -89,11 +91,12 @@ export function Join() {
 
   return (
     <JoinShell>
+      {step.name === 'code' ? <Welcome /> : null}
       <Card>
         {step.name === 'code' ? (
           <>
             <PageHeader title="Sign in" />
-            <p className="mb-4 text-sm text-ink-soft">
+            <p className="mb-4 text-sm text-muted">
               Type the class code your teacher gave you.
             </p>
             <form onSubmit={findClass} className="flex flex-col gap-4">
@@ -106,7 +109,7 @@ export function Join() {
                 spellCheck={false}
                 value={code}
                 onChange={(event) => setCode(event.target.value.toUpperCase())}
-                className="w-full rounded-lg bg-paper px-3 py-3 text-center font-mono text-2xl tracking-[0.35em] text-ink ring-1 ring-ink/15 focus:outline-2 focus:outline-sky"
+                className="w-full rounded-lg bg-surface px-3 py-3 text-center font-mono text-2xl tracking-[0.35em] text-grape ring-1 ring-grape/20 focus:outline-2 focus:outline-grape"
               />
               <Button type="submit" variant="primary" disabled={busy || !code.trim()}>
                 {busy ? 'Looking…' : 'Next'}
@@ -118,7 +121,7 @@ export function Join() {
         {step.name === 'pick' ? (
           <>
             <PageHeader title="Who are you?" />
-            <p className="mb-4 text-sm text-ink-soft">{step.lookup.class_name}</p>
+            <p className="mb-4 text-sm text-muted">{step.lookup.class_name}</p>
             <ul className="flex flex-col gap-2">
               {step.lookup.students.map((student) => (
                 <li key={student.id}>
@@ -129,11 +132,11 @@ export function Join() {
                       setNotYet(null)
                       setStep({ name: 'pin', lookup: step.lookup, student })
                     }}
-                    className="w-full rounded-xl bg-paper px-4 py-4 text-left text-lg text-ink ring-1 ring-ink/15 hover:ring-sky disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:ring-ink/15"
+                    className="w-full rounded-2xl bg-surface px-4 py-4 text-left text-lg text-grape ring-1 ring-grape/20 hover:ring-grape disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:ring-grape/20"
                   >
                     {student.display_name}
                     {!student.has_pin ? (
-                      <span className="mt-1 block text-sm text-amber">
+                      <span className="mt-1 block text-sm text-not-yet-ink">
                         Your teacher hasn’t set your PIN yet
                       </span>
                     ) : null}
@@ -163,7 +166,7 @@ export function Join() {
                 autoComplete="off"
                 value={pin}
                 onChange={(event) => setPin(event.target.value.replace(/\D/g, ''))}
-                className="w-full rounded-lg bg-paper px-3 py-3 text-center font-mono text-3xl tracking-[0.5em] text-ink ring-1 ring-ink/15 focus:outline-2 focus:outline-sky"
+                className="w-full rounded-lg bg-surface px-3 py-3 text-center font-mono text-3xl tracking-[0.5em] text-grape ring-1 ring-grape/20 focus:outline-2 focus:outline-grape"
               />
               <Button type="submit" variant="primary" disabled={busy || pin.length < 4}>
                 {busy ? 'Checking…' : 'Start'}
@@ -191,7 +194,7 @@ export function Join() {
               <Button variant="primary" onClick={() => navigate('/home')}>
                 Start writing Python
               </Button>
-              <p className="text-sm text-ink-soft">
+              <p className="text-sm text-muted">
                 You can close this and come back — you’ll still be signed in, and your work
                 will be where you left it.
               </p>
@@ -212,9 +215,9 @@ export function Join() {
       </Card>
       {/* The site's front door is the children's: teachers come in by this side door. */}
       {step.name === 'code' ? (
-        <p className="mt-4 text-center text-sm text-ink-soft">
+        <p className="mt-4 text-center text-sm text-muted">
           Teacher?{' '}
-          <Link to="/sign-in" className="text-sky-deep underline">
+          <Link to="/sign-in" className="text-grape-deep underline">
             Sign in here
           </Link>
         </p>

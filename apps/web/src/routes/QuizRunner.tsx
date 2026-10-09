@@ -58,10 +58,10 @@ export function QuizRunner() {
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-5 px-6 py-8">
       <div className="flex flex-wrap items-baseline gap-3">
-        <h1 className="font-serif text-2xl text-ink">{data.title}</h1>
+        <h1 className="font-display font-semibold text-2xl text-grape">{data.title}</h1>
         <Badge variant="muted">Quiz</Badge>
         {running ? (
-          <span className="ml-auto font-mono text-2xl text-ink" aria-label="time left">
+          <span className="ml-auto font-mono text-2xl text-grape" aria-label="time left">
             {timeLeft(running.ends_at, now)}
           </span>
         ) : null}
@@ -71,7 +71,7 @@ export function QuizRunner() {
         <Returned sheet={data} />
       ) : running ? (
         <>
-          <p className="text-sm text-ink-soft">
+          <p className="text-sm text-muted">
             Your answers save as you go and are handed in when the time is up.
           </p>
           <ol className="flex flex-col gap-2">
@@ -79,11 +79,11 @@ export function QuizRunner() {
               <li key={leaf.problem_id}>
                 <Link
                   to={`/lesson/${assignmentId}/${leaf.problem_id}`}
-                  className="flex items-center gap-4 rounded-xl bg-paper px-5 py-4 ring-1 ring-ink/10 hover:ring-sky"
+                  className="flex items-center gap-4 rounded-2xl bg-surface px-5 py-4 ring-1 ring-line hover:ring-grape"
                 >
-                  <span className="w-6 text-ink-soft">{index + 1}.</span>
+                  <span className="w-6 text-muted">{index + 1}.</span>
                   <Dots value={leaf.difficulty} />
-                  <span className="font-medium text-ink">{leaf.title.replace(/ \([a-f]\)$/, '')}</span>
+                  <span className="font-medium text-grape">{leaf.title.replace(/ \([a-f]\)$/, '')}</span>
                   <span className="ml-auto">
                     {leaf.progress !== 'not_started' ? <Badge variant="active">Started</Badge> : null}
                   </span>
@@ -95,8 +95,8 @@ export function QuizRunner() {
       ) : (
         <div className="flex flex-col gap-3">
           <Notice tone="good">Time’s up — your answers have been handed in.</Notice>
-          <p className="text-sm text-ink-soft">Your teacher will give them back when they’ve looked at them.</p>
-          <Link to="/home" className="text-sm text-sky-deep">
+          <p className="text-sm text-muted">Your teacher will give them back when they’ve looked at them.</p>
+          <Link to="/home" className="text-sm text-grape-deep">
             ← Home
           </Link>
         </div>

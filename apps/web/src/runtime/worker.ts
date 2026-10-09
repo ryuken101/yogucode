@@ -221,7 +221,7 @@ async function run(message: Extract<ToWorker, { type: 'run' }>): Promise<void> {
     ok = false
     const text = error instanceof Error ? error.message : String(error)
     interrupted = text.includes('KeyboardInterrupt')
-    // Python's own traceback, which the console shows in amber: this is the student's
+    // Python's own traceback, which the console shows as not-yet: this is the student's
     // mistake, not a failure of ours.
     sink.write('stderr', `${text.trimEnd()}\n`)
   } finally {

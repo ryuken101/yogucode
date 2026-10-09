@@ -83,19 +83,19 @@ export function ClassDetail() {
       <Card className="mb-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h2 className="text-sm font-medium text-ink-soft">Join code</h2>
+            <h2 className="text-sm font-medium text-muted">Join code</h2>
             {klass.data.join_code ? (
 <>
-              <p className="font-mono text-3xl tracking-[0.35em] text-ink">
+              <p className="font-mono text-3xl tracking-[0.35em] text-grape">
                 {klass.data.join_code}
               </p>
-              <p className="mt-1 text-sm text-ink-soft">
-                Students go to <span className="font-mono text-ink">{window.location.host}</span>{' '}
+              <p className="mt-1 text-sm text-muted">
+                Students go to <span className="font-mono text-grape">{window.location.host}</span>{' '}
                 and type this code.
               </p>
               </>
             ) : (
-              <p className="text-sm text-ink-soft">
+              <p className="text-sm text-muted">
                 This class has no code yet. Create one to let students join.
               </p>
             )}
@@ -128,8 +128,8 @@ export function ClassDetail() {
       <Card className="mb-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="font-serif text-lg text-ink">PINs</h2>
-            <p className="text-sm text-ink-soft">
+            <h2 className="font-display font-semibold text-lg text-grape">PINs</h2>
+            <p className="text-sm text-muted">
               Each student needs one to sign in. You’ll see them once, to print.
             </p>
           </div>
@@ -163,7 +163,7 @@ export function ClassDetail() {
         ) : null}
       </Card>
 
-      <h2 className="mb-3 font-serif text-lg text-ink">Roster</h2>
+      <h2 className="mb-3 font-display font-semibold text-lg text-grape">Roster</h2>
       {roster.isPending ? <Spinner label="Loading roster" /> : null}
       {roster.error ? <Notice tone="system-error">{messageFor(roster.error)}</Notice> : null}
 
@@ -178,9 +178,9 @@ export function ClassDetail() {
           {roster.data.map((entry) => (
             <li
               key={entry.student_id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-paper px-5 py-3 ring-1 ring-ink/10"
+              className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-surface px-5 py-3 ring-1 ring-line"
             >
-              <Link to={`/students/${entry.student_id}`} className="font-medium text-ink hover:text-sky-deep">
+              <Link to={`/students/${entry.student_id}`} className="font-medium text-grape hover:text-grape-deep hover:underline">
                 {entry.display_name}
               </Link>
               <div className="flex items-center gap-2">
@@ -283,7 +283,7 @@ function CurriculumCard({
 
   return (
     <Card className="mb-6">
-      <h2 className="mb-3 font-serif text-lg text-ink">Curriculum</h2>
+      <h2 className="mb-3 font-display font-semibold text-lg text-grape">Curriculum</h2>
       <div className="grid gap-3 sm:grid-cols-2">
         <Select
           label="Course"
@@ -348,27 +348,27 @@ function HomeworkCard({ classId }: { classId: string }) {
   return (
     <Card className="mb-6">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="font-serif text-lg text-ink">Homework</h2>
+        <h2 className="font-display font-semibold text-lg text-grape">Homework</h2>
         <Button variant="secondary" onClick={() => navigate(`/classes/${classId}/homework/new`)}>
           New homework
         </Button>
       </div>
       {homework.isPending ? <Spinner label="Loading homework" /> : null}
       {homework.data && homework.data.length === 0 ? (
-        <p className="text-sm text-ink-soft">None yet.</p>
+        <p className="text-sm text-muted">None yet.</p>
       ) : null}
       <ul className="flex flex-col gap-2">
         {(homework.data ?? []).map((hw) => (
           <li
             key={hw.id}
-            className="flex flex-wrap items-center gap-3 rounded-lg bg-cream/60 px-4 py-2.5 ring-1 ring-ink/10"
+            className="flex flex-wrap items-center gap-3 rounded-lg bg-cream/60 px-4 py-2.5 ring-1 ring-line"
           >
-            <span className="font-medium text-ink">{hw.title}</span>
+            <span className="font-medium text-grape">{hw.title}</span>
             {hw.status === 'draft' ? <Badge variant="active">Draft</Badge> : null}
             {hw.status === 'closed' ? <Badge variant="muted">Closed</Badge> : null}
-            <span className="text-sm text-ink-soft">due {formatDue(hw.due_at)}</span>
+            <span className="text-sm text-muted">due {formatDue(hw.due_at)}</span>
             {hw.status !== 'draft' ? (
-              <span className="text-sm text-ink-soft">
+              <span className="text-sm text-muted">
                 {hw.handed_in}/{hw.students} handed in · {hw.marked} marked
                 {hw.returned ? ` · ${hw.returned} given back` : ''}
               </span>
@@ -414,20 +414,20 @@ function QuizzesCard({ classId }: { classId: string }) {
   return (
     <Card className="mb-6">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="font-serif text-lg text-ink">Quizzes</h2>
+        <h2 className="font-display font-semibold text-lg text-grape">Quizzes</h2>
         <Button variant="secondary" onClick={() => navigate(`/classes/${classId}/quizzes/new`)}>
           New quiz
         </Button>
       </div>
-      {quizzes.data && quizzes.data.length === 0 ? <p className="text-sm text-ink-soft">None yet.</p> : null}
+      {quizzes.data && quizzes.data.length === 0 ? <p className="text-sm text-muted">None yet.</p> : null}
       <ul className="flex flex-col gap-2">
         {(quizzes.data ?? []).map((quiz) => (
           <li
             key={quiz.id}
-            className="flex flex-wrap items-center gap-3 rounded-lg bg-cream/60 px-4 py-2.5 ring-1 ring-ink/10"
+            className="flex flex-wrap items-center gap-3 rounded-lg bg-cream/60 px-4 py-2.5 ring-1 ring-line"
           >
-            <span className="font-medium text-ink">{quiz.title}</span>
-            <span className="text-sm text-ink-soft">
+            <span className="font-medium text-grape">{quiz.title}</span>
+            <span className="text-sm text-muted">
               {quiz.questions.length} question{quiz.questions.length === 1 ? '' : 's'} · {quiz.duration_minutes} min
             </span>
             {quiz.status === 'draft' ? <Badge variant="active">Draft</Badge> : null}

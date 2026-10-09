@@ -83,7 +83,7 @@ function Scale({
 }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="w-20 text-sm font-medium text-ink">{label}</span>
+      <span className="w-20 text-sm font-medium text-grape">{label}</span>
       <div role="radiogroup" aria-label={label} className="inline-flex gap-1">
         {[0, 1, 2].map((n) => (
           <button
@@ -93,7 +93,7 @@ function Scale({
             aria-checked={value === n}
             onClick={() => onChange(n)}
             className={`w-9 rounded-lg py-1 text-sm ring-1 ${
-              value === n ? 'bg-sky-pale ring-sky' : 'bg-paper ring-ink/15 hover:bg-cream'
+              value === n ? 'bg-grape-pale ring-grape' : 'bg-surface ring-grape/20 hover:bg-cream'
             }`}
           >
             {n}
@@ -244,7 +244,7 @@ export function Marking() {
   return (
     <>
       <PageHeader title={overview.data.title}>
-        <span className="text-sm text-ink-soft">due {formatDue(overview.data.due_at)}</span>
+        <span className="text-sm text-muted">due {formatDue(overview.data.due_at)}</span>
         <Button variant="primary" onClick={() => setConfirmRelease(true)}>
           Give back marked work
         </Button>
@@ -270,10 +270,10 @@ export function Marking() {
               void saveCurrent().then(() => navigate(`/assignments/${assignmentId}/mark/${q.leaf_item_id}`))
             }}
             className={`rounded-lg px-3 py-1.5 text-sm ring-1 ${
-              q.leaf_item_id === itemId ? 'bg-sky-pale ring-sky' : 'bg-paper ring-ink/15'
+              q.leaf_item_id === itemId ? 'bg-grape-pale ring-grape' : 'bg-surface ring-grape/20'
             }`}
           >
-            {q.title} <span className="text-ink-soft">· {q.marked} marked</span>
+            {q.title} <span className="text-muted">· {q.marked} marked</span>
           </button>
         ))}
       </div>
@@ -286,14 +286,14 @@ export function Marking() {
             onClick={() => void go(i)}
             aria-current={i === index}
             className={`rounded-full px-2.5 py-1 text-xs ring-1 ${
-              i === index ? 'bg-sky-pale ring-sky' : 'bg-paper ring-ink/15'
+              i === index ? 'bg-grape-pale ring-grape' : 'bg-surface ring-grape/20'
             }`}
           >
             {e.mark ? '● ' : e.code === null ? '– ' : '○ '}
             {e.display_name}
           </button>
         ))}
-        <span className="ml-auto flex items-center gap-1 text-sm text-ink-soft">
+        <span className="ml-auto flex items-center gap-1 text-sm text-muted">
           <Button variant="quiet" aria-label="Previous child" disabled={index === 0} onClick={() => void go(index - 1)}>
             ←
           </Button>
@@ -310,7 +310,7 @@ export function Marking() {
       </div>
 
       {rerunning > 0 ? (
-        <p className="mb-3 text-sm text-ink-soft">Re-running checks… {rerunning} to go</p>
+        <p className="mb-3 text-sm text-muted">Re-running checks… {rerunning} to go</p>
       ) : null}
       {error ? (
         <div className="mb-3">
@@ -321,14 +321,14 @@ export function Marking() {
       <div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
         <Card>
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <h2 className="font-serif text-lg text-ink">{entry.display_name}</h2>
+            <h2 className="font-display font-semibold text-lg text-grape">{entry.display_name}</h2>
             {entry.source === 'hand_in' ? (
-              <span className="text-sm text-ink-soft">handed in {formatDue(entry.submitted_at)}</span>
+              <span className="text-sm text-muted">handed in {formatDue(entry.submitted_at)}</span>
             ) : null}
             {entry.source === 'not_handed_in' ? <Badge variant="muted">Not handed in — saved work</Badge> : null}
             {entry.source === 'saved_work' ? <Badge variant="muted">Marked from saved work</Badge> : null}
             {entry.late ? <Badge variant="not-yet">Late</Badge> : null}
-            <span className="ml-auto text-sm text-ink-soft">Hints used: {entry.hints_used}</span>
+            <span className="ml-auto text-sm text-muted">Hints used: {entry.hints_used}</span>
           </div>
           {entry.mark?.stale ? (
             <div className="mb-3">
@@ -337,11 +337,11 @@ export function Marking() {
           ) : null}
           {isMcq ? (
             entry.choice === null || entry.choice === undefined ? (
-              <p className="text-ink-soft">No answer chosen.</p>
+              <p className="text-muted">No answer chosen.</p>
             ) : (
               <div className="flex flex-col gap-1">
-                <p className="font-mono text-base text-ink">{data.options[entry.choice]?.text}</p>
-                <p className="text-sm text-ink-soft">
+                <p className="font-mono text-base text-grape">{data.options[entry.choice]?.text}</p>
+                <p className="text-sm text-muted">
                   {entry.choice === rightChoice
                     ? 'The right answer.'
                     : data.options[entry.choice]?.misconception
@@ -351,9 +351,9 @@ export function Marking() {
               </div>
             )
           ) : entry.code === null ? (
-            <p className="text-ink-soft">Not started — nothing to mark.</p>
+            <p className="text-muted">Not started — nothing to mark.</p>
           ) : (
-            <pre className="max-h-96 overflow-auto rounded-lg bg-ink-deep p-3 font-mono text-sm text-cream">
+            <pre className="max-h-96 overflow-auto rounded-lg bg-night p-3 font-mono text-sm text-cream">
               {entry.code || '(nothing written)'}
             </pre>
           )}
@@ -361,15 +361,15 @@ export function Marking() {
 
         {isMcq ? (
           <Card>
-            <h2 className="mb-2 font-serif text-lg text-ink">The class’s answers</h2>
+            <h2 className="mb-2 font-display font-semibold text-lg text-grape">The class’s answers</h2>
             <ul className="flex flex-col gap-1.5 text-sm">
               {data.options.map((option, i) => (
                 <li key={i} className="flex items-baseline gap-2">
-                  <span className="w-6 text-right font-medium text-ink">{option.chosen_by}</span>
-                  <span className="font-mono text-ink">{option.text}</span>
+                  <span className="w-6 text-right font-medium text-grape">{option.chosen_by}</span>
+                  <span className="font-mono text-grape">{option.text}</span>
                   {option.correct ? <Badge variant="good">right</Badge> : null}
                   {!option.correct && option.misconception ? (
-                    <span className="text-ink-soft">— {option.misconception}</span>
+                    <span className="text-muted">— {option.misconception}</span>
                   ) : null}
                 </li>
               ))}
@@ -395,7 +395,7 @@ export function Marking() {
           </Card>
         ) : (
         <Card>
-          <h2 className="mb-2 font-serif text-lg text-ink">Checks (re-run)</h2>
+          <h2 className="mb-2 font-display font-semibold text-lg text-grape">Checks (re-run)</h2>
           {entry.code === null ? null : run === undefined ? (
             <Spinner label="Running" />
           ) : run === null ? (
@@ -410,7 +410,7 @@ export function Marking() {
             </div>
           )}
           {entry.child_total !== null ? (
-            <p className="mt-2 text-xs text-ink-soft">
+            <p className="mt-2 text-xs text-muted">
               Their own check at hand-in: {entry.child_passed} of {entry.child_total}
             </p>
           ) : null}
@@ -423,12 +423,12 @@ export function Marking() {
           <div className="flex flex-wrap items-center gap-6">
             {isMcq ? null : (
             <div className="flex items-center gap-2">
-              <span className="w-20 text-sm font-medium text-ink">Runs</span>
+              <span className="w-20 text-sm font-medium text-grape">Runs</span>
               <button
                 type="button"
                 aria-pressed={form.runs}
                 onClick={() => setForm({ runs: !form.runs })}
-                className={`w-12 rounded-lg py-1 text-sm ring-1 ${form.runs ? 'bg-sky-pale ring-sky' : 'bg-paper ring-ink/15'}`}
+                className={`w-12 rounded-lg py-1 text-sm ring-1 ${form.runs ? 'bg-grape-pale ring-grape' : 'bg-surface ring-grape/20'}`}
               >
                 {form.runs ? '✓' : '—'}
               </button>
@@ -462,7 +462,7 @@ export function Marking() {
                 </Button>
               </div>
               {form.comment ? (
-                <div className="rounded-lg bg-cream/60 px-3 py-1 text-sm ring-1 ring-ink/10">
+                <div className="rounded-lg bg-cream/60 px-3 py-1 text-sm ring-1 ring-line">
                   <Markdown>{form.comment}</Markdown>
                 </div>
               ) : null}
@@ -485,14 +485,14 @@ export function Marking() {
                           snippetIds: [...form.snippetIds, snippet.id],
                         })
                       }
-                      className="w-full rounded-lg bg-paper px-3 py-1.5 text-left text-sm text-ink ring-1 ring-ink/10 hover:ring-sky"
+                      className="w-full rounded-lg bg-surface px-3 py-1.5 text-left text-sm text-grape ring-1 ring-line hover:ring-grape"
                     >
                       {snippet.body}
                     </button>
                   </li>
                 ))}
                 {shownSnippets.length === 0 ? (
-                  <li className="text-sm text-ink-soft">No snippets yet — save a comment you’ll reuse.</li>
+                  <li className="text-sm text-muted">No snippets yet — save a comment you’ll reuse.</li>
                 ) : null}
               </ul>
             </div>

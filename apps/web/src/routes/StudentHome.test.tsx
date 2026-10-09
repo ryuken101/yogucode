@@ -78,7 +78,7 @@ test('a homework card says when it is due and how far they have got', async () =
   expect(link).toHaveTextContent('1 of 3 started')
 })
 
-test('handed in, changed since, and given back each say so — never in rust', async () => {
+test('handed in, changed since, and given back each say so — never in system-error', async () => {
   serve({
     today,
     homework: [
@@ -94,6 +94,6 @@ test('handed in, changed since, and given back each say so — never in rust', a
   expect(screen.getByText('Changed since you handed in')).toBeInTheDocument()
   expect(screen.getByText('Feedback is back')).toBeInTheDocument()
   const late = screen.getByText('Past the due date')
-  expect(late.className).toContain('amber')
-  expect(document.body.innerHTML).not.toContain('rust')
+  expect(late.className).toContain('not-yet')
+  expect(document.body.innerHTML).not.toContain('system-error')
 })

@@ -71,24 +71,24 @@ function Tile({
       type="button"
       onClick={onOpen}
       disabled={!online}
-      className={`flex h-56 flex-col rounded-xl bg-paper p-3 text-left ring-1 transition ${
-        online ? 'ring-ink/10 hover:ring-sky' : 'opacity-50 ring-ink/5'
+      className={`flex h-56 flex-col rounded-2xl bg-surface p-3 text-left ring-1 transition ${
+        online ? 'ring-line hover:ring-grape' : 'opacity-50 ring-line'
       }`}
     >
       <span className="flex items-center gap-2">
         <span
           aria-hidden
-          className={`size-2 rounded-full ${online ? 'bg-sage' : 'bg-ink-soft/30'}`}
+          className={`size-2 rounded-full ${online ? 'bg-good' : 'bg-muted/30'}`}
         />
-        <span className="font-medium text-ink">{name}</span>
-        <span className="ml-auto truncate text-xs text-ink-soft">
+        <span className="font-medium text-grape">{name}</span>
+        <span className="ml-auto truncate text-xs text-muted">
           {online ? (student?.focus?.title ?? 'nothing open') : 'not signed in'}
         </span>
       </span>
-      <pre className="mt-2 min-h-0 flex-1 overflow-hidden rounded-md bg-ink-deep p-2 font-mono text-[11px] leading-snug text-cream">
+      <pre className="mt-2 min-h-0 flex-1 overflow-hidden rounded-md bg-night p-2 font-mono text-[11px] leading-snug text-cream">
         {code || ' '}
       </pre>
-      <span className="mt-2 flex min-h-6 flex-wrap items-center gap-2 text-xs text-ink-soft">
+      <span className="mt-2 flex min-h-6 flex-wrap items-center gap-2 text-xs text-muted">
         {check ? <span>{check}</span> : null}
         {student ? <Flags flags={flagsFor(student)} /> : null}
       </span>
@@ -128,8 +128,8 @@ function Expanded({
   return (
     <Card className="mb-6">
       <div className="mb-3 flex flex-wrap items-center gap-3">
-        <h2 className="font-serif text-xl text-ink">{student.displayName}</h2>
-        <span className="text-sm text-ink-soft">{student.focus?.title ?? 'nothing open'}</span>
+        <h2 className="font-display font-semibold text-xl text-grape">{student.displayName}</h2>
+        <span className="text-sm text-muted">{student.focus?.title ?? 'nothing open'}</span>
         <Flags flags={flagsFor(student)} />
         <span className="ml-auto flex gap-2">
           {canHelp && doc ? (
@@ -143,12 +143,12 @@ function Expanded({
         </span>
       </div>
       {helping ? (
-        <p className="mb-2 text-sm text-ink-soft">
+        <p className="mb-2 text-sm text-muted">
           You and {student.displayName} are both typing in this editor. What you type appears on
           their screen straight away.
         </p>
       ) : null}
-      <div className="h-96 overflow-hidden rounded-lg ring-1 ring-ink/20">
+      <div className="h-96 overflow-hidden rounded-lg ring-1 ring-grape/25">
         {doc ? (
           <CodeSurface
             // A new document (the child reloaded) needs a new editor bound to it.
@@ -172,7 +172,7 @@ function Expanded({
             }}
           />
         ) : (
-          <p className="p-4 text-sm text-ink-soft">Their editor hasn’t sent anything yet.</p>
+          <p className="p-4 text-sm text-muted">Their editor hasn’t sent anything yet.</p>
         )}
       </div>
     </Card>
@@ -202,12 +202,12 @@ function QuizBar({ classId }: { classId: string }) {
 
   if (!running || !running.ends_at) return null
   return (
-    <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl bg-sky-pale/50 px-5 py-3 ring-1 ring-sky/40">
-      <span className="font-serif text-lg text-ink">Quiz · {running.title}</span>
-      <span className="font-mono text-xl text-ink" aria-label="time left">
+    <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl bg-grape-pale/50 px-5 py-3 ring-1 ring-grape/25">
+      <span className="font-display font-semibold text-lg text-grape">Quiz · {running.title}</span>
+      <span className="font-mono text-xl text-grape" aria-label="time left">
         {timeLeft(running.ends_at)}
       </span>
-      <span className="text-sm text-ink-soft">left · help is off during a quiz</span>
+      <span className="text-sm text-muted">left · help is off during a quiz</span>
       <Button
         variant="secondary"
         className="ml-auto"
@@ -250,14 +250,14 @@ export function Live() {
   return (
     <>
       <PageHeader title={klass.data ? `${klass.data.name} — live` : 'Live'}>
-        <span className="text-sm text-ink-soft">
+        <span className="text-sm text-muted">
           {live.state === 'live'
             ? `${[...live.students.values()].filter((s) => s.online).length} connected`
             : live.state === 'refused'
               ? ''
               : 'Connecting…'}
         </span>
-        <Link to={`/classes/${classId}`} className="text-sm text-sky-deep">
+        <Link to={`/classes/${classId}`} className="text-sm text-grape-deep">
           Back to the class
         </Link>
       </PageHeader>

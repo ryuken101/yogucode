@@ -100,7 +100,7 @@ export function HomeworkBuilder() {
   return (
     <>
       <PageHeader title={assignmentId ? 'Homework' : 'New homework'}>
-        {klass.data ? <span className="text-sm text-ink-soft">{klass.data.name}</span> : null}
+        {klass.data ? <span className="text-sm text-muted">{klass.data.name}</span> : null}
         {status === 'draft' ? <Badge variant="active">Draft</Badge> : null}
         {status === 'open' ? <Badge variant="good">Set</Badge> : null}
         {status === 'closed' ? <Badge variant="muted">Closed</Badge> : null}
@@ -123,7 +123,7 @@ export function HomeworkBuilder() {
             hint={draft.due ? null : 'Choose a day and time'}
           />
         </div>
-        <label className="mt-4 flex items-center gap-2 text-sm text-ink">
+        <label className="mt-4 flex items-center gap-2 text-sm text-grape">
           <input
             type="checkbox"
             checked={draft.hints}
@@ -132,16 +132,16 @@ export function HomeworkBuilder() {
           Hints available (unlocked after a few runs or minutes, as in class)
         </label>
         {draft.due ? (
-          <p className="mt-2 text-sm text-ink-soft">
+          <p className="mt-2 text-sm text-muted">
             Students will see: due {formatDue(fromLocalInput(draft.due))}
           </p>
         ) : null}
       </Card>
 
       <Card className="mb-6">
-        <h2 className="mb-3 font-serif text-lg text-ink">Problems</h2>
+        <h2 className="mb-3 font-display font-semibold text-lg text-grape">Problems</h2>
         {fixed ? (
-          <p className="mb-3 text-sm text-ink-soft">
+          <p className="mb-3 text-sm text-muted">
             The problems are fixed now that students have this homework.
           </p>
         ) : null}

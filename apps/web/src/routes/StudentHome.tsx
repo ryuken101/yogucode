@@ -6,8 +6,8 @@
  * how far have I got, have I handed it in. Work that has come back says so.
  *
  * The ladder is spec §3.3's answer to idle time — 1-dot problems first, a 2-dot, a 3-dot
- * extension — so nobody finishes with nothing to do. Progress is sage when every check
- * passes and sky while started. Never amber here: an unfinished problem on a list is not
+ * extension — so nobody finishes with nothing to do. Progress is `good` when every check
+ * passes and grape while started. Never not-yet here: an unfinished problem on a list is not
  * a "not yet", it is just the next thing to do.
  */
 
@@ -26,11 +26,11 @@ function HomeworkCard({ card }: { card: Schemas['HomeworkCardOut'] }) {
   return (
     <Link
       to={card.mode === 'quiz' ? `/quiz/${card.assignment_id}` : `/homework/${card.assignment_id}`}
-      className="flex flex-wrap items-center gap-3 rounded-xl bg-paper px-5 py-4 ring-1 ring-ink/10 hover:ring-sky"
+      className="flex flex-wrap items-center gap-3 rounded-2xl bg-surface px-5 py-4 ring-1 ring-line hover:ring-grape"
     >
-      <span className="font-medium text-ink">{card.title}</span>
+      <span className="font-medium text-grape">{card.title}</span>
       {card.mode === 'quiz' ? <Badge variant="muted">Quiz</Badge> : null}
-      <span className="text-sm text-ink-soft">
+      <span className="text-sm text-muted">
         {card.returned ? 'Given back' : `Due ${formatDue(card.due_at)}`}
       </span>
       <span className="ml-auto flex items-center gap-2">
@@ -44,7 +44,7 @@ function HomeworkCard({ card }: { card: Schemas['HomeworkCardOut'] }) {
           )
         ) : (
           <>
-            <span className="text-sm text-ink-soft">
+            <span className="text-sm text-muted">
               {card.started} of {card.problems} started
             </span>
             {/* Past due and not handed in: worth a nudge, never an alarm. */}
@@ -79,7 +79,7 @@ export function StudentHome() {
     <div className="mx-auto flex max-w-3xl flex-col gap-8 px-6 py-8">
       {homework.length > 0 ? (
         <section>
-          <h2 className="mb-3 font-serif text-xl text-ink">Homework</h2>
+          <h2 className="mb-3 font-display font-semibold text-xl text-grape">Homework</h2>
           <ul className="flex flex-col gap-2">
             {homework.map((card) => (
               <li key={card.assignment_id}>
@@ -91,13 +91,13 @@ export function StudentHome() {
       ) : null}
 
       <section>
-        <h1 className="mb-1 font-serif text-2xl text-ink">{today.lesson_title ?? 'Today'}</h1>
-        <p className="mb-4 text-sm text-ink-soft">{today.class_name}</p>
+        <h1 className="mb-1 font-display font-semibold text-2xl text-grape">{today.lesson_title ?? 'Today'}</h1>
+        <p className="mb-4 text-sm text-muted">{today.class_name}</p>
 
         {today.problems.length === 0 || !today.assignment_id ? (
           <EmptyState title="Nothing set for today yet">
             Your teacher will put today’s problems here. Meanwhile, your files are in{' '}
-            <Link to="/work" className="text-sky-deep underline">
+            <Link to="/work" className="text-grape-deep underline">
               My files
             </Link>
             .
@@ -108,12 +108,12 @@ export function StudentHome() {
               <li key={problem.item_id}>
                 <Link
                   to={`/lesson/${today.assignment_id}/${problem.item_id}`}
-                  className="flex items-center gap-4 rounded-xl bg-paper px-5 py-4 ring-1 ring-ink/10 hover:ring-sky"
+                  className="flex items-center gap-4 rounded-2xl bg-surface px-5 py-4 ring-1 ring-line hover:ring-grape"
                 >
                   <Dots value={problem.difficulty} />
-                  <span className="font-medium text-ink">{problem.title}</span>
+                  <span className="font-medium text-grape">{problem.title}</span>
                   {problem.part_labels.length ? (
-                    <span className="text-xs text-ink-soft">{problem.part_labels.length} parts</span>
+                    <span className="text-xs text-muted">{problem.part_labels.length} parts</span>
                   ) : null}
                   <span className="ml-auto">
                     {problem.progress === 'passing' ? <Badge variant="good">All checks pass</Badge> : null}

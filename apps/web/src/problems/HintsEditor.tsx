@@ -25,7 +25,7 @@ export function HintsEditor({ hints, onChange, disabled }: Props) {
   return (
     <div className="flex flex-col gap-3">
       {hints.map((hint, index) => (
-        <div key={index} className="rounded-lg bg-cream/60 p-3 ring-1 ring-ink/10">
+        <div key={index} className="rounded-lg bg-cream/60 p-3 ring-1 ring-line">
           <Textarea
             label={RUNGS[index]}
             rows={3}
@@ -47,7 +47,7 @@ export function HintsEditor({ hints, onChange, disabled }: Props) {
                 }
               />
             </div>
-            <span className="pb-2 text-sm text-ink-soft">or</span>
+            <span className="pb-2 text-sm text-muted">or</span>
             <div className="w-36">
               <TextInput
                 label="…or minutes"

@@ -10,8 +10,8 @@
  *   never framed as cheating);
  * - **all passing** — every check passes: finished, and ready for the next rung.
  *
- * Tones follow the palette rule: amber for "worth a look", sage for done, sky for
- * information. Never rust — a stuck child is not an error.
+ * Tones follow the palette rule: not-yet for "worth a look", good for done, grape for
+ * information. Never system-error — a stuck child is not an error.
  */
 
 import type { LiveStudent } from '../collab/useLiveClass'

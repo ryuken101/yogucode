@@ -3,9 +3,9 @@
  *
  * Two things are tested here that are easy to get wrong and expensive to get wrong:
  *
- * 1. **The §8 colour rule.** Every tool a programmer has used prints errors in red. This
- *    one shows them to nine-year-olds, so a traceback is amber — "not yet" — and rust is
- *    reserved for our own failures. A test, because reflex beats a comment.
+ * 1. **The palette rule.** Every tool a programmer has used prints errors in red. This one
+ *    shows them to nine-year-olds, so a traceback is `not-yet` (lemon) and `system-error`
+ *    is reserved for our own failures. A test, because reflex beats a comment.
  * 2. **Input happens in the terminal.** Typing goes where the cursor is, not into a field
  *    below, and what the child typed is echoed into the transcript.
  */
@@ -21,18 +21,18 @@ test('ordinary output is the plain text colour, not an alarming one', () => {
   render(<Console segments={[{ stream: 'stdout', text: 'Hello!' }]} />)
   const line = screen.getByText('Hello!')
   expect(line.className).toContain('text-cream')
-  expect(line.className).not.toContain('amber')
-  expect(line.className).not.toContain('rust')
+  expect(line.className).not.toContain('not-yet')
+  expect(line.className).not.toContain('system-error')
 })
 
-test('a traceback is amber and never rust', () => {
+test('a traceback is not-yet and never system-error', () => {
   render(<Console segments={[{ stream: 'stderr', text: 'NameError: x is not defined' }]} />)
   const line = screen.getByText(/NameError/)
-  expect(line.className).toContain('amber')
-  expect(line.className).not.toContain('rust')
+  expect(line.className).toContain('not-yet')
+  expect(line.className).not.toContain('system-error')
 })
 
-test('nothing a student can cause renders rust', () => {
+test('nothing a student can cause renders system-error', () => {
   render(
     <Console
       segments={[
@@ -43,7 +43,7 @@ test('nothing a student can cause renders rust', () => {
       ]}
     />,
   )
-  expect(document.body.innerHTML).not.toContain('rust')
+  expect(document.body.innerHTML).not.toContain('system-error')
 })
 
 test('an empty terminal explains itself rather than sitting blank', () => {

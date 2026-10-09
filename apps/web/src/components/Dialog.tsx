@@ -38,11 +38,11 @@ export function Dialog({ open, title, onClose, children, confirm }: Props) {
         event.preventDefault()
         onClose()
       }}
-      className="m-auto w-[min(32rem,calc(100vw-2rem))] rounded-xl bg-paper p-0 text-ink backdrop:bg-ink/30"
+      className="m-auto w-[min(32rem,calc(100vw-2rem))] rounded-3xl bg-surface p-0 text-grape backdrop:bg-night/40"
     >
       <div className="p-5">
-        <h2 className="font-serif text-xl text-ink">{title}</h2>
-        <div className="mt-3 text-sm text-ink">{children}</div>
+        <h2 className="font-display font-semibold text-xl text-grape">{title}</h2>
+        <div className="mt-3 text-sm text-grape">{children}</div>
         <div className="mt-5 flex justify-end gap-2">
           <Button variant="quiet" onClick={onClose}>
             Cancel

@@ -133,7 +133,7 @@ export function Curriculum() {
               ))}
             </Select>
           ) : (
-            <p className="text-sm text-ink-soft">No courses yet. Start with the one you teach.</p>
+            <p className="text-sm text-muted">No courses yet. Start with the one you teach.</p>
           )}
           <AddRow
             label="New course"
@@ -148,7 +148,7 @@ export function Curriculum() {
       {course.data ? (
         <>
           <div className="mb-4 flex items-center gap-2">
-            <h2 className="font-serif text-xl text-ink">{course.data.title}</h2>
+            <h2 className="font-display font-semibold text-xl text-grape">{course.data.title}</h2>
             <Button
               variant="quiet"
               onClick={() =>
@@ -168,7 +168,7 @@ export function Curriculum() {
           {course.data.units.map((unit) => (
             <Card key={unit.id} className="mb-4">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <h3 className="font-serif text-lg text-ink">{unit.title}</h3>
+                <h3 className="font-display font-semibold text-lg text-grape">{unit.title}</h3>
                 <div className="flex gap-1">
                   <Button
                     variant="quiet"
@@ -186,10 +186,10 @@ export function Curriculum() {
                 {unit.lessons.map((lesson, index) => (
                   <li
                     key={lesson.id}
-                    className="flex flex-wrap items-center gap-2 rounded-lg bg-cream/60 px-3 py-2 ring-1 ring-ink/10"
+                    className="flex flex-wrap items-center gap-2 rounded-lg bg-cream/60 px-3 py-2 ring-1 ring-line"
                   >
-                    <span className="w-6 text-sm text-ink-soft">{index + 1}.</span>
-                    <span className="font-medium text-ink">{lesson.title}</span>
+                    <span className="w-6 text-sm text-muted">{index + 1}.</span>
+                    <span className="font-medium text-grape">{lesson.title}</span>
                     <span className="flex flex-wrap gap-1">
                       {lesson.concept_ids.map((conceptId) => (
                         <Badge key={conceptId} variant="active">
@@ -298,7 +298,7 @@ export function Curriculum() {
                   setTagged(on ? tagged.filter((x) => x !== concept.id) : [...tagged, concept.id])
                 }
                 className={`rounded-full px-2.5 py-1 text-xs ring-1 ${
-                  on ? 'bg-sky-pale ring-sky' : 'bg-paper ring-ink/15'
+                  on ? 'bg-grape-pale ring-grape' : 'bg-surface ring-grape/20'
                 }`}
               >
                 {concept.label}

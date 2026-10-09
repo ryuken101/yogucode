@@ -13,6 +13,7 @@ import { Button } from '../components/Button'
 import { Card, PageHeader } from '../components/Card'
 import { TextInput } from '../components/Field'
 import { JoinShell } from '../components/AppShell'
+import { Welcome } from '../components/Brand'
 import { Notice } from '../components/Notice'
 import { messageFor } from '../lib/errors'
 import { sendMagicLink, supabaseConfigured } from '../lib/supabase'
@@ -43,6 +44,7 @@ export function SignIn() {
 
   return (
     <JoinShell>
+      <Welcome tagline="For teachers." />
       <Card>
         <PageHeader title="Sign in" />
         {!supabaseConfigured ? (
@@ -55,9 +57,9 @@ export function SignIn() {
             <Notice tone="good">
               Check your email. The link signs you in on this device.
             </Notice>
-            <p className="text-sm text-ink-soft">
-              Nothing arrived? The free Supabase tier sends two auth emails an hour across
-              the whole project, so a second attempt may need to wait.
+            <p className="text-sm text-muted">
+              Nothing arrived? It comes from no-reply@yogucode.com — check your spam folder,
+              or wait a minute and try again.
             </p>
             <Button variant="quiet" onClick={() => setSent(false)}>
               Use a different address
@@ -80,10 +82,10 @@ export function SignIn() {
           </form>
         )}
       </Card>
-      <p className="mt-6 text-center text-sm text-ink-soft">
+      <p className="mt-6 text-center text-sm text-muted">
         Students don’t sign in here —{' '}
-        <a href="/join" className="text-sky-deep underline">
-          go to /join
+        <a href="/" className="text-grape-deep underline">
+          go to the front page
         </a>
       </p>
     </JoinShell>

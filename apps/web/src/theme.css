@@ -1,38 +1,50 @@
 /*
- * Palette — product-spec.md §8, "soft sky and cream".
+ * Palette — the Yogucode brand (Ken's decision, 10 Oct 2026; it supersedes product-spec
+ * §8's sky and cream). Source: the "Yogucode Brand" design system.
  *
  * Rules that are not negotiable:
- *   - Never red for a student's incorrect answer. Amber means "not yet", sage means
- *     correct. Rust is reserved for system errors.
- *   - Cream page background, not white.
- *   - Serif headings, sans UI and body, monospace code.
+ *   - Never red for a student's incorrect answer. `not-yet` (lemon) means "not yet",
+ *     `good` (mint) means correct, and `system-error` (raspberry) is reserved for the app
+ *     failing. Strawberry is the brand accent and is never a student's state either —
+ *     pink-red on a wrong answer is still red.
+ *   - Mostly cream and white; grape for text and key surfaces; strawberry in small doses;
+ *     lemon only as a spark.
+ *   - Fredoka for everything, system monospace for code.
  */
 @theme {
-  --color-sky: #7b96d4;
-  --color-sky-deep: #5a77b8;
-  --color-sky-pale: #c4d3ee;
-  --color-cream: #f7f4ed;
-  --color-paper: #fffdf8;
-  --color-ink: #2c2a26;
-  --color-ink-soft: #6b665e;
-  --color-terracotta: #c1633f;
-  --color-sage: #7d9471;
-  --color-amber: #d9a441;
-  --color-rust: #a8503a;
+  /* Brand */
+  --color-grape: #4b2fb8;
+  --color-grape-deep: #3a2391;
+  --color-grape-pale: #eeeafb;
+  --color-strawberry: #ff5c8a;
+  --color-lemon: #ffd166;
+  --color-cream: #fff6e9;
+  --color-surface: #ffffff;
+  --color-line: #efe6d8;
+  /*
+   * The brand book's muted is #7c6bb5, which is 4.2:1 on cream — under the 4.5:1 that
+   * small text needs. This is the same hue, darkened until it passes (5.5:1).
+   */
+  --color-muted: #6a58a8;
+
+  /* A student's state, named by role so the rule above is visible in the class names. */
+  --color-good: #3dbe8b;
+  --color-good-ink: #1e7f55;
+  --color-not-yet: #ffd166;
+  --color-not-yet-ink: #7a5200;
+  --color-system-error: #b4235a;
 
   /*
-   * The code surface — editor and terminal.
-   *
-   * §8 warns against dropping a default dark VS Code theme into a cream page, and this is
-   * the answer to that: a dark panel derived from `ink` rather than VS Code's blue-grey,
-   * so the editor reads as part of this product. `ink-deep` is the background, `ink-raise`
-   * the gutter and selection, and the syntax colours are the palette above.
+   * The code surface — editor and terminal: the brand's dark theme, a deep grape ground
+   * rather than VS Code's blue-grey, so the editor reads as part of this product.
+   * `night` is the background, `night-raise` the gutter and selection, `lavender` quiet
+   * text on it.
    */
-  --color-ink-deep: #23211e;
-  --color-ink-raise: #302d29;
+  --color-night: #1a1233;
+  --color-night-raise: #2b2150;
+  --color-lavender: #b9ace6;
 
-  --font-serif: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
-  --font-sans:
-    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --font-display: 'Fredoka Variable', 'Fredoka', ui-rounded, system-ui, sans-serif;
+  --font-sans: 'Fredoka Variable', 'Fredoka', ui-rounded, system-ui, sans-serif;
   --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 }

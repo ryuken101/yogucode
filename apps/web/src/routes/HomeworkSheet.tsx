@@ -5,7 +5,7 @@
  * this browser and shows the result — "Q1 2 of 2 passing, Q2 not started" — with a last
  * chance to keep working. Then one hand-in for the whole sheet. They may hand in again
  * until their teacher gives it back; after that the sheet is read-only and shows the
- * feedback: a comment and a colour per question, sage or amber, never a number.
+ * feedback: a comment and a colour per question, good or not-yet, never a number.
  */
 
 import { useQueryClient } from '@tanstack/react-query'
@@ -42,9 +42,9 @@ export function Returned({ sheet }: { sheet: Schemas['SheetOut'] }) {
   return (
     <div className="flex flex-col gap-4">
       {sheet.note ? (
-        <div className="rounded-xl bg-sky-pale/40 px-5 py-4 ring-1 ring-sky/30">
-          <p className="mb-1 text-sm font-medium text-ink-soft">From your teacher</p>
-          <p className="text-ink">{sheet.note}</p>
+        <div className="rounded-2xl bg-grape-pale/40 px-5 py-4 ring-1 ring-grape/20">
+          <p className="mb-1 text-sm font-medium text-muted">From your teacher</p>
+          <p className="text-grape">{sheet.note}</p>
         </div>
       ) : null}
       {sheet.leaves.map((leaf) => {
@@ -53,7 +53,7 @@ export function Returned({ sheet }: { sheet: Schemas['SheetOut'] }) {
           <Card key={leaf.leaf_item_id}>
             <div className="mb-3 flex items-center gap-3">
               <Dots value={leaf.difficulty} />
-              <h2 className="font-serif text-lg text-ink">{leaf.title}</h2>
+              <h2 className="font-display font-semibold text-lg text-grape">{leaf.title}</h2>
               {leaf.feedback ? (
                 <span className="ml-auto">
                   <Badge variant={good ? 'good' : 'not-yet'}>{good ? 'Spot on' : 'Not yet'}</Badge>
@@ -63,22 +63,22 @@ export function Returned({ sheet }: { sheet: Schemas['SheetOut'] }) {
             {leaf.feedback?.comment_md ? (
               <div
                 className={`mb-3 rounded-lg px-4 py-2 ring-1 ${
-                  good ? 'bg-sage/10 ring-sage/40' : 'bg-amber/10 ring-amber/40'
+                  good ? 'bg-good/10 ring-good/60' : 'bg-not-yet/20 ring-not-yet'
                 }`}
               >
                 <Markdown>{leaf.feedback.comment_md}</Markdown>
               </div>
             ) : null}
             {leaf.feedback?.answer ? (
-              <p className="text-sm text-ink">
+              <p className="text-sm text-grape">
                 Your answer: <span className="font-mono">{leaf.feedback.answer}</span>
               </p>
             ) : leaf.feedback ? (
-              <pre className="overflow-x-auto rounded-lg bg-ink-deep p-3 font-mono text-sm text-cream">
+              <pre className="overflow-x-auto rounded-lg bg-night p-3 font-mono text-sm text-cream">
                 {leaf.feedback.code || '(nothing written)'}
               </pre>
             ) : (
-              <p className="text-sm text-ink-soft">Your teacher hasn’t written about this one.</p>
+              <p className="text-sm text-muted">Your teacher hasn’t written about this one.</p>
             )}
           </Card>
         )
@@ -181,11 +181,11 @@ export function HomeworkSheet() {
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-5 px-6 py-8">
       <div>
-        <Link to="/home" className="text-sm text-sky-deep">
+        <Link to="/home" className="text-sm text-grape-deep">
           ← Home
         </Link>
-        <h1 className="mt-2 font-serif text-2xl text-ink">{data.title}</h1>
-        <p className="text-sm text-ink-soft">Due {formatDue(data.due_at)}</p>
+        <h1 className="mt-2 font-display font-semibold text-2xl text-grape">{data.title}</h1>
+        <p className="text-sm text-muted">Due {formatDue(data.due_at)}</p>
       </div>
 
       {data.returned ? (
@@ -208,10 +208,10 @@ export function HomeworkSheet() {
               <li key={leaf.leaf_item_id}>
                 <Link
                   to={`/lesson/${assignmentId}/${leaf.problem_id}`}
-                  className="flex items-center gap-4 rounded-xl bg-paper px-5 py-4 ring-1 ring-ink/10 hover:ring-sky"
+                  className="flex items-center gap-4 rounded-2xl bg-surface px-5 py-4 ring-1 ring-line hover:ring-grape"
                 >
                   <Dots value={leaf.difficulty} />
-                  <span className="font-medium text-ink">{leaf.title}</span>
+                  <span className="font-medium text-grape">{leaf.title}</span>
                   <span className="ml-auto">
                     {leaf.progress === 'passing' ? <Badge variant="good">All checks pass</Badge> : null}
                     {leaf.progress === 'started' ? <Badge variant="active">Started</Badge> : null}
@@ -231,7 +231,7 @@ export function HomeworkSheet() {
                 {checking ? 'Checking your work…' : data.handed_in_at ? 'Hand in again' : 'Hand in'}
               </Button>
               {unavailable ? (
-                <span className="text-sm text-ink-soft">This browser can’t run Python, so it can’t check your work.</span>
+                <span className="text-sm text-muted">This browser can’t run Python, so it can’t check your work.</span>
               ) : null}
             </div>
           ) : null}
@@ -252,11 +252,11 @@ export function HomeworkSheet() {
         <table className="w-full text-sm">
           <tbody>
             {(ready ?? []).map((row) => (
-              <tr key={row.attemptId} className="border-b border-ink/5 last:border-0">
-                <td className="py-1.5 pr-3 text-ink">{row.title}</td>
+              <tr key={row.attemptId} className="border-b border-line last:border-0">
+                <td className="py-1.5 pr-3 text-grape">{row.title}</td>
                 <td
                   className={`py-1.5 text-right ${
-                    row.started && row.total > 0 && row.passed === row.total ? 'text-sage' : 'text-ink-soft'
+                    row.started && row.total > 0 && row.passed === row.total ? 'text-good-ink' : 'text-muted'
                   }`}
                 >
                   {row.mcq
@@ -271,7 +271,7 @@ export function HomeworkSheet() {
             ))}
           </tbody>
         </table>
-        <p className="mt-3 text-ink-soft">
+        <p className="mt-3 text-muted">
           You can keep working and hand in again until your teacher gives it back.
         </p>
       </Dialog>

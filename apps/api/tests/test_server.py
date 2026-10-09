@@ -90,3 +90,52 @@ async def test_a_head_request_is_answered(dist: Path) -> None:
         response = await client.head("/")
     assert response.status_code == 200
     assert isolated(response)
+
+
+def on_domain(dist: Path):
+    return create_site(
+        dist,
+        canonical_host="yogucode.com",
+        redirect_hosts="www.yogucode.com, magikid-code.fly.dev",
+    )
+
+
+async def get_as(site, host: str, path: str) -> httpx.Response:
+    transport = httpx.ASGITransport(app=site)
+    async with httpx.AsyncClient(transport=transport, base_url=f"http://{host}") as client:
+        return await client.get(path)
+
+
+async def test_www_and_the_old_address_redirect_to_the_one_address(dist: Path) -> None:
+    """One host, because a child's cookie and a teacher's session both belong to one."""
+    site = on_domain(dist)
+    for host in ["www.yogucode.com", "magikid-code.fly.dev", "WWW.YOGUCODE.COM:443"]:
+        response = await get_as(site, host, "/classes/123?tab=roster")
+        assert response.status_code == 308, host
+        assert response.headers["location"] == "https://yogucode.com/classes/123?tab=roster"
+        assert isolated(response), "redirects carry the isolation headers too"
+
+
+async def test_a_post_is_redirected_as_a_post(dist: Path) -> None:
+    transport = httpx.ASGITransport(app=on_domain(dist))
+    async with httpx.AsyncClient(transport=transport, base_url="http://www.yogucode.com") as c:
+        response = await c.post("/api/join/lookup", json={"code": "x"})
+    assert response.status_code == 308, "308, not 301: a POST must not become a GET"
+
+
+async def test_a_redirect_cannot_leave_the_site(dist: Path) -> None:
+    response = await get_as(on_domain(dist), "www.yogucode.com", "//evil.example/x")
+    assert response.headers["location"].startswith("https://yogucode.com/")
+
+
+async def test_the_canonical_host_and_unlisted_hosts_are_served(dist: Path) -> None:
+    """Fly's health check reaches the machine by its private address, not by name."""
+    site = on_domain(dist)
+    for host in ["yogucode.com", "172.19.0.2:8080", "localhost"]:
+        assert (await get_as(site, host, "/")).status_code == 200, host
+        assert (await get_as(site, host, "/api/health")).json() == {"status": "ok"}, host
+
+
+async def test_no_redirect_without_a_canonical_host(dist: Path) -> None:
+    site = create_site(dist, canonical_host="", redirect_hosts="www.yogucode.com")
+    assert (await get_as(site, "www.yogucode.com", "/")).status_code == 200

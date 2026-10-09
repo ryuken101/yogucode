@@ -5,8 +5,8 @@
  * room — spec §1.2's whole problem. Homework grids answer "who hasn't done it" in one look.
  * Refresh to update; live updating is Phase 10.
  *
- * Tones follow the palette rule: sky while working, sage when done, muted for not started.
- * No rust anywhere — not having started is not an error.
+ * Tones follow the palette rule: grape while working, `good` when done, muted for not
+ * started. No error colour anywhere — not having started is not an error.
  */
 
 import { useQueryClient } from '@tanstack/react-query'
@@ -25,12 +25,12 @@ import { useClass, useClassHomework, useHomeworkGrid, useTodayGrid } from '../li
 type Status = Schemas['GridCellOut']['status']
 
 const CELL: Record<Status, { label: string; className: string }> = {
-  not_started: { label: '·', className: 'bg-cream text-ink-soft ring-ink-soft/20' },
-  started: { label: 'working', className: 'bg-sky-pale/60 text-ink ring-sky/40' },
-  passing: { label: '✓ passing', className: 'bg-sage/15 text-ink ring-sage/40' },
-  handed_in: { label: 'handed in', className: 'bg-sky-pale text-ink ring-sky' },
-  marked: { label: 'marked', className: 'bg-sage/15 text-ink ring-sage/40' },
-  returned: { label: 'given back', className: 'bg-sage/25 text-ink ring-sage/50' },
+  not_started: { label: '·', className: 'bg-cream text-muted ring-muted/20' },
+  started: { label: 'working', className: 'bg-grape-pale/60 text-grape ring-grape/25' },
+  passing: { label: '✓ passing', className: 'bg-good/15 text-grape ring-good/60' },
+  handed_in: { label: 'handed in', className: 'bg-grape-pale text-grape ring-grape' },
+  marked: { label: 'marked', className: 'bg-good/15 text-grape ring-good/60' },
+  returned: { label: 'given back', className: 'bg-good/25 text-grape ring-good/70' },
 }
 
 export function Cell({ cell, to }: { cell: Schemas['GridCellOut']; to?: string }) {
@@ -38,7 +38,7 @@ export function Cell({ cell, to }: { cell: Schemas['GridCellOut']; to?: string }
   const body = (
     <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs ring-1 ${className}`}>
       {label}
-      {cell.late ? <span className="text-amber">· late</span> : null}
+      {cell.late ? <span className="text-not-yet-ink">· late</span> : null}
     </span>
   )
   return to ? <Link to={to}>{body}</Link> : body
@@ -53,15 +53,15 @@ function Grid({
   linkFor?: (column: Schemas['GridColumnOut']) => string
   showFinished?: boolean
 }) {
-  if (grid.rows.length === 0) return <p className="text-sm text-ink-soft">Nobody in this class yet.</p>
+  if (grid.rows.length === 0) return <p className="text-sm text-muted">Nobody in this class yet.</p>
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr>
-            <th className="py-2 pr-4 text-left font-medium text-ink-soft">Student</th>
+            <th className="py-2 pr-4 text-left font-medium text-muted">Student</th>
             {grid.columns.map((column) => (
-              <th key={column.item_id} className="px-2 py-2 text-left font-medium text-ink-soft">
+              <th key={column.item_id} className="px-2 py-2 text-left font-medium text-muted">
                 <span className="flex items-center gap-1.5">
                   <Dots value={column.difficulty} />
                   {column.title}
@@ -73,9 +73,9 @@ function Grid({
         </thead>
         <tbody>
           {grid.rows.map((row) => (
-            <tr key={row.student_id} className="border-t border-ink/5">
+            <tr key={row.student_id} className="border-t border-line">
               <td className="py-1.5 pr-4">
-                <Link to={`/students/${row.student_id}`} className="text-ink hover:text-sky-deep">
+                <Link to={`/students/${row.student_id}`} className="text-grape hover:text-grape-deep hover:underline">
                   {row.display_name}
                 </Link>
               </td>
@@ -102,12 +102,12 @@ function HomeworkGrid({ homework }: { homework: Schemas['HomeworkOut'] }) {
   return (
     <Card className="mb-6">
       <div className="mb-3 flex flex-wrap items-center gap-3">
-        <h2 className="font-serif text-lg text-ink">{homework.title}</h2>
-        <span className="text-sm text-ink-soft">due {formatDue(homework.due_at)}</span>
-        <span className="text-sm text-ink-soft">
+        <h2 className="font-display font-semibold text-lg text-grape">{homework.title}</h2>
+        <span className="text-sm text-muted">due {formatDue(homework.due_at)}</span>
+        <span className="text-sm text-muted">
           {homework.handed_in}/{homework.students} handed in
         </span>
-        <Link to={`/assignments/${homework.id}/mark`} className="ml-auto text-sm text-sky-deep">
+        <Link to={`/assignments/${homework.id}/mark`} className="ml-auto text-sm text-grape-deep">
           Mark →
         </Link>
       </div>
@@ -146,12 +146,12 @@ export function Progress() {
       </PageHeader>
 
       <Card className="mb-6">
-        <h2 className="mb-3 font-serif text-lg text-ink">
+        <h2 className="mb-3 font-display font-semibold text-lg text-grape">
           Today{today.data?.title ? `: ${today.data.title}` : ''}
         </h2>
         {today.isPending ? <Spinner label="Loading" /> : null}
         {today.data && today.data.columns.length === 0 ? (
-          <p className="text-sm text-ink-soft">
+          <p className="text-sm text-muted">
             No ladder open today. Choose today’s lesson on the class page.
           </p>
         ) : null}

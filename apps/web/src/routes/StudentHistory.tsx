@@ -31,11 +31,11 @@ export function StudentHistory() {
       {history.data.homework.map((hw) => (
         <Card key={hw.assignment_id} className="mb-4">
           <div className="mb-2 flex flex-wrap items-center gap-3">
-            <h2 className="font-serif text-lg text-ink">{hw.title}</h2>
-            <span className="text-sm text-ink-soft">{hw.class_name}</span>
-            <span className="text-sm text-ink-soft">due {formatDue(hw.due_at)}</span>
+            <h2 className="font-display font-semibold text-lg text-grape">{hw.title}</h2>
+            <span className="text-sm text-muted">{hw.class_name}</span>
+            <span className="text-sm text-muted">due {formatDue(hw.due_at)}</span>
             {hw.handed_in_at ? (
-              <span className="text-sm text-ink-soft">handed in {formatDue(hw.handed_in_at)}</span>
+              <span className="text-sm text-muted">handed in {formatDue(hw.handed_in_at)}</span>
             ) : (
               <Badge variant="muted">not handed in</Badge>
             )}
@@ -43,7 +43,7 @@ export function StudentHistory() {
           </div>
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-ink-soft">
+              <tr className="text-left text-muted">
                 <th className="py-1 font-medium">Question</th>
                 <th className="py-1 font-medium">Correct</th>
                 <th className="py-1 font-medium">Approach</th>
@@ -52,10 +52,10 @@ export function StudentHistory() {
             </thead>
             <tbody>
               {hw.questions.map((q) => (
-                <tr key={q.title} className="border-t border-ink/5">
-                  <td className="py-1.5 text-ink">{q.title}</td>
-                  <td className="py-1.5 text-ink">{q.correct ?? '—'}</td>
-                  <td className="py-1.5 text-ink">{q.approach ?? '—'}</td>
+                <tr key={q.title} className="border-t border-line">
+                  <td className="py-1.5 text-grape">{q.title}</td>
+                  <td className="py-1.5 text-grape">{q.correct ?? '—'}</td>
+                  <td className="py-1.5 text-grape">{q.approach ?? '—'}</td>
                   <td className="py-1.5">
                     {q.correct !== null && !q.released ? <Badge variant="muted">not given back</Badge> : null}
                   </td>

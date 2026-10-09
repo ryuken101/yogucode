@@ -28,7 +28,7 @@ export function TestsEditor({ tests, onChange, results, disabled }: Props) {
   return (
     <div className="flex flex-col gap-3">
       {tests.map((test, index) => (
-        <div key={index} className="rounded-lg bg-cream/60 p-3 ring-1 ring-ink/10">
+        <div key={index} className="rounded-lg bg-cream/60 p-3 ring-1 ring-line">
           <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
             <TextInput
               label="Name a student will see"
@@ -49,7 +49,7 @@ export function TestsEditor({ tests, onChange, results, disabled }: Props) {
               <option value="io">prints</option>
               <option value="function">returns</option>
             </Select>
-            <label className="flex items-end gap-2 pb-2 text-sm text-ink">
+            <label className="flex items-end gap-2 pb-2 text-sm text-grape">
               <input
                 type="checkbox"
                 checked={test.hidden}

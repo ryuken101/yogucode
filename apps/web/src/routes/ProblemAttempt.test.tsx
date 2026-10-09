@@ -94,7 +94,7 @@ function renderAttempt() {
   )
 }
 
-test('check shows how many pass, in sage and amber, and reports the result', async () => {
+test('check shows how many pass, in good and not-yet, and reports the result', async () => {
   check.mockResolvedValue({
     compile_error: null,
     results: [
@@ -111,8 +111,8 @@ test('check shows how many pass, in sage and amber, and reports the result', asy
     expect.arrayContaining([expect.objectContaining({ name: 'secret', hidden: true })]),
   )
   const failing = screen.getByText(/○/).closest('div')!
-  expect(failing.className).toContain('amber')
-  expect(failing.className).not.toContain('rust')
+  expect(failing.className).toContain('not-yet')
+  expect(failing.className).not.toContain('system-error')
   await waitFor(() => expect(runs).toEqual([{ passed: 1, total: 2 }]))
 })
 
@@ -125,7 +125,7 @@ test('a syntax error is "not yet", with what Python said', async () => {
   await user.click(await screen.findByRole('button', { name: 'Check' }))
 
   const notice = await screen.findByText(/was never closed/)
-  expect(notice.className).toContain('amber')
+  expect(notice.className).toContain('not-yet')
 })
 
 test('the hint waits for a run, then opens', async () => {
@@ -142,7 +142,7 @@ test('the hint waits for a run, then opens', async () => {
   expect(await screen.findByText('Lists have a method for this.')).toBeInTheDocument()
 })
 
-test('a refused hint says why, in amber', async () => {
+test('a refused hint says why, in not-yet', async () => {
   server.use(
     http.post(`/api/me/attempts/${ATTEMPT}/hints`, () =>
       HttpResponse.json({ detail: 'Not yet — try running your code.' }, { status: 409 }),
@@ -153,7 +153,7 @@ test('a refused hint says why, in amber', async () => {
   await user.click(screen.getByRole('button', { name: 'Get a hint' }))
 
   const message = await screen.findByText('Not yet — try running your code.')
-  expect(message.className).toContain('amber')
+  expect(message.className).toContain('not-yet')
 })
 
 test('typing saves the attempt', async () => {

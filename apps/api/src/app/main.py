@@ -20,7 +20,7 @@ from app.routers import (
     student_work,
 )
 
-app = FastAPI(title="Coding-teaching-tool API")
+app = FastAPI(title="Yogucode API")
 
 app.include_router(auth.router)
 app.include_router(centres.router)

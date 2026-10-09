@@ -153,8 +153,8 @@ test('a failing solution keeps publish shut and is shown as not-yet, not as an e
   await screen.findByText('The solution does not pass every check yet.')
   expect(screen.getByRole('button', { name: 'Publish' })).toBeDisabled()
   const line = screen.getByText(/○/).closest('div')!
-  expect(line.className).toContain('amber')
-  expect(line.className).not.toContain('rust')
+  expect(line.className).toContain('not-yet')
+  expect(line.className).not.toContain('system-error')
   expect(within(line).getByText('[1, 2, 3]')).toBeInTheDocument()
 })
 

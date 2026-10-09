@@ -74,7 +74,7 @@ test('the form clears after a successful create, ready for the next one', async 
   expect(screen.getByLabelText('Term (optional)')).toHaveValue('')
 })
 
-test('a rejected create is amber — the teacher can fix the name', async () => {
+test('a rejected create is not-yet — the teacher can fix the name', async () => {
   server.use(
     http.post('/api/classes', () =>
       HttpResponse.json(
@@ -94,6 +94,6 @@ test('a rejected create is amber — the teacher can fix the name', async () => 
   await user.click(screen.getByRole('button', { name: 'Create class' }))
 
   const message = await screen.findByText(/at least 1 character/)
-  expect(message.className).toContain('amber')
-  expect(message.className).not.toContain('rust')
+  expect(message.className).toContain('not-yet')
+  expect(message.className).not.toContain('system-error')
 })

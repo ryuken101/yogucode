@@ -19,15 +19,15 @@ vi.mock('../runtime/usePython', () => ({
   usePython: () => ({ state: { status: 'idle' }, output: [], check: vi.fn(), run: vi.fn(), stop: vi.fn(), answer: vi.fn() }),
 }))
 
-test('a chosen answer is sky, never sage or amber, and saves', async () => {
+test('a chosen answer is grape, never good or not-yet, and saves', async () => {
   const chosen: number[] = []
   render(<McqAttempt options={['[0, 1, 2, 3, 4]', '[1, 2, 3, 4, 5]']} initial={null} onChoose={async (c) => void chosen.push(c)} />)
   await userEvent.click(screen.getByRole('radio', { name: '[1, 2, 3, 4, 5]' }))
 
   const picked = screen.getByRole('radio', { name: '[1, 2, 3, 4, 5]' })
   expect(picked).toHaveAttribute('aria-checked', 'true')
-  expect(picked.className).toContain('sky')
-  expect(document.body.innerHTML).not.toMatch(/sage|amber|rust/)
+  expect(picked.className).toContain('grape')
+  expect(document.body.innerHTML).not.toMatch(/-good|not-yet|system-error/)
   expect(chosen).toEqual([1])
 })
 

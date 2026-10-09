@@ -16,6 +16,7 @@
     "prebuild": "npm run pyodide"
   },
   "dependencies": {
+    "@fontsource-variable/fredoka": "^5.3.0",
     "@supabase/supabase-js": "^2.117.2",
     "@tanstack/react-query": "^5.104.0",
     "monaco-editor": "^0.57.0",

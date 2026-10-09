@@ -11,6 +11,7 @@
  */
 
 import { Link, useLocation, useParams } from 'react-router'
+import { CupMark } from '../components/Brand'
 import { Button } from '../components/Button'
 import { Card, PageHeader } from '../components/Card'
 import { Notice } from '../components/Notice'
@@ -37,7 +38,7 @@ export function SlipSheet() {
             — not even us — can read them back. Issue new ones if you need them.
           </Notice>
           <div className="mt-4">
-            <Link to={`/classes/${classId}`} className="text-sky-deep underline">
+            <Link to={`/classes/${classId}`} className="text-grape-deep underline">
               Back to the class
             </Link>
           </div>
@@ -56,7 +57,7 @@ export function SlipSheet() {
           </Button>
           <Link
             to={`/classes/${classId}`}
-            className="rounded-lg px-4 py-2 text-sm text-ink-soft hover:text-ink"
+            className="rounded-lg px-4 py-2 text-sm text-muted hover:text-grape"
           >
             Done
           </Link>
@@ -73,27 +74,30 @@ export function SlipSheet() {
         {state.slips.map((slip) => (
           <div
             key={slip.student_id}
-            className="rounded-lg border border-dashed border-ink-soft/50 bg-paper p-4 print:break-inside-avoid"
+            className="rounded-2xl border-2 border-dashed border-grape/20 bg-surface p-4 print:break-inside-avoid"
           >
-            <p className="font-serif text-lg text-ink">{slip.display_name}</p>
-            <dl className="mt-2 text-sm text-ink">
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-display font-semibold text-lg text-grape">{slip.display_name}</p>
+              <CupMark size={28} />
+            </div>
+            <dl className="mt-2 text-sm text-grape">
               {/* The one thing a child is told to type (Ken's decision): the address. */}
               <div className="flex gap-2">
-                <dt className="text-ink-soft">Go to</dt>
+                <dt className="text-muted">Go to</dt>
                 <dd className="font-mono">{host}</dd>
               </div>
               <div className="flex gap-2">
-                <dt className="text-ink-soft">Class</dt>
+                <dt className="text-muted">Class</dt>
                 <dd className="font-mono">{state.className}</dd>
               </div>
               {state.joinCode ? (
                 <div className="flex gap-2">
-                  <dt className="text-ink-soft">Code</dt>
+                  <dt className="text-muted">Code</dt>
                   <dd className="font-mono tracking-widest">{state.joinCode}</dd>
                 </div>
               ) : null}
               <div className="flex gap-2">
-                <dt className="text-ink-soft">PIN</dt>
+                <dt className="text-muted">PIN</dt>
                 <dd className="font-mono text-xl tracking-[0.3em]">{slip.pin}</dd>
               </div>
             </dl>

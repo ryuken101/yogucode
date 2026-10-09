@@ -109,13 +109,13 @@ function ProblemRow({
     <li>
       <Link
         to={`/problems/${problem.id}`}
-        className="flex flex-wrap items-center gap-3 rounded-xl bg-paper px-5 py-3 ring-1 ring-ink/10 hover:ring-sky"
+        className="flex flex-wrap items-center gap-3 rounded-2xl bg-surface px-5 py-3 ring-1 ring-line hover:ring-grape"
       >
         <Dots value={problem.difficulty} />
-        <span className="font-medium text-ink">{problem.title}</span>
+        <span className="font-medium text-grape">{problem.title}</span>
         {problem.kind === 'mcq' ? <Badge variant="muted">Multiple choice</Badge> : null}
         {problem.part_labels.length ? (
-          <span className="text-xs text-ink-soft">parts {problem.part_labels.join(', ')}</span>
+          <span className="text-xs text-muted">parts {problem.part_labels.join(', ')}</span>
         ) : null}
         <span className="flex flex-wrap gap-1">
           {main ? <Badge variant="active">★ {main}</Badge> : null}
@@ -125,7 +125,7 @@ function ProblemRow({
             </Badge>
           ))}
         </span>
-        <span className="ml-auto flex items-center gap-2 text-xs text-ink-soft">
+        <span className="ml-auto flex items-center gap-2 text-xs text-muted">
           {problem.test_count} check{problem.test_count === 1 ? '' : 's'}
           {problem.status === 'draft' ? <Badge variant="not-yet">Draft</Badge> : null}
           {problem.status === 'published' ? <Badge variant="good">Published</Badge> : null}

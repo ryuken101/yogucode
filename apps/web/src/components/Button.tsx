@@ -15,10 +15,10 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react'
 type Variant = 'primary' | 'secondary' | 'quiet'
 
 const VARIANTS: Record<Variant, string> = {
-  primary: 'bg-sky text-paper hover:bg-sky-deep focus-visible:outline-sky-deep',
+  primary: 'bg-grape text-surface hover:bg-grape-deep focus-visible:outline-grape-deep',
   secondary:
-    'bg-paper text-ink ring-1 ring-ink/15 hover:bg-cream focus-visible:outline-sky-deep',
-  quiet: 'bg-transparent text-ink-soft hover:text-ink hover:bg-cream focus-visible:outline-sky-deep',
+    'bg-surface text-grape ring-1 ring-grape/20 hover:bg-cream focus-visible:outline-grape-deep',
+  quiet: 'bg-transparent text-muted hover:text-grape hover:bg-cream focus-visible:outline-grape-deep',
 }
 
 interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -30,7 +30,7 @@ export function Button({ variant = 'secondary', className = '', children, ...res
   return (
     <button
       {...rest}
-      className={`inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${VARIANTS[variant]} ${className}`}
+      className={`inline-flex items-center justify-center rounded-2xl px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${VARIANTS[variant]} ${className}`}
     >
       {children}
     </button>

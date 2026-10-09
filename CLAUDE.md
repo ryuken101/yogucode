@@ -4,9 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A classroom platform for after-school coding academies — hosted Python editors, problem
-sets, quizzes, per-concept mastery tracking. First customer is Magikid Castle Hill's
-Year 4–6 Python class.
+**Yogucode** (yogucode.com) — a classroom platform for after-school coding academies:
+hosted Python editors, problem sets, quizzes, per-concept mastery tracking. First customer
+is Magikid Castle Hill's Year 4–6 Python class. Yogucode is the product; the centre (a
+customer) keeps its own name in `CENTRE_NAME`.
 
 Two documents drive the work and both are worth reading before a substantial change:
 
@@ -125,9 +126,11 @@ setup cost, not something to discover from intermittent failures.
 
 ### Frontend
 
-**Never red for a student's incorrect answer** — amber means "not yet", sage means
-correct, rust is reserved for system errors. The rest of the frontend conventions live
-in `apps/web/CLAUDE.md`, which loads when working under that directory.
+The look is the Yogucode brand (Ken's choice, 10 Oct 2026; it supersedes spec §8's sky and
+cream). **Never red for a student's incorrect answer** — `not-yet` (lemon) means "not yet",
+`good` (mint) means correct, `system-error` (raspberry) is reserved for system errors, and
+strawberry — the brand accent — is never a student's state. The rest of the frontend
+conventions live in `apps/web/CLAUDE.md`, which loads when working under that directory.
 
 ### Production: one app
 
@@ -145,6 +148,13 @@ in-memory hubs — deploy with `--ha=false` and keep `fly scale count 1`. Every 
 A new table's migration must enable it. Secrets (`DATABASE_URL`, `SUPABASE_URL`,
 `TEACHER_EMAIL_ALLOWLIST`) are Fly secrets that Ken sets himself; they never go in the repo
 or in a chat.
+
+**One public address: yogucode.com.** `CanonicalHost` in `app/server.py` 308s the hosts in
+`REDIRECT_HOSTS` (www, the old fly.dev name) to `CANONICAL_HOST`, because sessions are
+per host. It only redirects listed hosts — Fly's health check arrives by private IP and
+must keep reaching the app. Auth emails come from `no-reply@yogucode.com` through Resend
+as Supabase's SMTP (dashboard settings, no code); templates are in `docs/email-templates/`.
+The README's "Domain and email" section has the DNS steps.
 
 ## Keeping the README current
 

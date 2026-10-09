@@ -1,8 +1,8 @@
 /**
  * Answering a multiple-choice question.
  *
- * The chosen answer is shown in sky — "this is the one you picked" — and never in sage or
- * amber: colouring it would tell the child whether they were right, which is the
+ * The chosen answer is shown in grape — "this is the one you picked" — and never in `good`
+ * or `not-yet`: colouring it would tell the child whether they were right, which is the
  * teacher's to say when the work is given back. The choice saves as soon as it is made,
  * and can be changed until the work is handed in or the quiz ends.
  */
@@ -40,8 +40,8 @@ export function McqAttempt({ options, initial, onChoose, disabled = false }: Pro
                 setFailed(true)
               })
             }}
-            className={`rounded-xl px-4 py-3 text-left font-mono text-base ring-1 transition disabled:cursor-not-allowed ${
-              chosen === index ? 'bg-sky-pale ring-2 ring-sky' : 'bg-paper ring-ink/15 hover:ring-sky'
+            className={`rounded-2xl px-4 py-3 text-left font-mono text-base ring-1 transition disabled:cursor-not-allowed ${
+              chosen === index ? 'bg-grape-pale ring-2 ring-grape' : 'bg-surface ring-grape/20 hover:ring-grape'
             }`}
           >
             {text}

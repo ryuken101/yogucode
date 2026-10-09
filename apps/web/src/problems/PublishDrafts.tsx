@@ -81,7 +81,7 @@ export function PublishDrafts({ drafts }: { drafts: Schemas['ProblemSummaryOut']
             ? `Checking ${outcomes.length + 1} of ${drafts.length}…`
             : `Check & publish ${drafts.length} draft${drafts.length === 1 ? '' : 's'}`}
         </Button>
-        <span className="text-sm text-ink-soft">
+        <span className="text-sm text-muted">
           {unavailable
             ? 'Python is not available in this browser.'
             : 'Each solution is run against its checks here; only the ones that pass are published.'}
@@ -94,10 +94,10 @@ export function PublishDrafts({ drafts }: { drafts: Schemas['ProblemSummaryOut']
               <Badge variant={outcome.published ? 'good' : 'not-yet'}>
                 {outcome.published ? 'Published' : 'Still a draft'}
               </Badge>
-              <Link to={`/problems/${outcome.id}`} className="text-ink hover:text-sky-deep">
+              <Link to={`/problems/${outcome.id}`} className="text-grape hover:text-grape-deep hover:underline">
                 {outcome.title}
               </Link>
-              {outcome.reason ? <span className="text-ink-soft">— {outcome.reason}</span> : null}
+              {outcome.reason ? <span className="text-muted">— {outcome.reason}</span> : null}
             </li>
           ))}
         </ul>

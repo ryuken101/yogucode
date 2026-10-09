@@ -7,8 +7,9 @@
  * across terms; getting the third wrong merges two children's records. So the preview
  * writes nothing, and the teacher sees the verdicts before anything happens.
  *
- * Colour follows §8 rather than instinct. A mis-paste is not a system error, so nothing
- * here is rust: rows that will act are sage, rows needing a decision are amber.
+ * Colour follows the palette rule rather than instinct. A mis-paste is not a system
+ * error, so nothing here is system-error: rows that will act are `good`, rows needing a
+ * decision are `not-yet`.
  */
 
 import { useState } from 'react'
@@ -138,7 +139,7 @@ export function BulkPasteDialog({
             onChange={(event) => setNames(event.target.value)}
             placeholder={'Aiden C\nBella N\nChen W'}
           />
-          <p className="text-xs text-ink-soft">
+          <p className="text-xs text-muted">
             A first name and a last initial is enough — it is all we store. Nothing is
             added until you have seen what this will do.
           </p>
@@ -160,13 +161,13 @@ export function BulkPasteDialog({
                   key={`${entry.line}-${index}`}
                   className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-cream px-3 py-2"
                 >
-                  <span className="text-sm text-ink">{entry.display_name || entry.raw}</span>
+                  <span className="text-sm text-grape">{entry.display_name || entry.raw}</span>
                   <Badge variant={verdict.tone === 'muted' ? 'muted' : verdict.tone}>
                     {verdict.label}
                   </Badge>
                   {entry.action === 'ambiguous' ? (
                     <select
-                      className="w-full rounded-lg bg-paper px-2 py-1 text-sm ring-1 ring-amber/40"
+                      className="w-full rounded-lg bg-surface px-2 py-1 text-sm ring-1 ring-not-yet"
                       value={chosen[index] ?? ''}
                       onChange={(event) =>
                         setChosen((prev) => ({ ...prev, [index]: event.target.value }))
@@ -181,7 +182,7 @@ export function BulkPasteDialog({
                     </select>
                   ) : null}
                   {entry.reason && entry.action !== 'ambiguous' ? (
-                    <span className="w-full text-xs text-ink-soft">{entry.reason}</span>
+                    <span className="w-full text-xs text-muted">{entry.reason}</span>
                   ) : null}
                 </li>
               )

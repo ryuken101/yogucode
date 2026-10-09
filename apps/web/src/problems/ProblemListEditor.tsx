@@ -43,16 +43,16 @@ export function ProblemListEditor({ rows, onChange, empty, limit = 12, disabled 
   return (
     <div className="flex flex-col gap-3">
       {rows.length === 0 ? (
-        <p className="text-sm text-ink-soft">{empty}</p>
+        <p className="text-sm text-muted">{empty}</p>
       ) : (
         <ol className="flex flex-col gap-1.5">
           {rows.map((row, index) => (
             <li
               key={row.id}
-              className="flex flex-wrap items-center gap-2 rounded-lg bg-cream/60 px-3 py-2 ring-1 ring-ink/10"
+              className="flex flex-wrap items-center gap-2 rounded-lg bg-cream/60 px-3 py-2 ring-1 ring-line"
             >
               <Dots value={row.difficulty} />
-              <span className="text-ink">{row.title}</span>
+              <span className="text-grape">{row.title}</span>
               {row.newerVersionId && !disabled ? (
                 <Button
                   variant="quiet"

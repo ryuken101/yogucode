@@ -237,7 +237,7 @@ export function lockedOut() {
   )
 }
 
-/** The API unreachable, which is the only case allowed to show rust. */
+/** The API unreachable, which is the only case allowed to show system-error. */
 export function unreachable() {
   return http.post('/api/join/lookup', () => HttpResponse.error())
 }

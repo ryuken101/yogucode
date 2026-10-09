@@ -17,7 +17,9 @@
 import { useEffect } from 'react'
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
+import { CupMark } from '../components/Brand'
 import { Button } from '../components/Button'
+import { navPill } from '../components/navPill'
 import { Spinner } from '../components/Spinner'
 import { closeStudentLive, studentLive } from '../collab/socket'
 import { api } from '../lib/api'
@@ -74,13 +76,14 @@ export function RequireStudent() {
 
   return (
     <div className="flex h-dvh flex-col bg-cream">
-      <header className="flex shrink-0 items-center justify-between border-b border-ink/10 px-4 py-2">
-        <div className="flex items-center gap-5">
-          <p className="text-sm text-ink">
+      <header className="flex shrink-0 items-center justify-between border-b border-line bg-surface px-4 py-2">
+        <div className="flex items-center gap-4">
+          <CupMark size={28} />
+          <p className="text-sm text-grape">
             <span className="font-medium">{me.display_name}</span>
-            <span className="text-ink-soft"> · {me.class_name}</span>
+            <span className="text-muted"> · {me.class_name}</span>
           </p>
-          <nav className={`flex gap-4 text-sm ${quiz ? 'invisible' : ''}`}>
+          <nav className={`flex gap-1 text-sm ${quiz ? 'invisible' : ''}`}>
             {[
               ['/home', 'Today'],
               ['/work', 'My files'],
@@ -88,7 +91,7 @@ export function RequireStudent() {
               <NavLink
                 key={to}
                 to={to}
-                className={({ isActive }) => (isActive ? 'text-sky-deep' : 'text-ink-soft hover:text-ink')}
+                className={navPill}
               >
                 {label}
               </NavLink>

@@ -28,11 +28,11 @@ export function McqEditor({ options, onChange, disabled }: Props) {
 
   return (
     <fieldset disabled={disabled} className="flex flex-col gap-3">
-      <legend className="mb-1 text-sm font-medium text-ink">Options</legend>
+      <legend className="mb-1 text-sm font-medium text-grape">Options</legend>
       {options.map((option, index) => (
-        <div key={index} className="rounded-lg bg-cream/60 p-3 ring-1 ring-ink/10">
+        <div key={index} className="rounded-lg bg-cream/60 p-3 ring-1 ring-line">
           <div className="flex items-center gap-3">
-            <label className="flex items-center gap-1.5 text-sm text-ink">
+            <label className="flex items-center gap-1.5 text-sm text-grape">
               <input
                 type="radio"
                 name="correct-option"
@@ -46,7 +46,7 @@ export function McqEditor({ options, onChange, disabled }: Props) {
               value={option.text}
               onChange={(e) => update(index, { text: e.target.value })}
               placeholder={`Option ${index + 1}`}
-              className="flex-1 rounded-lg bg-paper px-3 py-1.5 font-mono text-sm text-ink ring-1 ring-ink/15"
+              className="flex-1 rounded-lg bg-surface px-3 py-1.5 font-mono text-sm text-grape ring-1 ring-grape/20"
             />
             {disabled ? null : (
               <Button variant="quiet" onClick={() => onChange(options.filter((_, i) => i !== index))}>
@@ -60,7 +60,7 @@ export function McqEditor({ options, onChange, disabled }: Props) {
               value={option.misconception ?? ''}
               onChange={(e) => update(index, { misconception: e.target.value || null })}
               placeholder="Who picks this? e.g. “thinks range includes the end”"
-              className="mt-2 w-full rounded-lg bg-paper px-3 py-1.5 text-sm text-ink ring-1 ring-ink/15"
+              className="mt-2 w-full rounded-lg bg-surface px-3 py-1.5 text-sm text-grape ring-1 ring-grape/20"
             />
           )}
         </div>

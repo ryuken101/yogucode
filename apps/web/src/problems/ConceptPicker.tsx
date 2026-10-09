@@ -29,7 +29,7 @@ export function ConceptPicker({ concepts, selected, primary, onChange, disabled 
 
   return (
     <fieldset disabled={disabled}>
-      <legend className="mb-1.5 text-sm font-medium text-ink">Concepts</legend>
+      <legend className="mb-1.5 text-sm font-medium text-grape">Concepts</legend>
       <div className="flex flex-wrap gap-1.5">
         {concepts.map((concept) => {
           const on = selected.includes(concept.id)
@@ -38,14 +38,14 @@ export function ConceptPicker({ concepts, selected, primary, onChange, disabled 
             <span
               key={concept.id}
               className={`inline-flex items-center rounded-full text-xs ring-1 ${
-                on ? 'bg-sky-pale ring-sky' : 'bg-paper ring-ink/15'
+                on ? 'bg-grape-pale ring-grape' : 'bg-surface ring-grape/20'
               }`}
             >
               <button
                 type="button"
                 aria-pressed={on}
                 onClick={() => toggle(concept.id)}
-                className="px-2.5 py-1 text-ink"
+                className="px-2.5 py-1 text-grape"
               >
                 {concept.label}
               </button>
@@ -55,7 +55,7 @@ export function ConceptPicker({ concepts, selected, primary, onChange, disabled 
                   aria-label={`Make ${concept.label} the main concept`}
                   aria-pressed={main}
                   onClick={() => onChange(selected, concept.id)}
-                  className={`pr-2 ${main ? 'text-sky-deep' : 'text-ink-soft/50 hover:text-ink-soft'}`}
+                  className={`pr-2 ${main ? 'text-grape-deep' : 'text-muted/50 hover:text-muted'}`}
                 >
                   ★
                 </button>
@@ -65,7 +65,7 @@ export function ConceptPicker({ concepts, selected, primary, onChange, disabled 
         })}
       </div>
       {selected.length > 0 ? (
-        <p className="mt-1.5 text-xs text-ink-soft">★ marks the main concept.</p>
+        <p className="mt-1.5 text-xs text-muted">★ marks the main concept.</p>
       ) : null}
     </fieldset>
   )

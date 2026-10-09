@@ -50,11 +50,11 @@ test('a reload says the PINs are gone rather than spinning forever', () => {
   expect(screen.queryByRole('status', { name: /loading/i })).not.toBeInTheDocument()
 })
 
-test('the warning is amber, because reissuing is a fix and not a fault', () => {
+test('the warning is not-yet, because reissuing is a fix and not a fault', () => {
   renderAt(null)
   const notice = screen.getByText(/can’t be shown again/i)
-  expect(notice.className).toContain('amber')
-  expect(notice.className).not.toContain('rust')
+  expect(notice.className).toContain('not-yet')
+  expect(notice.className).not.toContain('system-error')
 })
 
 test('a slip tells the child which address to type', () => {

@@ -1,7 +1,7 @@
 /**
  * The join flow — the one screen a nine-year-old uses unaided.
  *
- * The colour assertions here are not decoration. product-spec §8: "never red for a
+ * The colour assertions here are not decoration. The palette rule: "never red for a
  * student's incorrect answer." Every other product colours a wrong password red, so this
  * is the convention most likely to be broken by reflex, and a test is the only thing that
  * will notice.
@@ -53,7 +53,7 @@ test('the class code never reaches the URL', async () => {
   expect(window.location.href).not.toContain(CODE)
 })
 
-test('a wrong PIN is amber and never rust', async () => {
+test('a wrong PIN is not-yet and never system-error', async () => {
   const { user } = renderJoin()
   await reachThePinStep(user)
 
@@ -61,9 +61,9 @@ test('a wrong PIN is amber and never rust', async () => {
   await user.click(screen.getByRole('button', { name: 'Start' }))
 
   const message = await screen.findByText(/try again/i)
-  expect(message.className).toContain('amber')
-  expect(message.className).not.toContain('rust')
-  expect(document.body.innerHTML).not.toContain('rust')
+  expect(message.className).toContain('not-yet')
+  expect(message.className).not.toContain('system-error')
+  expect(document.body.innerHTML).not.toContain('system-error')
 })
 
 test('a wrong PIN clears the box so the next try starts clean', async () => {
@@ -77,7 +77,7 @@ test('a wrong PIN clears the box so the next try starts clean', async () => {
   expect(screen.getByLabelText('Your 4-digit PIN')).toHaveValue('')
 })
 
-test('a lockout is amber too, and tells the child what to do', async () => {
+test('a lockout is not-yet too, and tells the child what to do', async () => {
   server.use(lockedOut())
   const { user } = renderJoin()
   await reachThePinStep(user)
@@ -86,8 +86,8 @@ test('a lockout is amber too, and tells the child what to do', async () => {
   await user.click(screen.getByRole('button', { name: 'Start' }))
 
   const message = await screen.findByText(/ask your teacher/i)
-  expect(message.className).toContain('amber')
-  expect(document.body.innerHTML).not.toContain('rust')
+  expect(message.className).toContain('not-yet')
+  expect(document.body.innerHTML).not.toContain('system-error')
 })
 
 test('a child with no PIN yet is listed but not selectable', async () => {
@@ -106,17 +106,17 @@ test('a wrong code is something to fix, not a system error', async () => {
   await user.click(screen.getByRole('button', { name: 'Next' }))
 
   const message = await screen.findByText(/couldn’t find that code/i)
-  expect(message.className).toContain('amber')
-  expect(message.className).not.toContain('rust')
+  expect(message.className).toContain('not-yet')
+  expect(message.className).not.toContain('system-error')
 })
 
-test('an unreachable server is the one case that shows rust', async () => {
+test('an unreachable server is the one case that shows system-error', async () => {
   server.use(unreachable())
   const { user } = renderJoin()
   await user.type(screen.getByLabelText('Class code'), CODE)
   await user.click(screen.getByRole('button', { name: 'Next' }))
 
   const message = await screen.findByRole('alert')
-  expect(message.className).toContain('rust')
+  expect(message.className).toContain('system-error')
   expect(message.textContent).toMatch(/could not reach the server/i)
 })

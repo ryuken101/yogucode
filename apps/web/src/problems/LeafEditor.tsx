@@ -38,10 +38,10 @@ function CodeBox({
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <p className="text-sm font-medium text-ink">
-        {label} <span className="font-normal text-ink-soft">— {hint}</span>
+      <p className="text-sm font-medium text-grape">
+        {label} <span className="font-normal text-muted">— {hint}</span>
       </p>
-      <div className="h-48 overflow-hidden rounded-lg ring-1 ring-ink/20">
+      <div className="h-48 overflow-hidden rounded-lg ring-1 ring-grape/25">
         <CodeSurface value={value} onChange={onChange} readOnly={readOnly} autoFocus={false} />
       </div>
     </div>
@@ -53,7 +53,7 @@ export function LeafEditor({ editorKey, leaf, onChange, concepts, results, disab
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-start gap-6">
         <div>
-          <p className="mb-1.5 text-sm font-medium text-ink">Difficulty</p>
+          <p className="mb-1.5 text-sm font-medium text-grape">Difficulty</p>
           <DotsPicker
             value={leaf.difficulty}
             disabled={disabled}
@@ -93,7 +93,7 @@ export function LeafEditor({ editorKey, leaf, onChange, concepts, results, disab
       </div>
 
       <section>
-        <h3 className="mb-2 font-serif text-lg text-ink">Checks</h3>
+        <h3 className="mb-2 font-display font-semibold text-lg text-grape">Checks</h3>
         <TestsEditor
           tests={leaf.tests ?? []}
           results={results}
@@ -103,7 +103,7 @@ export function LeafEditor({ editorKey, leaf, onChange, concepts, results, disab
       </section>
 
       <section>
-        <h3 className="mb-2 font-serif text-lg text-ink">Hints</h3>
+        <h3 className="mb-2 font-display font-semibold text-lg text-grape">Hints</h3>
         <HintsEditor
           hints={leaf.hints ?? []}
           disabled={disabled}

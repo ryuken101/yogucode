@@ -5,8 +5,8 @@
  * last in — which is product-spec §3.1's actual promise: "work persists across sessions,
  * no lost files between weeks."
  *
- * Both panels are dark, a deliberately *considered* dark built from the §8 palette rather
- * than VS Code's, which is what §8 asks for. The page stays cream around them.
+ * Both panels are dark, a deliberately *considered* dark — the brand's `night` rather than
+ * VS Code's. The page stays cream around them.
  *
  * This is free coding — "write a program that prints your name". Problems, with their
  * checks and hints, live in `ProblemAttempt` and save to attempts rather than to files.
@@ -124,16 +124,16 @@ export function Work() {
         </Button>
         {loading ? <Spinner label={state.detail} /> : null}
         {state.status === 'asking' ? (
-          <span className="text-sm text-amber">Your program is waiting for you to type.</span>
+          <span className="text-sm text-not-yet-ink">Your program is waiting for you to type.</span>
         ) : null}
-        <span className="ml-auto text-xs text-ink-soft" aria-live="polite">
+        <span className="ml-auto text-xs text-muted" aria-live="polite">
           {autosave.state === 'saving' ? 'Saving…' : null}
           {autosave.state === 'saved' ? 'Saved' : null}
         </span>
       </div>
 
       {/* A failed save is the one thing here that is genuinely our problem rather than
-          something the child did, so it is the one thing allowed to be rust. */}
+          something the child did, so it is the one thing allowed to be system-error. */}
       {autosave.state === 'failed' ? (
         <Notice tone="system-error">
           Your work is not saving. Tell your teacher — you may need to sign in again.
@@ -141,7 +141,7 @@ export function Work() {
       ) : null}
 
       {/* Two live files cannot share a name — the API refuses with a 409 and a sentence
-          written for a child. Amber, not rust: renaming to something else fixes it, so it
+          written for a child. Not-yet, not system-error: renaming to something else fixes it, so it
           is "not yet" rather than a fault. Without this the tab simply reverted and
           nothing explained why. TanStack clears the error on the next attempt. */}
       {rename.error ? <Notice tone="not-yet">{messageFor(rename.error)}</Notice> : null}
@@ -168,9 +168,9 @@ export function Work() {
 
       {/* The editor gets roughly two thirds; the terminal is legible at a third and grows
           when there is room. min-h-0 is what lets both scroll instead of overflowing. */}
-      <div className="min-h-0 flex-[2] overflow-hidden rounded-b-lg rounded-tr-lg ring-1 ring-ink/20">
+      <div className="min-h-0 flex-[2] overflow-hidden rounded-b-lg rounded-tr-lg ring-1 ring-grape/25">
         {active.isPending && activeId ? (
-          <div className="flex h-full items-center justify-center bg-ink-deep">
+          <div className="flex h-full items-center justify-center bg-night">
             <Spinner label="Opening your file" />
           </div>
         ) : (

@@ -72,7 +72,7 @@ export function ProblemImport() {
       <PageHeader title="Import problems" />
       <Card className="mb-6">
         <div className="flex flex-col gap-3">
-          <label className="text-sm text-ink">
+          <label className="text-sm text-grape">
             <span className="mb-1.5 block font-medium">Choose a .yaml file…</span>
             <input
               type="file"
@@ -101,7 +101,7 @@ export function ProblemImport() {
               Import {changes || ''} problem{changes === 1 ? '' : 's'}
             </Button>
           </div>
-          <p className="text-xs text-ink-soft">
+          <p className="text-xs text-muted">
             The format is described at the top of <code>seed/starter-problems.yaml</code>.
             Nothing is published by importing.
           </p>
@@ -136,15 +136,15 @@ export function ProblemImport() {
       {entries.length > 0 ? (
         <ul className="flex flex-col gap-2">
           {entries.map((entry) => (
-            <li key={entry.key} className="rounded-xl bg-paper px-5 py-3 ring-1 ring-ink/10">
+            <li key={entry.key} className="rounded-2xl bg-surface px-5 py-3 ring-1 ring-line">
               <div className="flex flex-wrap items-center gap-3">
                 <Badge variant={ACTION[entry.action].variant}>{ACTION[entry.action].label}</Badge>
-                <span className="font-medium text-ink">{entry.title}</span>
-                <code className="text-xs text-ink-soft">{entry.key}</code>
+                <span className="font-medium text-grape">{entry.title}</span>
+                <code className="text-xs text-muted">{entry.key}</code>
               </div>
-              {entry.error ? <p className="mt-1 text-sm text-ink">{entry.error}</p> : null}
+              {entry.error ? <p className="mt-1 text-sm text-grape">{entry.error}</p> : null}
               {entry.publish_problems.length ? (
-                <ul className="mt-1 list-disc pl-5 text-sm text-ink-soft">
+                <ul className="mt-1 list-disc pl-5 text-sm text-muted">
                   {entry.publish_problems.map((gap) => (
                     <li key={gap}>{gap}</li>
                   ))}

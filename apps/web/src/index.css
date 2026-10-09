@@ -1,18 +1,20 @@
 @import 'tailwindcss';
+@import '@fontsource-variable/fredoka/wght.css';
 @import './theme.css';
 
 body {
   margin: 0;
   background-color: var(--color-cream);
-  color: var(--color-ink);
+  color: var(--color-grape);
   font-family: var(--font-sans);
 }
 
 h1,
 h2,
 h3 {
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 code,
@@ -30,5 +32,5 @@ pre {
   top: 0;
   bottom: 0;
   left: -1px;
-  border-left: 2px solid var(--color-terracotta);
+  border-left: 2px solid var(--color-strawberry);
 }

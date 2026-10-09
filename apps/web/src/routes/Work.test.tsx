@@ -171,7 +171,7 @@ test('typing and undoing back to the original saves nothing', async () => {
 
 test('a failed save is said out loud rather than hidden', async () => {
   // The one thing on this screen that is genuinely our fault, so the one thing allowed to
-  // be rust. A child typing into a page that silently discards their work is exactly the
+  // be system-error. A child typing into a page that silently discards their work is exactly the
   // failure worth shouting about.
   server.use(savesRefused())
   const user = userEvent.setup()
@@ -181,7 +181,7 @@ test('a failed save is said out loud rather than hidden', async () => {
   await user.type(box, 'x')
 
   const warning = await screen.findByText(/not saving/i, undefined, AFTER_AUTOSAVE)
-  expect(warning.className).toContain('rust')
+  expect(warning.className).toContain('system-error')
 })
 
 // --- renaming ------------------------------------------------------------------------
@@ -200,8 +200,8 @@ test('renaming onto a name already in use says so', async () => {
 
   const message = await screen.findByText(/already have a file with that name/i)
   // Amber: renaming to something else fixes it, so it is "not yet", not a fault.
-  expect(message.className).toContain('amber')
-  expect(message.className).not.toContain('rust')
+  expect(message.className).toContain('not-yet')
+  expect(message.className).not.toContain('system-error')
 })
 
 test('a rename that does not clash raises nothing', async () => {

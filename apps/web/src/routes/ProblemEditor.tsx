@@ -12,8 +12,8 @@
  *   in Pyodide, and remembers the `updated_at` it ran against. Any edit after that makes
  *   the run stale and Publish goes back to disabled. The server checks the same
  *   timestamp, so a second tab cannot slip a stale run through either.
- * - **Nothing a teacher's solution fails is shown in rust.** It is "not yet", like a
- *   child's — amber.
+ * - **Nothing a teacher's solution fails is shown as an error.** It is "not yet", like a
+ *   child's.
  */
 
 import { useEffect, useMemo, useState } from 'react'
@@ -179,7 +179,7 @@ export function ProblemEditor() {
     <>
       <PageHeader title={doc.title || 'New problem'}>
         <Badge variant={STATUS_BADGE[status].variant}>{STATUS_BADGE[status].label}</Badge>
-        {loaded ? <span className="text-sm text-ink-soft">v{loaded.version}</span> : null}
+        {loaded ? <span className="text-sm text-muted">v{loaded.version}</span> : null}
       </PageHeader>
 
       {mutationError ? (
@@ -191,7 +191,7 @@ export function ProblemEditor() {
       {!editable ? (
         <Card className="mb-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-ink-soft">
+            <p className="text-sm text-muted">
               {status === 'published'
                 ? 'Published problems are not edited in place, so marks stay tied to the version students saw.'
                 : status === 'archived'
@@ -252,7 +252,7 @@ export function ProblemEditor() {
                     })
                   }
                   className={`rounded-lg px-3 py-1.5 text-sm ring-1 ${
-                    doc.kind === kind ? 'bg-sky-pale ring-sky' : 'bg-paper ring-ink/15'
+                    doc.kind === kind ? 'bg-grape-pale ring-grape' : 'bg-surface ring-grape/20'
                   }`}
                 >
                   {kind === 'code' ? 'Code problem' : 'Multiple choice'}
@@ -269,13 +269,13 @@ export function ProblemEditor() {
           />
           <div>
             <div className="mb-1.5 flex items-center justify-between">
-              <span className="text-sm font-medium text-ink">Prompt</span>
+              <span className="text-sm font-medium text-grape">Prompt</span>
               <Button variant="quiet" onClick={() => setPreview(!preview)}>
                 {preview ? 'Edit' : 'Preview'}
               </Button>
             </div>
             {preview || !editable ? (
-              <div className="rounded-lg bg-cream/60 px-4 py-2 ring-1 ring-ink/10">
+              <div className="rounded-lg bg-cream/60 px-4 py-2 ring-1 ring-line">
                 <Markdown>{doc.prompt_md || '*No prompt yet.*'}</Markdown>
               </div>
             ) : (
@@ -289,7 +289,7 @@ export function ProblemEditor() {
           </div>
           {(doc.parts ?? []).length > 0 ? (
             <div>
-              <p className="mb-1.5 text-sm font-medium text-ink">Overall difficulty</p>
+              <p className="mb-1.5 text-sm font-medium text-grape">Overall difficulty</p>
               <DotsPicker
                 value={doc.difficulty}
                 disabled={!editable}
@@ -305,7 +305,7 @@ export function ProblemEditor() {
           <div className="flex flex-col gap-5">
             <div className="flex flex-wrap items-start gap-6">
               <div>
-                <p className="mb-1.5 text-sm font-medium text-ink">Difficulty</p>
+                <p className="mb-1.5 text-sm font-medium text-grape">Difficulty</p>
                 <DotsPicker
                   value={doc.difficulty}
                   disabled={!editable}
@@ -336,7 +336,7 @@ export function ProblemEditor() {
           <Card key={leaf.key || 'whole'} className="mb-6">
             {leaf.key ? (
               <div className="mb-4 flex items-center justify-between">
-                <h2 className="font-serif text-xl text-ink">{leaf.title}</h2>
+                <h2 className="font-display font-semibold text-xl text-grape">{leaf.title}</h2>
                 {editable ? (
                   <Button
                     variant="quiet"
@@ -441,7 +441,7 @@ export function ProblemEditor() {
                 Archive draft
               </Button>
             ) : null}
-            <span className="text-sm text-ink-soft">
+            <span className="text-sm text-muted">
               {isMcq
                 ? dirty
                   ? 'Save the question, then publish.'
@@ -456,10 +456,10 @@ export function ProblemEditor() {
             </span>
           </div>
           {warnings.length > 0 ? (
-            <p className="mt-3 text-sm text-ink-soft">{warnings.join(' · ')}</p>
+            <p className="mt-3 text-sm text-muted">{warnings.join(' · ')}</p>
           ) : null}
           {gaps.length > 0 ? (
-            <ul className="mt-3 list-disc pl-5 text-sm text-ink">
+            <ul className="mt-3 list-disc pl-5 text-sm text-grape">
               {gaps.map((gap) => (
                 <li key={gap}>{gap}</li>
               ))}

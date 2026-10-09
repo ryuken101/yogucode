@@ -86,11 +86,11 @@ test('the token goes first, the snapshot fills the tiles, and keystrokes stream 
   send({ type: 'doc', student_id: ARIA, target: TARGET, update: toBase64(Y.encodeStateAsUpdate(doc, before)), full: false })
   await waitFor(() => expect(screen.getByText(/numbers\.append\(5\)/)).toBeInTheDocument())
 
-  // A finished child is flagged sage; nothing on the page is rust.
+  // A finished child is flagged good; nothing on the page is system-error.
   send({ type: 'status', student_id: ARIA, status: { kind: 'check', target: TARGET, passed: 2, total: 2, compile_error: null, at: Date.now() } })
   const done = await screen.findByText('all passing')
-  expect(done.className).toContain('sage')
-  expect(document.body.innerHTML).not.toContain('rust')
+  expect(done.className).toContain('good')
+  expect(document.body.innerHTML).not.toContain('system-error')
 })
 
 /* --- stuck signals ---------------------------------------------------------------------- */

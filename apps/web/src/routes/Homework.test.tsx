@@ -109,7 +109,7 @@ test('hand in checks every problem first and shows how each one is doing', async
   expect(await screen.findByText(/Handed in/)).toBeInTheDocument()
 })
 
-test('given-back work is read-only: comments and colours, no numbers, no rust', async () => {
+test('given-back work is read-only: comments and colours, no numbers, no system-error', async () => {
   server.use(
     http.get(`/api/me/homework/${HW}`, () =>
       HttpResponse.json(
@@ -130,9 +130,9 @@ test('given-back work is read-only: comments and colours, no numbers, no rust', 
   expect(await screen.findByText('Great loops this week!')).toBeInTheDocument()
   expect(screen.getByText('Spot on')).toBeInTheDocument()
   const notYet = screen.getByText('Not yet')
-  expect(notYet.className).toContain('amber')
+  expect(notYet.className).toContain('not-yet')
   expect(screen.queryByRole('button', { name: /Hand in/ })).not.toBeInTheDocument()
-  expect(document.body.innerHTML).not.toContain('rust')
+  expect(document.body.innerHTML).not.toContain('system-error')
 })
 
 /* --- marking --------------------------------------------------------------------------- */
@@ -209,17 +209,17 @@ test('marking pre-fills Runs and Correct from the re-run and saves when moving o
   expect(marks).toEqual([
     { attempt: A1, body: expect.objectContaining({ runs: true, correct: 2, approach: 1, comment_md: 'Nice', verified_passed: 2, verified_total: 2 }) },
   ])
-  // Bella: one of two passing → Correct 1, and her lateness shows as amber, not rust.
+  // Bella: one of two passing → Correct 1, and her lateness shows as not-yet, not system-error.
   await waitFor(() =>
     expect(within(screen.getByRole('radiogroup', { name: 'Correct' })).getByRole('radio', { name: '1' })).toHaveAttribute('aria-checked', 'true'),
   )
-  expect(screen.getByText('Late').className).toContain('amber')
+  expect(screen.getByText('Late').className).toContain('not-yet')
   expect(screen.getByText('Not handed in — saved work')).toBeInTheDocument()
 })
 
 /* --- progress -------------------------------------------------------------------------- */
 
-test('progress cells use the calm tones, and late is amber', () => {
+test('progress cells use the calm tones, and late is not-yet', () => {
   const { container } = renderScreen(
     <>
       <Cell cell={{ status: 'not_started', late: false }} />
@@ -227,7 +227,7 @@ test('progress cells use the calm tones, and late is amber', () => {
       <Cell cell={{ status: 'handed_in', late: true }} />
     </>,
   )
-  expect(container.innerHTML).not.toContain('rust')
-  expect(screen.getByText('✓ passing').className).toContain('sage')
-  expect(screen.getByText('· late').className).toContain('amber')
+  expect(container.innerHTML).not.toContain('system-error')
+  expect(screen.getByText('✓ passing').className).toContain('good')
+  expect(screen.getByText('· late').className).toContain('not-yet')
 })

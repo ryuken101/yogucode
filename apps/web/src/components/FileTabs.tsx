@@ -57,8 +57,8 @@ export function FileTabs({
             key={file.id}
             className={`group flex items-center gap-1 rounded-t-lg px-3 py-1.5 text-sm ${
               active
-                ? 'bg-ink-deep text-cream'
-                : 'bg-paper text-ink-soft ring-1 ring-ink/10 hover:text-ink'
+                ? 'bg-night text-cream'
+                : 'bg-surface text-muted ring-1 ring-line hover:text-grape'
             }`}
           >
             {renaming === file.id ? (
@@ -72,7 +72,7 @@ export function FileTabs({
                   if (event.key === 'Escape') setRenaming(null)
                 }}
                 aria-label={`Rename ${file.title}`}
-                className="w-28 rounded bg-paper px-1 text-ink ring-1 ring-sky outline-none"
+                className="w-28 rounded bg-surface px-1 text-grape ring-1 ring-grape outline-none"
               />
             ) : (
               <button
@@ -95,7 +95,7 @@ export function FileTabs({
                 aria-label={`Close ${file.title}`}
                 title="Close this file (you can get it back)"
                 className={`rounded px-1 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 ${
-                  active ? 'text-cream/60 hover:text-cream' : 'text-ink-soft hover:text-ink'
+                  active ? 'text-cream/60 hover:text-cream' : 'text-muted hover:text-grape'
                 }`}
               >
                 ×
@@ -111,7 +111,7 @@ export function FileTabs({
         disabled={busy}
         aria-label="New file"
         title="New file"
-        className="rounded-t-lg bg-paper px-3 py-1.5 text-sm text-ink-soft ring-1 ring-ink/10 hover:text-ink disabled:opacity-50"
+        className="rounded-t-lg bg-surface px-3 py-1.5 text-sm text-muted ring-1 ring-line hover:text-grape disabled:opacity-50"
       >
         +
       </button>

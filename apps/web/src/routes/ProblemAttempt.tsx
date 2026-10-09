@@ -4,7 +4,7 @@
  *
  * - **Run** runs their program, interactively, exactly like My files.
  * - **Check** runs it against the problem's tests in fresh globals (`grader.py`) and shows
- *   **"3 of 5 passing"** in sage and amber — never red, never a wall of crosses (§3.4).
+ *   **"3 of 5 passing"** in `good` and `not-yet` — never red, never a wall of crosses (§3.4).
  * - **Hints** unlock in order, after enough runs or enough minutes. The server decides;
  *   the page only says how close the next one is.
  *
@@ -52,20 +52,20 @@ function hintProgress(next: NonNullable<Leaf['next_hint']>, runsSinceOpen: numbe
 function BackLink({ mode, assignmentId }: { mode: string; assignmentId: string }) {
   if (mode === 'homework') {
     return (
-      <Link to={`/homework/${assignmentId}`} className="text-sm text-sky-deep">
+      <Link to={`/homework/${assignmentId}`} className="text-sm text-grape-deep">
         ← Back to the homework
       </Link>
     )
   }
   if (mode === 'quiz') {
     return (
-      <Link to={`/quiz/${assignmentId}`} className="text-sm text-sky-deep">
+      <Link to={`/quiz/${assignmentId}`} className="text-sm text-grape-deep">
         ← Back to the quiz
       </Link>
     )
   }
   return (
-    <Link to="/home" className="text-sm text-sky-deep">
+    <Link to="/home" className="text-sm text-grape-deep">
       ← Today
     </Link>
   )
@@ -164,7 +164,7 @@ export function ProblemAttempt() {
         <BackLink mode={problem.data.mode} assignmentId={assignmentId} />
         <div className="flex items-center gap-3">
           <Dots value={problem.data.difficulty} />
-          <h1 className="font-serif text-xl text-ink">{problem.data.title}</h1>
+          <h1 className="font-display font-semibold text-xl text-grape">{problem.data.title}</h1>
         </div>
         <Markdown>{problem.data.prompt_md}</Markdown>
         <McqAttempt
@@ -256,12 +256,12 @@ export function ProblemAttempt() {
   return (
     <div className="grid h-full gap-3 p-3 lg:grid-cols-[2fr_3fr]">
       {/* Left: what to do, how it is going, and help. Scrolls on its own. */}
-      <div className="flex min-h-0 flex-col gap-4 overflow-y-auto rounded-lg bg-paper p-4 ring-1 ring-ink/10">
+      <div className="flex min-h-0 flex-col gap-4 overflow-y-auto rounded-lg bg-surface p-4 ring-1 ring-line">
         <div>
           <BackLink mode={data.mode} assignmentId={assignmentId} />
           <div className="mt-2 flex items-center gap-3">
             <Dots value={data.difficulty} />
-            <h1 className="font-serif text-xl text-ink">{data.title}</h1>
+            <h1 className="font-display font-semibold text-xl text-grape">{data.title}</h1>
           </div>
           <Markdown>{data.prompt_md}</Markdown>
         </div>
@@ -279,7 +279,7 @@ export function ProblemAttempt() {
                   setHintMessage(null)
                 }}
                 className={`rounded-lg px-3 py-1.5 text-sm ring-1 ${
-                  index === active ? 'bg-sky-pale ring-sky' : 'bg-paper ring-ink/15'
+                  index === active ? 'bg-grape-pale ring-grape' : 'bg-surface ring-grape/20'
                 }`}
               >
                 Part ({part.label})
@@ -290,13 +290,13 @@ export function ProblemAttempt() {
         {leaf.prompt_md ? <Markdown>{leaf.prompt_md}</Markdown> : null}
 
         <section aria-label="Checks" className="flex flex-col gap-2">
-          <h2 className="font-serif text-lg text-ink">Checks</h2>
+          <h2 className="font-display font-semibold text-lg text-grape">Checks</h2>
           {!data.checks ? (
-            <p className="text-sm text-ink-soft">
+            <p className="text-sm text-muted">
               Checks are off for this quiz — use Run to try your code yourself.
             </p>
           ) : run === undefined ? (
-            <p className="text-sm text-ink-soft">
+            <p className="text-sm text-muted">
               Press <strong>Check</strong> to see how your code does on {leaf.tests.length}{' '}
               check{leaf.tests.length === 1 ? '' : 's'}.
             </p>
@@ -316,9 +316,9 @@ export function ProblemAttempt() {
 
         {leaf.hints.length > 0 || leaf.next_hint ? (
           <section aria-label="Hints" className="flex flex-col gap-2">
-            <h2 className="font-serif text-lg text-ink">Hints</h2>
+            <h2 className="font-display font-semibold text-lg text-grape">Hints</h2>
             {leaf.hints.map((hint) => (
-              <div key={hint.level} className="rounded-lg bg-sky-pale/30 px-3 py-2 ring-1 ring-sky/30">
+              <div key={hint.level} className="rounded-lg bg-grape-pale/30 px-3 py-2 ring-1 ring-grape/20">
                 <Markdown>{hint.body_md}</Markdown>
               </div>
             ))}
@@ -328,7 +328,7 @@ export function ProblemAttempt() {
                   {leaf.hints.length ? 'Another hint' : 'Get a hint'}
                 </Button>
                 {waitFor ? (
-                  <span className="text-sm text-ink-soft">Available {waitFor}.</span>
+                  <span className="text-sm text-muted">Available {waitFor}.</span>
                 ) : null}
               </div>
             ) : null}
@@ -353,9 +353,9 @@ export function ProblemAttempt() {
           ) : null}
           {python.state.status === 'loading' ? <Spinner label={python.state.detail} /> : null}
           {python.state.status === 'asking' ? (
-            <span className="text-sm text-amber">Your program is waiting for you to type.</span>
+            <span className="text-sm text-not-yet-ink">Your program is waiting for you to type.</span>
           ) : null}
-          <span className="ml-auto text-xs text-ink-soft" aria-live="polite">
+          <span className="ml-auto text-xs text-muted" aria-live="polite">
             {autosave.state === 'saving' ? 'Saving…' : null}
             {autosave.state === 'saved' ? 'Saved' : null}
           </span>
@@ -365,7 +365,7 @@ export function ProblemAttempt() {
             Your work is not saving. Tell your teacher — you may need to sign in again.
           </Notice>
         ) : null}
-        <div className="min-h-64 flex-[2] overflow-hidden rounded-lg ring-1 ring-ink/20">
+        <div className="min-h-64 flex-[2] overflow-hidden rounded-lg ring-1 ring-grape/25">
           <CodeSurface
             // One editor per part: Monaco's undo stack must not carry one part's history
             // into another.

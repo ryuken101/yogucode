@@ -482,6 +482,15 @@ improvement.
 
 ## 8. Colour palette
 
+> **Superseded 10 Oct 2026 (Ken's decision): the Yogucode brand.** The product is now
+> Yogucode (yogucode.com), and its look comes from the "Yogucode Brand" design system —
+> grape #4B2FB8, strawberry #FF5C8A, lemon #FFD166, cream #FFF6E9, Fredoka, a smiling cup
+> mark. Ken chose a playful-but-toned-down brand over the calm sky-and-cream direction
+> below. **The rule survives unchanged:** never red for a student's incorrect answer. Lemon
+> means "not yet", mint means correct, raspberry is reserved for system errors, and
+> strawberry (the accent) is never a student's state. The section below is kept for the
+> reasoning; `apps/web/src/theme.css` is the source of truth for values.
+
 Direction: **soft sky and cream** — calm, warm, analog, unhurried.
 
 Every kids' coding platform on the market is saturated primary colours and

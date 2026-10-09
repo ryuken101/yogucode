@@ -8,7 +8,9 @@
 
 import { Link, NavLink } from 'react-router'
 import type { ReactNode } from 'react'
+import { Lockup } from './Brand'
 import { Button } from './Button'
+import { navPill } from './navPill'
 
 interface Props {
   centreName?: string
@@ -19,25 +21,24 @@ interface Props {
 export function AppShell({ centreName, onSignOut, children }: Props) {
   return (
     <div className="min-h-dvh bg-cream">
-      <header className="border-b border-ink/10 bg-paper/80">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3">
-          <div className="flex items-center gap-6">
-            <Link to="/classes" className="font-serif text-lg text-ink hover:text-sky-deep">
-              {centreName ?? 'Coding-teaching-tool'}
+      <header className="border-b border-line bg-surface">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-6 py-3">
+          <div className="flex items-center gap-5">
+            <Link to="/classes" className="flex items-center gap-3 text-grape">
+              <Lockup size={30} />
+              {centreName ? (
+                <span className="hidden border-l border-line pl-3 text-sm text-muted sm:inline">
+                  {centreName}
+                </span>
+              ) : null}
             </Link>
-            <nav className="flex gap-4 text-sm">
+            <nav className="flex gap-1 text-sm">
               {[
                 ['/classes', 'Classes'],
                 ['/curriculum', 'Curriculum'],
                 ['/problems', 'Problems'],
               ].map(([to, label]) => (
-                <NavLink
-                  key={to}
-                  to={to}
-                  className={({ isActive }) =>
-                    isActive ? 'text-sky-deep' : 'text-ink-soft hover:text-ink'
-                  }
-                >
+                <NavLink key={to} to={to} className={navPill}>
                   {label}
                 </NavLink>
               ))}

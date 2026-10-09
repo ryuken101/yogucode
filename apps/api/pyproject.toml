@@ -1,7 +1,7 @@
 [project]
 name = "api"
 version = "0.1.0"
-description = "Coding-teaching-tool API — FastAPI backend"
+description = "Yogucode API — FastAPI backend"
 requires-python = ">=3.12"
 authors = [
     { name = "ryuken101", email = "169988777+ryuken101@users.noreply.github.com" }

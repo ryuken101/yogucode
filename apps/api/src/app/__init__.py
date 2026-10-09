@@ -1,1 +1,1 @@
-"""Coding-teaching-tool API."""
+"""Yogucode API."""

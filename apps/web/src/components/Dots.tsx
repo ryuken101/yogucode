@@ -15,7 +15,7 @@ export function Dots({ value }: { value: number }) {
         <span
           key={level}
           aria-hidden
-          className={`size-2 rounded-full ${level <= value ? 'bg-sky-deep' : 'bg-sky-pale'}`}
+          className={`size-2 rounded-full ${level <= value ? 'bg-grape' : 'bg-grape-pale'}`}
         />
       ))}
     </span>
@@ -42,7 +42,7 @@ export function DotsPicker({
           disabled={disabled}
           onClick={() => onChange(level)}
           className={`rounded-lg px-3 py-1.5 ring-1 transition-colors disabled:opacity-50 ${
-            value === level ? 'bg-sky-pale ring-sky' : 'bg-paper ring-ink/15 hover:bg-cream'
+            value === level ? 'bg-grape-pale ring-grape' : 'bg-surface ring-grape/20 hover:bg-cream'
           }`}
         >
           <Dots value={level} />

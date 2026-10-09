@@ -36,7 +36,7 @@ export function ClassList() {
       <PageHeader title="Classes" />
 
       <Card className="mb-6">
-        <h2 className="mb-3 font-serif text-lg text-ink">New class</h2>
+        <h2 className="mb-3 font-display font-semibold text-lg text-grape">New class</h2>
         <form onSubmit={submit} className="flex flex-col gap-4 sm:flex-row sm:items-end">
           <div className="flex-1">
             <TextInput
@@ -81,10 +81,10 @@ export function ClassList() {
             <li key={klass.id}>
               <Link
                 to={`/classes/${klass.id}`}
-                className="flex items-center justify-between rounded-xl bg-paper px-5 py-4 ring-1 ring-ink/10 hover:ring-sky"
+                className="flex items-center justify-between rounded-2xl bg-surface px-5 py-4 ring-1 ring-line hover:ring-grape"
               >
-                <span className="font-medium text-ink">{klass.name}</span>
-                <span className="text-sm text-ink-soft">{klass.term_label ?? ''}</span>
+                <span className="font-medium text-grape">{klass.name}</span>
+                <span className="text-sm text-muted">{klass.term_label ?? ''}</span>
               </Link>
             </li>
           ))}

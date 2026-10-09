@@ -93,7 +93,7 @@ export function QuizBuilder() {
   return (
     <>
       <PageHeader title={quizId ? 'Quiz' : 'New quiz'}>
-        {klass.data ? <span className="text-sm text-ink-soft">{klass.data.name}</span> : null}
+        {klass.data ? <span className="text-sm text-muted">{klass.data.name}</span> : null}
         {status === 'draft' ? <Badge variant="active">Draft</Badge> : null}
         {existing.data?.running ? <Badge variant="good">Running</Badge> : null}
         {status === 'closed' ? <Badge variant="muted">Finished</Badge> : null}
@@ -119,7 +119,7 @@ export function QuizBuilder() {
             onChange={(e) => update({ minutes: Math.max(1, Math.min(180, Number(e.target.value) || 1)) })}
           />
         </div>
-        <label className="mt-4 flex items-center gap-2 text-sm text-ink">
+        <label className="mt-4 flex items-center gap-2 text-sm text-grape">
           <input
             type="checkbox"
             checked={draft.checks}
@@ -128,14 +128,14 @@ export function QuizBuilder() {
           />
           Let students press Check (see “N of M passing”) during the quiz
         </label>
-        <p className="mt-2 text-sm text-ink-soft">
+        <p className="mt-2 text-sm text-muted">
           During the quiz, autocomplete and hints are off and pastes are flagged on your live
           view. Students can still Run their code.
         </p>
       </Card>
 
       <Card className="mb-6">
-        <h2 className="mb-3 font-serif text-lg text-ink">Questions</h2>
+        <h2 className="mb-3 font-display font-semibold text-lg text-grape">Questions</h2>
         <ProblemListEditor
           rows={draft.rows}
           onChange={(rows) => update({ rows })}

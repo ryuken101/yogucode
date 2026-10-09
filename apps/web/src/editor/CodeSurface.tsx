@@ -20,7 +20,7 @@ export function CodeSurface(props: CodeSurfaceProps) {
       fallback={
         // Same surface and type as the editor, so the panel does not jump when Monaco
         // arrives — and the starting code stays readable while it loads.
-        <pre className="h-full w-full overflow-hidden bg-ink-deep p-3 font-mono text-sm text-cream/60">
+        <pre className="h-full w-full overflow-hidden bg-night p-3 font-mono text-sm text-cream/60">
           {props.value}
         </pre>
       }

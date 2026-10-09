@@ -1,7 +1,9 @@
-# Coding-teaching-tool
+# Yogucode
 
 Classroom platform for after-school coding academies with a browser-based Python editor
-and per-concept mastery tracking.
+and per-concept mastery tracking. Lives at <https://yogucode.com>; the brand (cup mark,
+`<yogucode>` wordmark, grape/strawberry/lemon/cream, Fredoka) is the "Yogucode Brand"
+design system, applied in `apps/web/src/theme.css` and `components/Brand.tsx`.
 
 The product is specified in [`docs/product-spec.md`](docs/product-spec.md). Phase 1 —
 auth, centres, classes and roster — is the current work.
@@ -419,6 +421,45 @@ Supabase migrated to head and seeded with the concept taxonomy. Every table has
 row-level security with no policies, so Supabase's public API can read nothing even if
 its Data API is switched on. Deploy with
 `fly deploy --remote-only --ha=false --build-arg VITE_SUPABASE_URL=… --build-arg VITE_SUPABASE_ANON_KEY=…`.
+
+**Rebranded as Yogucode (10 Oct 2026).** Ken's domain is yogucode.com (GoDaddy). The Fly
+app keeps its name, `magikid-code` — Fly apps cannot be renamed and nobody sees it once the
+domain is on.
+
+### Domain and email
+
+**One address.** `https://yogucode.com` is the app. `www.yogucode.com` and
+`magikid-code.fly.dev` answer with a 308 to it (`CanonicalHost` in `app/server.py`, set by
+`CANONICAL_HOST` / `REDIRECT_HOSTS` in `fly.toml`). Serving the app on several names would
+split sessions: a child's cookie and a teacher's Supabase session each belong to one host.
+
+Connecting the domain, once:
+
+1. `fly ips list -a magikid-code` — note the IPv4 and IPv6 (`fly ips allocate-v6` if
+   there is none; a shared IPv4 is fine).
+2. `fly certs add yogucode.com -a magikid-code` and `fly certs add www.yogucode.com -a magikid-code`.
+3. GoDaddy → yogucode.com → DNS: delete the parked `A @` record and any forwarding, then add
+   `A @` → the IPv4, `AAAA @` → the IPv6, `CNAME www` → `magikid-code.fly.dev`, plus any
+   `_acme-challenge` CNAME that `fly certs show yogucode.com` asks for.
+4. `fly certs check yogucode.com` (and `www.yogucode.com`) until both say Issued.
+5. Supabase → Authentication → URL Configuration: Site URL `https://yogucode.com`; add
+   `https://yogucode.com/auth/callback` to Redirect URLs (leave the fly.dev one until done).
+6. Uncomment `CANONICAL_HOST` / `REDIRECT_HOSTS` in `fly.toml` and deploy.
+
+**Auth email from `no-reply@yogucode.com`, sent by Resend.** No app code: Supabase sends the
+emails and Resend is its SMTP server.
+
+1. resend.com → Domains → add `yogucode.com` (region Tokyo, nearest Sydney). Add the DNS
+   records it lists in GoDaddy — `MX send`, `TXT send` (SPF), `TXT resend._domainkey`
+   (DKIM) — plus `TXT _dmarc` = `v=DMARC1; p=none;`. Verify.
+2. Resend → API Keys → create one with *Sending access* for yogucode.com only.
+3. Supabase → Authentication → Emails → SMTP Settings: host `smtp.resend.com`, port `465`,
+   user `resend`, password = the API key (dashboard only — never the repo or a chat),
+   sender `no-reply@yogucode.com`, name `Yogucode`.
+4. Supabase → Email Templates: paste `docs/email-templates/magic-link.html` (and
+   `confirm-signup.html` when password sign-up arrives); subjects are in each file's comment.
+
+Free Resend is 3,000 emails a month, 100 a day.
 
 ## Local development
 

@@ -1,5 +1,8 @@
 # Fly.io: the whole product as one app in Sydney (see Dockerfile, apps/api/src/app/server.py).
 #
+# Yogucode — app name stays magikid-code (Fly apps cannot be renamed); the public
+# address is https://yogucode.com (see README "Domain and email").
+#
 # Secrets (set by Ken in his own terminal, never committed):
 #   fly secrets set DATABASE_URL=postgresql+asyncpg://…:6543/postgres   # Supavisor, transaction mode
 #   fly secrets set SUPABASE_URL=https://<project>.supabase.co
@@ -26,6 +29,10 @@ primary_region = "syd"
   QUIZ_TIMER = "true"
   CENTRE_SLUG = "castle-hill"
   CENTRE_NAME = "Magikid Castle Hill"
+  # One address: www and the old fly.dev name 308 to yogucode.com (app/server.py).
+  # Turned on 10 Oct 2026, after both certificates were issued.
+  CANONICAL_HOST = "yogucode.com"
+  REDIRECT_HOSTS = "www.yogucode.com,magikid-code.fly.dev"
 
 # Exactly ONE machine (`fly deploy --ha=false`; `fly scale count 1`). The live classroom's
 # hub and the quiz timers live in this process's memory: two machines would split a class.
