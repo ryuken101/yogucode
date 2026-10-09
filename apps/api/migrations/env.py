@@ -17,6 +17,7 @@ from sqlmodel import SQLModel
 
 import app.models  # noqa: F401  — registers every table on SQLModel.metadata
 from app.config import get_settings
+from app.db import NO_STATEMENT_CACHE
 
 config = context.config
 
@@ -51,7 +52,11 @@ async def run_async_migrations() -> None:
     configuration = config.get_section(config.config_ini_section, {})
     configuration["sqlalchemy.url"] = get_url()
     connectable = async_engine_from_config(
-        configuration, prefix="sqlalchemy.", poolclass=pool.NullPool
+        configuration,
+        prefix="sqlalchemy.",
+        poolclass=pool.NullPool,
+        # The same reason as app/db.py: migrations run through Supabase's pooler too.
+        connect_args=NO_STATEMENT_CACHE,
     )
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)

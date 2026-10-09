@@ -1,0 +1,13 @@
+# Keep the build context small and free of anything local or secret.
+.git
+**/node_modules
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+apps/web/dist
+apps/web/public/pyodide
+# Local environment files hold real credentials; production settings are Fly secrets.
+**/.env
+**/.env.*
+!**/.env.example

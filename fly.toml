@@ -1,0 +1,48 @@
+# Fly.io: the whole product as one app in Sydney (see Dockerfile, apps/api/src/app/server.py).
+#
+# Secrets (set by Ken in his own terminal, never committed):
+#   fly secrets set DATABASE_URL=postgresql+asyncpg://…:6543/postgres   # Supavisor, transaction mode
+#   fly secrets set SUPABASE_URL=https://<project>.supabase.co
+#   fly secrets set TEACHER_EMAIL_ALLOWLIST=you@example.com,other@example.com
+
+app = "magikid-code"
+primary_region = "syd"
+
+[build]
+  dockerfile = "Dockerfile"
+
+  [build.args]
+    # Public values the browser needs for teacher sign-in. Filled in at deploy time.
+    VITE_SUPABASE_URL = ""
+    VITE_SUPABASE_ANON_KEY = ""
+
+[deploy]
+  # Migrations run against Supabase before the new version starts. Upgrade only — a
+  # downgrade against production would drop children's records.
+  release_command = "/srv/api/.venv/bin/alembic upgrade head"
+
+[env]
+  COOKIE_SECURE = "true"
+  QUIZ_TIMER = "true"
+  CENTRE_SLUG = "castle-hill"
+  CENTRE_NAME = "Magikid Castle Hill"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # Always on: the live classroom holds WebSockets open for a lesson and quiz timers run
+  # in this process, and nobody should wait for a sleeping machine to wake.
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "15s"
+    interval = "30s"
+    method = "GET"
+    path = "/api/health"
+    timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"

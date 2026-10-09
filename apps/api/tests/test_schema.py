@@ -10,6 +10,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -258,3 +259,19 @@ def test_models_match_the_migrations(run_alembic) -> None:
     """
     result = run_alembic("check")
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+async def test_every_table_has_row_level_security(session: AsyncSession) -> None:
+    """Supabase publishes the public schema to its `anon` role through PostgREST. RLS with
+    no policies means that role reads nothing, whatever the dashboard's Data API switch
+    says. A new table without it would be readable with the key that ships in the website —
+    so add `ALTER TABLE … ENABLE ROW LEVEL SECURITY` to its migration."""
+    rows = (
+        await session.execute(
+            text(
+                "SELECT tablename FROM pg_tables WHERE schemaname = 'public' "
+                "AND tablename <> 'alembic_version' AND NOT rowsecurity"
+            )
+        )
+    ).all()
+    assert rows == [], f"tables without row-level security: {[r[0] for r in rows]}"

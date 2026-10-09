@@ -54,7 +54,12 @@ slips and the class page print the site's host so children know what to type.
 in a query string lands in browser history on a shared centre laptop, in proxy logs, and
 in the `Referer` of the next request — which is also why the API takes it in a POST body.
 
-## Local development
+## Local development and production
+
+In production the API serves this build itself (`apps/api/src/app/server.py`) under one
+address, so `/api` is same-origin there too: no CORS, and the student cookie and live
+sockets just work. The isolation headers that `vite.config.ts` sets in development are set
+by the server in production.
 
 `npm run dev` proxies `/api` to `localhost:8000` (see `vite.config.ts`), so the browser
 sees one origin and the API needs no CORS. That changes at step 10, when the two are

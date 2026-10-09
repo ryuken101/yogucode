@@ -118,14 +118,27 @@ Use `sqlmodel.ext.asyncio.session.AsyncSession`, not SQLAlchemy's; only the form
 
 `db.py` uses `poolclass=NullPool`. Staging and production run through Supabase's
 Supavisor pooler in transaction mode, which does its own pooling; a second pool on top
-exhausts connections under trivial load. This is a known one-time setup cost, not
-something to discover from intermittent failures.
+exhausts connections under trivial load. For the same reason asyncpg's statement caches
+are off (`NO_STATEMENT_CACHE`, also used by `migrations/env.py`): in transaction mode a
+statement prepared on one server connection may run on another. This is a known one-time
+setup cost, not something to discover from intermittent failures.
 
 ### Frontend
 
 **Never red for a student's incorrect answer** — amber means "not yet", sage means
 correct, rust is reserved for system errors. The rest of the frontend conventions live
 in `apps/web/CLAUDE.md`, which loads when working under that directory.
+
+### Production: one app
+
+`app.server:site` mounts the API (`app.main:app`) under `/api` and serves the built
+website, adding the cross-origin isolation headers to every response. The `Dockerfile` and
+`fly.toml` at the repo root deploy it as **one Fly.io app** (`magikid-code`, Sydney, always
+on, one uvicorn worker — the live hub and quiz timers live in process memory).
+`release_command` runs `alembic upgrade head` against Supabase on each deploy, upgrade
+only. Never run a downgrade against production. Secrets (`DATABASE_URL`, `SUPABASE_URL`,
+`TEACHER_EMAIL_ALLOWLIST`) are Fly secrets that Ken sets himself; they never go in the repo
+or in a chat.
 
 ## Keeping the README current
 

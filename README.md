@@ -406,8 +406,13 @@ Ken's choice.**
   on **one registrable domain** (e.g. `app.<domain>` and `api.<domain>`), and the API on
   **one Fly machine** until Redis pub/sub exists.
 
-Next: Phase 1's deploy steps (now needing a domain) and the Supabase Pro upgrade, then a
-fortnight of real use.
+**Deploy is ready to run (Phase 1 steps 10–11).** One app on Fly.io at
+`magikid-code.fly.dev` (Ken's choice, 10 Oct 2026): `app.server:site` serves the built
+website and mounts the API under `/api`, so there is one origin — no Vercel, no CORS, no
+domain needed (one can be added later). `Dockerfile` and `fly.toml` are at the repo root;
+`release_command` migrates Supabase on each deploy. Checked locally in production mode:
+`crossOriginIsolated` is true, Python runs, and the live socket connects. Supabase moves
+to Pro a day or two before the first real class.
 
 ## Local development
 
