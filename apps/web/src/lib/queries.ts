@@ -23,8 +23,13 @@ export const keys = {
   me: ['me'] as const,
   teachers: ['teachers'] as const,
   classes: ['classes'] as const,
+  /** Under `classes`, so invalidating the list refreshes this too. */
+  classesWithArchived: ['classes', 'all'] as const,
   class: (classId: string) => ['class', classId] as const,
   roster: (classId: string) => ['roster', classId] as const,
+  /** Under `roster`, so invalidating the roster refreshes this too. */
+  rosterWithWithdrawn: (classId: string) => ['roster', classId, 'all'] as const,
+  classTeachers: (classId: string) => ['class-teachers', classId] as const,
   studentMe: ['student-me'] as const,
   documents: ['documents'] as const,
   document: (documentId: string) => ['document', documentId] as const,
@@ -79,7 +84,30 @@ export function useMe(options?: Partial<UseQueryOptions<Schemas['TeacherProfileO
 }
 
 export function useClasses() {
-  return useQuery({ queryKey: keys.classes, queryFn: api.listClasses })
+  return useQuery({ queryKey: keys.classes, queryFn: () => api.listClasses() })
+}
+
+/** Every class, removed ones included — for "Show removed classes". */
+export function useClassesWithArchived(enabled: boolean) {
+  return useQuery({
+    queryKey: keys.classesWithArchived,
+    queryFn: () => api.listClasses(true),
+    enabled,
+  })
+}
+
+/** Remove (archive) or put back a class. Refreshes the list and the class itself. */
+export function useArchiveClass() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ classId, archive }: { classId: string; archive: boolean }) =>
+      archive ? api.archiveClass(classId) : api.unarchiveClass(classId),
+    onSuccess: (_result, { classId }) => {
+      void client.invalidateQueries({ queryKey: keys.classes })
+      void client.invalidateQueries({ queryKey: keys.class(classId) })
+      void client.invalidateQueries({ queryKey: keys.roster(classId) })
+    },
+  })
 }
 
 export function useClass(classId: string) {
@@ -88,6 +116,58 @@ export function useClass(classId: string) {
 
 export function useRoster(classId: string) {
   return useQuery({ queryKey: keys.roster(classId), queryFn: () => api.readRoster(classId) })
+}
+
+/** Everyone ever in the class, removed ones included — for "Show removed students". */
+export function useRosterWithWithdrawn(classId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: keys.rosterWithWithdrawn(classId),
+    queryFn: () => api.readRoster(classId, true),
+    enabled,
+  })
+}
+
+export function useWithdrawStudent(classId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (studentId: string) => api.withdrawStudent(classId, studentId),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.roster(classId) }),
+  })
+}
+
+export function useReinstateStudent(classId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (studentId: string) => api.reinstateStudent(classId, studentId),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.roster(classId) }),
+  })
+}
+
+export function useClassTeachers(classId: string) {
+  return useQuery({ queryKey: keys.classTeachers(classId), queryFn: () => api.classTeachers(classId) })
+}
+
+export function useClassTeacherCandidates(classId: string) {
+  return useQuery({
+    queryKey: [...keys.classTeachers(classId), 'candidates'],
+    queryFn: () => api.classTeacherCandidates(classId),
+  })
+}
+
+/** Add, re-role or remove a class teacher. Refreshes the box and "My classes". */
+export function useClassTeacherMutation<T>(
+  classId: string,
+  mutationFn: (arg: T) => Promise<Schemas['ClassTeacherOut'][]>,
+) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn,
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: keys.classTeachers(classId) })
+      void client.invalidateQueries({ queryKey: keys.classes })
+      void client.invalidateQueries({ queryKey: keys.class(classId) })
+    },
+  })
 }
 
 export function useCreateClass() {

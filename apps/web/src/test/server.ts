@@ -44,6 +44,7 @@ export const AIDEN_TWO = '018f0000-0000-7000-8000-000000000011'
 
 const classDetail: Schemas['ClassDetailOut'] = {
   id: CLASS_ID,
+  is_mine: true,
   name: 'Year 4-6 Python',
   term_label: '2026 T4',
   status: 'active',
@@ -289,6 +290,7 @@ export function oneClass() {
     HttpResponse.json([
       {
         id: CLASS_ID,
+        is_mine: true,
         name: 'Year 4-6 Python',
         term_label: '2026 T4',
         status: 'active',

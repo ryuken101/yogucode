@@ -33,7 +33,7 @@ beforeEach(() => {
   server.use(
     http.get(`/api/classes/${CLASS}`, () =>
       HttpResponse.json({ id: CLASS, name: 'Year 4-6 Python', term_label: null, status: 'active',
-        course_id: null, current_lesson_id: null, join_code: 'WNPXYZ',
+        course_id: null, current_lesson_id: null, join_code: 'WNPXYZ', is_mine: true,
         created_at: '2026-10-01T00:00:00Z', updated_at: '2026-10-01T00:00:00Z' } satisfies Schemas['ClassDetailOut']),
     ),
     http.get(`/api/classes/${CLASS}/roster`, () =>

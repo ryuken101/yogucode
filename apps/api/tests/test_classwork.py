@@ -57,7 +57,9 @@ async def test_a_withdrawn_child_loses_the_class_work_but_it_is_kept(
     response = await client.patch(
         f"/me/attempts/{opened['leaves'][0]['attempt']['id']}", json={"code": "x"}
     )
-    assert response.status_code == 404
+    # Removing a child from a class also signs them out (routers/roster.py), so the
+    # refusal now arrives one step earlier: 401 rather than the class-scoping 404.
+    assert response.status_code == 401
     assert len((await session.exec(select(Attempt))).all()) == 1
 
 

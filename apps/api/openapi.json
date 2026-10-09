@@ -327,6 +327,11 @@
             "title": "Id",
             "type": "string"
           },
+          "is_mine": {
+            "default": false,
+            "title": "Is Mine",
+            "type": "boolean"
+          },
           "join_code": {
             "anyOf": [
               {
@@ -439,6 +444,11 @@
             "title": "Id",
             "type": "string"
           },
+          "is_mine": {
+            "default": false,
+            "title": "Is Mine",
+            "type": "boolean"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -514,6 +524,83 @@
           "archived"
         ],
         "title": "ClassStatus",
+        "type": "string"
+      },
+      "ClassTeacherCandidateOut": {
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "user_id": {
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "display_name",
+          "email"
+        ],
+        "title": "ClassTeacherCandidateOut",
+        "type": "object"
+      },
+      "ClassTeacherIn": {
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/ClassTeacherRole"
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "title": "ClassTeacherIn",
+        "type": "object"
+      },
+      "ClassTeacherOut": {
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "is_you": {
+            "title": "Is You",
+            "type": "boolean"
+          },
+          "role": {
+            "$ref": "#/components/schemas/ClassTeacherRole"
+          },
+          "user_id": {
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "display_name",
+          "email",
+          "role",
+          "is_you"
+        ],
+        "title": "ClassTeacherOut",
+        "type": "object"
+      },
+      "ClassTeacherRole": {
+        "enum": [
+          "lead",
+          "assistant"
+        ],
+        "title": "ClassTeacherRole",
         "type": "string"
       },
       "ConceptOut": {
@@ -5912,7 +5999,7 @@
     },
     "/classes/{class_id}/archive": {
       "post": {
-        "description": "Close a class: hide it from the default list and revoke its live join codes.\n\nEnrolments are left untouched. They are the record of who was actually in the class\nthis term, which is exactly what Phase 8 mastery reads \u2014 withdrawing them on archive\nwould overwrite history to tidy up a status field.",
+        "description": "Close a class: hide it from the default list, revoke its join codes, sign its\nchildren out. This is the class page's \"Remove class\".\n\nEnrolments are left untouched. They are the record of who was actually in the class\nthis term, which is exactly what Phase 8 mastery reads \u2014 withdrawing them on archive\nwould overwrite history to tidy up a status field.\n\nChildren still signed in are signed out, as when one child is removed from a class: a\nsession belongs to the child, so without this they would carry on working in a class\nthat no longer exists for anyone else. They can sign in to any other class they are in.",
         "operationId": "archive_class_classes__class_id__archive_post",
         "parameters": [
           {
@@ -6182,7 +6269,7 @@
     },
     "/classes/{class_id}/enrolments/{student_id}/withdraw": {
       "post": {
-        "description": "Take a student out of a class. The enrolment row stays; its status changes.",
+        "description": "Take a student out of a class. The enrolment row stays; its status changes.\n\nThe child is signed out too. A session belongs to the student, not to a class, so\nwithout this a child removed mid-lesson would carry on working in the class they were\njust taken out of until the session expired. They can sign in again only to a class\nthey are still in \u2014 the join flow needs an active enrolment.",
         "operationId": "withdraw_student_classes__class_id__enrolments__student_id__withdraw_post",
         "parameters": [
           {
@@ -6861,6 +6948,291 @@
         "summary": "Preview Roster Paste",
         "tags": [
           "roster"
+        ]
+      }
+    },
+    "/classes/{class_id}/teachers": {
+      "get": {
+        "operationId": "list_class_teachers_classes__class_id__teachers_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "class_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Class Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ClassTeacherOut"
+                  },
+                  "title": "Response List Class Teachers Classes  Class Id  Teachers Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Class Teachers",
+        "tags": [
+          "class teachers"
+        ]
+      }
+    },
+    "/classes/{class_id}/teachers/candidates": {
+      "get": {
+        "description": "The centre's active teachers who are not on this class yet \u2014 the Add picker.",
+        "operationId": "list_candidates_classes__class_id__teachers_candidates_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "class_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Class Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ClassTeacherCandidateOut"
+                  },
+                  "title": "Response List Candidates Classes  Class Id  Teachers Candidates Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Candidates",
+        "tags": [
+          "class teachers"
+        ]
+      }
+    },
+    "/classes/{class_id}/teachers/{user_id}": {
+      "put": {
+        "description": "Add a teacher to the class, or change their role. Returns the new listing.",
+        "operationId": "set_class_teacher_classes__class_id__teachers__user_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "class_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Class Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClassTeacherIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ClassTeacherOut"
+                  },
+                  "title": "Response Set Class Teacher Classes  Class Id  Teachers  User Id  Put",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Class Teacher",
+        "tags": [
+          "class teachers"
+        ]
+      }
+    },
+    "/classes/{class_id}/teachers/{user_id}/remove": {
+      "post": {
+        "description": "Take a teacher off the class. They can still open it, like any teacher here.",
+        "operationId": "remove_class_teacher_classes__class_id__teachers__user_id__remove_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "class_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Class Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ClassTeacherOut"
+                  },
+                  "title": "Response Remove Class Teacher Classes  Class Id  Teachers  User Id  Remove Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Class Teacher",
+        "tags": [
+          "class teachers"
         ]
       }
     },

@@ -16,7 +16,7 @@ import { Notice } from '../components/Notice'
 import { Spinner } from '../components/Spinner'
 import { api } from '../lib/api'
 import { formatDue } from '../lib/dates'
-import { messageFor } from '../lib/errors'
+import { ApiError, messageFor } from '../lib/errors'
 import {
   useClass,
   useClassHomework,
@@ -28,12 +28,17 @@ import {
   useSetClassCurriculum,
   useIssuePins,
   useResetPin,
+  useArchiveClass,
+  useReinstateStudent,
   useRevokeSessions,
   useRoster,
+  useRosterWithWithdrawn,
+  useWithdrawStudent,
   useRotateJoinCode,
 } from '../lib/queries'
 import { Select } from '../components/Field'
 import { BulkPasteDialog } from './BulkPasteDialog'
+import { ClassTeachersCard } from './ClassTeachersCard'
 import type { SlipState } from './SlipSheet'
 
 export function ClassDetail() {
@@ -50,6 +55,10 @@ export function ClassDetail() {
   const [confirmRotate, setConfirmRotate] = useState(false)
   const [confirmReissue, setConfirmReissue] = useState(false)
   const [kicked, setKicked] = useState<string | null>(null)
+  const withdraw = useWithdrawStudent(classId)
+  const [removing, setRemoving] = useState<{ id: string; name: string } | null>(null)
+  const archive = useArchiveClass()
+  const [confirmRemoveClass, setConfirmRemoveClass] = useState(false)
 
   function goToSlips(slips: SlipState['slips']) {
     navigate(`/classes/${classId}/slips`, {
@@ -66,8 +75,24 @@ export function ClassDetail() {
 
   const withoutPins = roster.data?.length ?? 0
 
+  const removed = klass.data.status === 'archived'
+
   return (
     <>
+      {removed ? (
+        <div className="mb-6 flex flex-wrap items-center gap-3">
+          <Notice tone="info">
+            This class has been removed. Its students, work and marks are all kept.
+          </Notice>
+          <Button
+            variant="primary"
+            disabled={archive.isPending}
+            onClick={() => archive.mutate({ classId, archive: false })}
+          >
+            Put back
+          </Button>
+        </div>
+      ) : null}
       <PageHeader title={klass.data.name}>
         <Button variant="primary" onClick={() => navigate(`/classes/${classId}/live`)}>
           Live
@@ -114,6 +139,8 @@ export function ClassDetail() {
           </div>
         ) : null}
       </Card>
+
+      <ClassTeachersCard classId={classId} />
 
       <CurriculumCard
         classId={classId}
@@ -212,11 +239,25 @@ export function ClassDetail() {
                 >
                   Sign out
                 </Button>
+                <Button
+                  variant="quiet"
+                  onClick={() => setRemoving({ id: entry.student_id, name: entry.display_name })}
+                >
+                  Remove from class
+                </Button>
               </div>
             </li>
           ))}
         </ul>
       ) : null}
+
+      {withdraw.error ? (
+        <div className="mt-3">
+          <Notice tone="system-error">{messageFor(withdraw.error)}</Notice>
+        </div>
+      ) : null}
+
+      <RemovedStudents classId={classId} />
 
       {kicked ? (
         <div className="mt-4">
@@ -224,7 +265,66 @@ export function ClassDetail() {
         </div>
       ) : null}
 
+      {!removed ? (
+        <div className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-6">
+          <p className="text-sm text-muted">
+            Finished with this class? Removing it keeps every student’s work, and you can put it
+            back later.
+          </p>
+          <Button variant="quiet" onClick={() => setConfirmRemoveClass(true)}>
+            Remove class
+          </Button>
+        </div>
+      ) : null}
+      {archive.error ? (
+        <div className="mt-3">
+          <Notice tone="system-error">{messageFor(archive.error)}</Notice>
+        </div>
+      ) : null}
+
+      <Dialog
+        open={confirmRemoveClass}
+        title={`Remove ${klass.data.name}?`}
+        onClose={() => setConfirmRemoveClass(false)}
+        confirm={{
+          label: 'Remove class',
+          disabled: archive.isPending,
+          onConfirm: () =>
+            archive.mutate(
+              { classId, archive: true },
+              {
+                onSuccess: () => {
+                  setConfirmRemoveClass(false)
+                  navigate('/classes')
+                },
+              },
+            ),
+        }}
+      >
+        It disappears from your classes, its join code stops working, and anyone signed in to
+        it is signed out. Every student’s work, homework and marks are kept, and you can put
+        the class back from “Show removed classes”.
+      </Dialog>
+
       <BulkPasteDialog classId={classId} open={pasteOpen} onClose={() => setPasteOpen(false)} />
+
+      <Dialog
+        open={removing !== null}
+        title={removing ? `Remove ${removing.name} from this class?` : ''}
+        onClose={() => setRemoving(null)}
+        confirm={{
+          label: 'Remove from class',
+          disabled: withdraw.isPending,
+          onConfirm: () => {
+            if (!removing) return
+            withdraw.mutate(removing.id, { onSuccess: () => setRemoving(null) })
+          },
+        }}
+      >
+        They’ll be signed out straight away and won’t be able to sign in to this class. Their
+        saved work, homework and marks are kept, and you can put them back any time from
+        “Show removed students”.
+      </Dialog>
 
       <Dialog
         open={confirmRotate}
@@ -268,6 +368,80 @@ export function ClassDetail() {
  * (step 6), so it sits on the class page a teacher already has open at the start of a
  * lesson rather than somewhere in the curriculum editor.
  */
+/**
+ * Children taken out of this class, with Put back. Collapsed by default — the roster is
+ * who is here now — and only fetched when opened.
+ */
+function RemovedStudents({ classId }: { classId: string }) {
+  const [open, setOpen] = useState(false)
+  const everyone = useRosterWithWithdrawn(classId, open)
+  const reinstate = useReinstateStudent(classId)
+  const removed = everyone.data?.filter((entry) => entry.status === 'withdrawn') ?? []
+
+  return (
+    <div className="mt-4">
+      <Button variant="quiet" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        {open ? '▾ Hide removed students' : '▸ Show removed students'}
+      </Button>
+      {open ? (
+        <div className="mt-2">
+          {everyone.isPending ? <Spinner label="Loading removed students" /> : null}
+          {everyone.error ? (
+            <Notice tone="system-error">{messageFor(everyone.error)}</Notice>
+          ) : null}
+          {everyone.data && removed.length === 0 ? (
+            <p className="px-2 text-sm text-muted">Nobody has been removed from this class.</p>
+          ) : null}
+          {removed.length > 0 ? (
+            <ul className="flex flex-col gap-2">
+              {removed.map((entry) => (
+                <li
+                  key={entry.student_id}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-surface/60 px-5 py-3 ring-1 ring-line"
+                >
+                  <span className="text-muted">
+                    {entry.display_name}
+                    {entry.withdrawn_at ? (
+                      <span className="ml-2 text-sm">
+                        removed{' '}
+                        {new Date(entry.withdrawn_at).toLocaleDateString(undefined, {
+                          day: 'numeric',
+                          month: 'short',
+                        })}
+                      </span>
+                    ) : null}
+                  </span>
+                  <Button
+                    variant="secondary"
+                    disabled={reinstate.isPending}
+                    onClick={() => reinstate.mutate(entry.student_id)}
+                  >
+                    Put back
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {reinstate.error ? (
+            // A name clash (409) is the teacher's to fix by renaming; not a fault.
+            <div className="mt-2">
+              <Notice
+                tone={
+                  reinstate.error instanceof ApiError && reinstate.error.status === 409
+                    ? 'not-yet'
+                    : 'system-error'
+                }
+              >
+                {messageFor(reinstate.error)}
+              </Notice>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 function CurriculumCard({
   classId,
   courseId,

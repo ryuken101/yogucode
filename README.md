@@ -437,6 +437,13 @@ join by the owner's invite on the Teachers page (`/teachers`), sign up at `/sign
 cancel invites and remove teachers. No service key on the server: inviting sends no
 email — the owner copies the sign-up link to the teacher.
 
+**Class people (10 Oct 2026).** A class page can remove a child from the class (history
+kept, the child signed out; "Show removed students" puts them back) and lists its
+teachers as Lead or Assistant. The Classes page shows "My classes" first. Assigning
+teachers organises; it does not restrict — every teacher at the centre can still open
+every class. **Remove class** archives the whole class: hidden from the list, join code
+off, children signed out, everything kept; "Show removed classes" puts it back.
+
 **Rebranded as Yogucode (10 Oct 2026).** Ken's domain is yogucode.com (GoDaddy). The Fly
 app keeps its name, `magikid-code` — Fly apps cannot be renamed and nobody sees it once the
 domain is on.

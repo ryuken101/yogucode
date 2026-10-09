@@ -550,7 +550,13 @@ async def enrol_student(
 async def withdraw_student(
     class_id: uuid.UUID, student_id: uuid.UUID, principal: CurrentTeacher, session: SessionDep
 ) -> RosterEntryOut:
-    """Take a student out of a class. The enrolment row stays; its status changes."""
+    """Take a student out of a class. The enrolment row stays; its status changes.
+
+    The child is signed out too. A session belongs to the student, not to a class, so
+    without this a child removed mid-lesson would carry on working in the class they were
+    just taken out of until the session expired. They can sign in again only to a class
+    they are still in — the join flow needs an active enrolment.
+    """
     await get_owned_class(session, principal, class_id)
     student = await get_owned_student(session, principal, student_id)
     enrolment = await get_enrolment(session, principal, class_id, student.id)
@@ -558,10 +564,20 @@ async def withdraw_student(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="enrolment not found")
 
     if enrolment.status == EnrolmentStatus.ACTIVE:
+        now = utcnow()
         enrolment.status = EnrolmentStatus.WITHDRAWN
-        enrolment.withdrawn_at = utcnow()
+        enrolment.withdrawn_at = now
         session.add(enrolment)
-        session.add(_audit(principal, "enrolment.withdrawn", student.id, class_id=str(class_id)))
+        sessions_revoked = await revoke_live_sessions(session, student.id, now)
+        session.add(
+            _audit(
+                principal,
+                "enrolment.withdrawn",
+                student.id,
+                class_id=str(class_id),
+                sessions_revoked=sessions_revoked,
+            )
+        )
         await session.commit()
     return await _roster_entry(session, principal, class_id, student.id)
 

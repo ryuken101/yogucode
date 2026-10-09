@@ -96,6 +96,15 @@ table from `users` (no email, no Supabase identity, different PII posture), and 
 belong to a **centre**, not a class — enrolments are per-term, which is what lets mastery
 follow a child across terms in Phase 8.
 
+**Removing a child from a class** withdraws the enrolment (never deletes it) and revokes
+their sessions — a session belongs to the student, not the class, so without that they
+would keep working in a class they were taken out of. Archiving a class ("Remove
+class") does the same for everyone enrolled in it. **`class_teachers` is
+organisation, not permission:** every teacher at the centre can open every class (covering
+a lesson must not need someone to add you first). The links drive the class page's
+Teachers box (Lead/Assistant, any teacher may edit, at least one Lead kept,
+`routers/class_teachers.py`) and `ClassOut.is_mine` for "My classes".
+
 `centre_id` exists on nearly everything even though there is one centre today. Adding
 tenancy later means backfilling every table and re-auditing every query.
 

@@ -19,6 +19,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.audit import audit_entry
 from app.auth.principal import CurrentTeacher, Principal
+from app.auth.student_session import revoke_live_sessions
 from app.classwork import ensure_classwork
 from app.db import get_session
 from app.join_codes import mint_code, rotate_code
@@ -30,6 +31,8 @@ from app.models import (
     ClassTeacher,
     ClassTeacherRole,
     CurriculumStatus,
+    Enrolment,
+    EnrolmentStatus,
 )
 from app.models.base import utcnow
 from app.scoping import (
@@ -78,9 +81,12 @@ class ClassOut(BaseModel):
     current_lesson_id: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
+    # The caller is one of this class's teachers (`class_teachers`). Drives "My classes";
+    # it does not gate anything — every teacher at the centre can open every class.
+    is_mine: bool = False
 
     @classmethod
-    def build(cls, record: Class) -> "ClassOut":
+    def build(cls, record: Class, is_mine: bool = False) -> "ClassOut":
         return cls(
             id=record.id,
             name=record.name,
@@ -90,6 +96,7 @@ class ClassOut(BaseModel):
             current_lesson_id=record.current_lesson_id,
             created_at=record.created_at,
             updated_at=record.updated_at,
+            is_mine=is_mine,
         )
 
 
@@ -104,11 +111,25 @@ class ClassDetailOut(ClassOut):
     join_code: str | None
 
     @classmethod
-    def build_detail(cls, record: Class, code: ClassJoinCode | None) -> "ClassDetailOut":
+    def build_detail(
+        cls, record: Class, code: ClassJoinCode | None, is_mine: bool = False
+    ) -> "ClassDetailOut":
         return cls(
-            **ClassOut.build(record).model_dump(),
+            **ClassOut.build(record, is_mine).model_dump(),
             join_code=code.code if code else None,
         )
+
+
+async def my_class_ids(session: AsyncSession, principal: Principal) -> set[uuid.UUID]:
+    """The classes the caller teaches — one query, for marking `is_mine`."""
+    rows = await session.exec(
+        select(ClassTeacher.class_id).where(ClassTeacher.user_id == principal.subject_id)
+    )
+    return set(rows.all())
+
+
+async def _mine(session: AsyncSession, principal: Principal, class_id: uuid.UUID) -> bool:
+    return class_id in await my_class_ids(session, principal)
 
 
 def _audit(principal: Principal, action: str, class_id: uuid.UUID, **payload: object) -> AuditLog:
@@ -144,7 +165,7 @@ async def create_class(
     )
     await session.commit()
     await session.refresh(record)
-    return ClassDetailOut.build_detail(record, code)
+    return ClassDetailOut.build_detail(record, code, is_mine=True)
 
 
 @router.get("", response_model=list[ClassOut])
@@ -152,7 +173,8 @@ async def list_classes(
     principal: CurrentTeacher, session: SessionDep, include_archived: bool = False
 ) -> list[ClassOut]:
     records = await list_owned_classes(session, principal, include_archived)
-    return [ClassOut.build(record) for record in records]
+    mine = await my_class_ids(session, principal)
+    return [ClassOut.build(record, record.id in mine) for record in records]
 
 
 @router.get("/{class_id}", response_model=ClassDetailOut)
@@ -161,7 +183,7 @@ async def read_class(
 ) -> ClassDetailOut:
     record = await get_owned_class(session, principal, class_id)
     code = await get_live_join_code(session, principal, class_id)
-    return ClassDetailOut.build_detail(record, code)
+    return ClassDetailOut.build_detail(record, code, await _mine(session, principal, record.id))
 
 
 @router.patch("/{class_id}", response_model=ClassOut)
@@ -186,18 +208,23 @@ async def update_class(
         session.add(_audit(principal, "class.renamed", record.id, **changed))
         await session.commit()
         await session.refresh(record)
-    return ClassOut.build(record)
+    return ClassOut.build(record, await _mine(session, principal, record.id))
 
 
 @router.post("/{class_id}/archive", response_model=ClassOut)
 async def archive_class(
     class_id: uuid.UUID, principal: CurrentTeacher, session: SessionDep
 ) -> ClassOut:
-    """Close a class: hide it from the default list and revoke its live join codes.
+    """Close a class: hide it from the default list, revoke its join codes, sign its
+    children out. This is the class page's "Remove class".
 
     Enrolments are left untouched. They are the record of who was actually in the class
     this term, which is exactly what Phase 8 mastery reads — withdrawing them on archive
     would overwrite history to tidy up a status field.
+
+    Children still signed in are signed out, as when one child is removed from a class: a
+    session belongs to the child, so without this they would carry on working in a class
+    that no longer exists for anyone else. They can sign in to any other class they are in.
     """
     record = await get_owned_class(session, principal, class_id)
     record.status = ClassStatus.ARCHIVED
@@ -223,10 +250,30 @@ async def archive_class(
             .values(revoked_at=now)
         )
 
-    session.add(_audit(principal, "class.archived", record.id, join_codes_revoked=len(live_codes)))
+    enrolled = (
+        await session.exec(
+            select(Enrolment.student_id).where(
+                Enrolment.class_id == record.id,
+                Enrolment.status == EnrolmentStatus.ACTIVE,
+            )
+        )
+    ).all()
+    sessions_revoked = 0
+    for student_id in enrolled:
+        sessions_revoked += await revoke_live_sessions(session, student_id, now)
+
+    session.add(
+        _audit(
+            principal,
+            "class.archived",
+            record.id,
+            join_codes_revoked=len(live_codes),
+            sessions_revoked=sessions_revoked,
+        )
+    )
     await session.commit()
     await session.refresh(record)
-    return ClassOut.build(record)
+    return ClassOut.build(record, await _mine(session, principal, record.id))
 
 
 @router.post("/{class_id}/join-code/rotate", response_model=ClassDetailOut)
@@ -254,7 +301,7 @@ async def rotate_join_code(
     )
     await session.commit()
     record = await get_owned_class(session, principal, class_id)
-    return ClassDetailOut.build_detail(record, code)
+    return ClassDetailOut.build_detail(record, code, await _mine(session, principal, record.id))
 
 
 @router.post("/{class_id}/unarchive", response_model=ClassOut)
@@ -272,7 +319,7 @@ async def unarchive_class(
     session.add(_audit(principal, "class.unarchived", record.id))
     await session.commit()
     await session.refresh(record)
-    return ClassOut.build(record)
+    return ClassOut.build(record, await _mine(session, principal, record.id))
 
 
 def _unprocessable(detail: str) -> HTTPException:
@@ -326,4 +373,4 @@ async def set_class_curriculum(
         await ensure_classwork(session, principal, record)
         await session.commit()
         await session.refresh(record)
-    return ClassOut.build(record)
+    return ClassOut.build(record, await _mine(session, principal, record.id))

@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from app.routers import (
     auth,
     centres,
+    class_teachers,
     classes,
     curriculum,
     documents,
@@ -26,6 +27,7 @@ app = FastAPI(title="Yogucode API")
 app.include_router(auth.router)
 app.include_router(centres.router)
 app.include_router(classes.router)
+app.include_router(class_teachers.router)
 app.include_router(roster.students_router)
 app.include_router(roster.roster_router)
 app.include_router(join.router)

@@ -113,7 +113,13 @@ export const api = {
 
   /* --- teacher: classes ---------------------------------------------------------- */
 
-  listClasses: () => request<Schemas['ClassOut'][]>('/classes'),
+  listClasses: (includeArchived = false) =>
+    request<Schemas['ClassOut'][]>(`/classes${includeArchived ? '?include_archived=true' : ''}`),
+  /** "Remove class": hidden, code turned off, children signed out — all history kept. */
+  archiveClass: (classId: string) =>
+    request<Schemas['ClassOut']>(`/classes/${classId}/archive`, { method: 'POST' }),
+  unarchiveClass: (classId: string) =>
+    request<Schemas['ClassOut']>(`/classes/${classId}/unarchive`, { method: 'POST' }),
   createClass: (body: Schemas['ClassIn']) =>
     request<Schemas['ClassDetailOut']>('/classes', { method: 'POST', body }),
   readClass: (classId: string) => request<Schemas['ClassDetailOut']>(`/classes/${classId}`),
@@ -265,8 +271,35 @@ export const api = {
 
   /* --- teacher: roster ----------------------------------------------------------- */
 
-  readRoster: (classId: string) =>
-    request<Schemas['RosterEntryOut'][]>(`/classes/${classId}/roster`),
+  readRoster: (classId: string, includeWithdrawn = false) =>
+    request<Schemas['RosterEntryOut'][]>(
+      `/classes/${classId}/roster${includeWithdrawn ? '?include_withdrawn=true' : ''}`,
+    ),
+  /** Take a child out of a class. History is kept, and they are signed out. */
+  withdrawStudent: (classId: string, studentId: string) =>
+    request<Schemas['RosterEntryOut']>(`/classes/${classId}/enrolments/${studentId}/withdraw`, {
+      method: 'POST',
+    }),
+  reinstateStudent: (classId: string, studentId: string) =>
+    request<Schemas['RosterEntryOut']>(`/classes/${classId}/enrolments/${studentId}/reinstate`, {
+      method: 'POST',
+    }),
+
+  /* --- teacher: who teaches a class ------------------------------------------------ */
+
+  classTeachers: (classId: string) =>
+    request<Schemas['ClassTeacherOut'][]>(`/classes/${classId}/teachers`),
+  classTeacherCandidates: (classId: string) =>
+    request<Schemas['ClassTeacherCandidateOut'][]>(`/classes/${classId}/teachers/candidates`),
+  setClassTeacher: (classId: string, userId: string, role: Schemas['ClassTeacherRole']) =>
+    request<Schemas['ClassTeacherOut'][]>(`/classes/${classId}/teachers/${userId}`, {
+      method: 'PUT',
+      body: { role },
+    }),
+  removeClassTeacher: (classId: string, userId: string) =>
+    request<Schemas['ClassTeacherOut'][]>(`/classes/${classId}/teachers/${userId}/remove`, {
+      method: 'POST',
+    }),
   previewPaste: (classId: string, names: string) =>
     request<Schemas['RosterPreviewOut']>(`/classes/${classId}/roster/preview`, {
       method: 'POST',

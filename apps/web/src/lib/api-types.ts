@@ -424,11 +424,16 @@ export interface paths {
         put?: never;
         /**
          * Archive Class
-         * @description Close a class: hide it from the default list and revoke its live join codes.
+         * @description Close a class: hide it from the default list, revoke its join codes, sign its
+         *     children out. This is the class page's "Remove class".
          *
          *     Enrolments are left untouched. They are the record of who was actually in the class
          *     this term, which is exactly what Phase 8 mastery reads — withdrawing them on archive
          *     would overwrite history to tidy up a status field.
+         *
+         *     Children still signed in are signed out, as when one child is removed from a class: a
+         *     session belongs to the child, so without this they would carry on working in a class
+         *     that no longer exists for anyone else. They can sign in to any other class they are in.
          */
         post: operations["archive_class_classes__class_id__archive_post"];
         delete?: never;
@@ -521,6 +526,11 @@ export interface paths {
         /**
          * Withdraw Student
          * @description Take a student out of a class. The enrolment row stays; its status changes.
+         *
+         *     The child is signed out too. A session belongs to the student, not to a class, so
+         *     without this a child removed mid-lesson would carry on working in the class they were
+         *     just taken out of until the session expired. They can sign in again only to a class
+         *     they are still in — the join flow needs an active enrolment.
          */
         post: operations["withdraw_student_classes__class_id__enrolments__student_id__withdraw_post"];
         delete?: never;
@@ -692,6 +702,83 @@ export interface paths {
          *     into two requests at all.
          */
         post: operations["preview_roster_paste_classes__class_id__roster_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classes/{class_id}/teachers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Class Teachers */
+        get: operations["list_class_teachers_classes__class_id__teachers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classes/{class_id}/teachers/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Candidates
+         * @description The centre's active teachers who are not on this class yet — the Add picker.
+         */
+        get: operations["list_candidates_classes__class_id__teachers_candidates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classes/{class_id}/teachers/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Class Teacher
+         * @description Add a teacher to the class, or change their role. Returns the new listing.
+         */
+        put: operations["set_class_teacher_classes__class_id__teachers__user_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classes/{class_id}/teachers/{user_id}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Remove Class Teacher
+         * @description Take a teacher off the class. They can still open it, like any teacher here.
+         */
+        post: operations["remove_class_teacher_classes__class_id__teachers__user_id__remove_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2028,6 +2115,11 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /**
+             * Is Mine
+             * @default false
+             */
+            is_mine: boolean;
             /** Join Code */
             join_code: string | null;
             /** Name */
@@ -2064,6 +2156,11 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /**
+             * Is Mine
+             * @default false
+             */
+            is_mine: boolean;
             /** Name */
             name: string;
             status: components["schemas"]["ClassStatus"];
@@ -2090,6 +2187,42 @@ export interface components {
          * @enum {string}
          */
         ClassStatus: "active" | "archived";
+        /** ClassTeacherCandidateOut */
+        ClassTeacherCandidateOut: {
+            /** Display Name */
+            display_name: string;
+            /** Email */
+            email: string;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+        };
+        /** ClassTeacherIn */
+        ClassTeacherIn: {
+            role: components["schemas"]["ClassTeacherRole"];
+        };
+        /** ClassTeacherOut */
+        ClassTeacherOut: {
+            /** Display Name */
+            display_name: string;
+            /** Email */
+            email: string;
+            /** Is You */
+            is_you: boolean;
+            role: components["schemas"]["ClassTeacherRole"];
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+        };
+        /**
+         * ClassTeacherRole
+         * @enum {string}
+         */
+        ClassTeacherRole: "lead" | "assistant";
         /** ConceptOut */
         ConceptOut: {
             /**
@@ -4935,6 +5068,144 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RosterPreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_class_teachers_classes__class_id__teachers_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                class_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassTeacherOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_candidates_classes__class_id__teachers_candidates_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                class_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassTeacherCandidateOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_class_teacher_classes__class_id__teachers__user_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                class_id: string;
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClassTeacherIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassTeacherOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_class_teacher_classes__class_id__teachers__user_id__remove_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                class_id: string;
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassTeacherOut"][];
                 };
             };
             /** @description Validation Error */
