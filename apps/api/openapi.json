@@ -732,6 +732,18 @@
             ],
             "title": "Content"
           },
+          "folder_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folder Id"
+          },
           "title": {
             "anyOf": [
               {
@@ -759,6 +771,18 @@
             "title": "Created At",
             "type": "string"
           },
+          "folder_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folder Id"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -780,6 +804,7 @@
         "required": [
           "id",
           "title",
+          "folder_id",
           "status",
           "created_at",
           "updated_at",
@@ -802,6 +827,18 @@
               }
             ],
             "title": "Content"
+          },
+          "folder_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folder Id"
           },
           "title": {
             "anyOf": [
@@ -836,6 +873,18 @@
             "title": "Created At",
             "type": "string"
           },
+          "folder_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folder Id"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -857,6 +906,7 @@
         "required": [
           "id",
           "title",
+          "folder_id",
           "status",
           "created_at",
           "updated_at"
@@ -885,6 +935,22 @@
         ],
         "title": "EnrolmentStatus",
         "type": "string"
+      },
+      "EraseIn": {
+        "description": "Delete entirely: the name, typed out, as the confirmation (case and spaces ignored).",
+        "properties": {
+          "confirm_name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Confirm Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "confirm_name"
+        ],
+        "title": "EraseIn",
+        "type": "object"
       },
       "EventBatchIn": {
         "properties": {
@@ -1031,6 +1097,122 @@
           "outcome"
         ],
         "title": "FeedbackOut",
+        "type": "object"
+      },
+      "FolderDeletedOut": {
+        "properties": {
+          "files_archived": {
+            "title": "Files Archived",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "files_archived"
+        ],
+        "title": "FolderDeletedOut",
+        "type": "object"
+      },
+      "FolderIn": {
+        "properties": {
+          "name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "FolderIn",
+        "type": "object"
+      },
+      "FolderOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "parent_id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "FolderOut",
+        "type": "object"
+      },
+      "FolderPatch": {
+        "description": "Rename and/or move. An absent field is left alone; `parent_id: null` is the top.",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          }
+        },
+        "title": "FolderPatch",
         "type": "object"
       },
       "FunctionTest": {
@@ -1943,85 +2125,6 @@
         "title": "ItemStatus",
         "type": "string"
       },
-      "JoinLookupIn": {
-        "properties": {
-          "code": {
-            "maxLength": 32,
-            "minLength": 1,
-            "title": "Code",
-            "type": "string"
-          }
-        },
-        "required": [
-          "code"
-        ],
-        "title": "JoinLookupIn",
-        "type": "object"
-      },
-      "JoinLookupOut": {
-        "properties": {
-          "class_id": {
-            "format": "uuid",
-            "title": "Class Id",
-            "type": "string"
-          },
-          "class_name": {
-            "title": "Class Name",
-            "type": "string"
-          },
-          "students": {
-            "items": {
-              "$ref": "#/components/schemas/JoinStudentOut"
-            },
-            "title": "Students",
-            "type": "array"
-          },
-          "term_label": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Term Label"
-          }
-        },
-        "required": [
-          "class_id",
-          "class_name",
-          "term_label",
-          "students"
-        ],
-        "title": "JoinLookupOut",
-        "type": "object"
-      },
-      "JoinStudentOut": {
-        "description": "A name on the picker, and whether it can be signed in to yet.",
-        "properties": {
-          "display_name": {
-            "title": "Display Name",
-            "type": "string"
-          },
-          "has_pin": {
-            "title": "Has Pin",
-            "type": "boolean"
-          },
-          "id": {
-            "format": "uuid",
-            "title": "Id",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "display_name",
-          "has_pin"
-        ],
-        "title": "JoinStudentOut",
-        "type": "object"
-      },
       "LadderIn": {
         "properties": {
           "item_ids": {
@@ -2818,6 +2921,25 @@
         "title": "PastedNamesIn",
         "type": "object"
       },
+      "PinIn": {
+        "description": "A PIN the teacher chose, or none for a random one.",
+        "properties": {
+          "pin": {
+            "anyOf": [
+              {
+                "maxLength": 8,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pin"
+          }
+        },
+        "title": "PinIn",
+        "type": "object"
+      },
       "PinSlipOut": {
         "description": "A PIN in plaintext. Returned exactly once, to be printed and handed over.\n\nThe stored form is an Argon2id hash, so this is the only moment the PIN is legible to\nanyone. If the teacher loses it, the remedy is to issue a new one, not to look it up.",
         "properties": {
@@ -2833,11 +2955,16 @@
             "format": "uuid",
             "title": "Student Id",
             "type": "string"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
           }
         },
         "required": [
           "student_id",
           "display_name",
+          "username",
           "pin"
         ],
         "title": "PinSlipOut",
@@ -3558,6 +3685,10 @@
             "title": "Display Name",
             "type": "string"
           },
+          "has_pin": {
+            "title": "Has Pin",
+            "type": "boolean"
+          },
           "joined_at": {
             "format": "date-time",
             "title": "Joined At",
@@ -3573,6 +3704,10 @@
           },
           "student_status": {
             "$ref": "#/components/schemas/StudentStatus"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
           },
           "withdrawn_at": {
             "anyOf": [
@@ -3590,6 +3725,8 @@
         "required": [
           "student_id",
           "display_name",
+          "username",
+          "has_pin",
           "student_status",
           "status",
           "joined_at",
@@ -4001,6 +4138,52 @@
         "title": "StudentClassOut",
         "type": "object"
       },
+      "StudentCreatedOut": {
+        "description": "A new account, with its PIN \u2014 returned this once, to print or tell the child.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "pin": {
+            "title": "Pin",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/StudentStatus"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "display_name",
+          "username",
+          "status",
+          "created_at",
+          "updated_at",
+          "pin"
+        ],
+        "title": "StudentCreatedOut",
+        "type": "object"
+      },
       "StudentDetailOut": {
         "properties": {
           "classes": {
@@ -4031,11 +4214,16 @@
             "format": "date-time",
             "title": "Updated At",
             "type": "string"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
           }
         },
         "required": [
           "id",
           "display_name",
+          "username",
           "status",
           "created_at",
           "updated_at",
@@ -4072,12 +4260,37 @@
         "type": "object"
       },
       "StudentIn": {
+        "description": "A new account (Ken's decision, 11 Oct 2026): a name, a username and a PIN.\n\nLeave `username` out and one is suggested from the name; leave `pin` out and a random\none is drawn. Either way the PIN comes back once, in the response, to print or tell.",
         "properties": {
           "display_name": {
             "maxLength": 80,
             "minLength": 1,
             "title": "Display Name",
             "type": "string"
+          },
+          "pin": {
+            "anyOf": [
+              {
+                "maxLength": 8,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pin"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
           }
         },
         "required": [
@@ -4220,11 +4433,16 @@
             "format": "date-time",
             "title": "Updated At",
             "type": "string"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
           }
         },
         "required": [
           "id",
           "display_name",
+          "username",
           "status",
           "created_at",
           "updated_at"
@@ -4247,6 +4465,19 @@
               }
             ],
             "title": "Display Name"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
           }
         },
         "title": "StudentPatch",
@@ -4323,27 +4554,21 @@
       },
       "StudentSignInIn": {
         "properties": {
-          "code": {
-            "maxLength": 32,
-            "minLength": 1,
-            "title": "Code",
-            "type": "string"
-          },
           "pin": {
             "maxLength": 16,
             "minLength": 1,
             "title": "Pin",
             "type": "string"
           },
-          "student_id": {
-            "format": "uuid",
-            "title": "Student Id",
+          "username": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Username",
             "type": "string"
           }
         },
         "required": [
-          "code",
-          "student_id",
+          "username",
           "pin"
         ],
         "title": "StudentSignInIn",
@@ -4609,6 +4834,19 @@
         ],
         "title": "UserRole",
         "type": "string"
+      },
+      "UsernameSuggestionOut": {
+        "properties": {
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username"
+        ],
+        "title": "UsernameSuggestionOut",
+        "type": "object"
       },
       "ValidationError": {
         "properties": {
@@ -5593,7 +5831,7 @@
     },
     "/auth/student/session": {
       "post": {
-        "description": "Name plus PIN plus class code, in exchange for a session cookie.",
+        "description": "Username plus PIN, in exchange for a session cookie.",
         "operationId": "student_sign_in_auth_student_session_post",
         "parameters": [
           {
@@ -6122,6 +6360,69 @@
           }
         },
         "summary": "Set Class Curriculum",
+        "tags": [
+          "classes"
+        ]
+      }
+    },
+    "/classes/{class_id}/delete": {
+      "post": {
+        "description": "Delete a class entirely: it and its homework, quizzes, submissions and marks (Ken's\ndecision, 11 Oct 2026). Student accounts and their own files stay \u2014 a child can be in\nother classes. Owner only, with the class name typed out. See `app.erase`.",
+        "operationId": "delete_class_classes__class_id__delete_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "class_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Class Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EraseIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Class",
         "tags": [
           "classes"
         ]
@@ -6946,6 +7247,76 @@
           }
         },
         "summary": "Preview Roster Paste",
+        "tags": [
+          "roster"
+        ]
+      }
+    },
+    "/classes/{class_id}/students": {
+      "post": {
+        "description": "Create a child's account and put them in this class \u2014 the class page's Add student.\n\nReturns the slip (name, username, PIN) once: the PIN is stored hashed and cannot be\nread back later (Ken's decision, 11 Oct 2026).",
+        "operationId": "add_new_student_classes__class_id__students_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "class_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Class Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PinSlipOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add New Student",
         "tags": [
           "roster"
         ]
@@ -8496,48 +8867,6 @@
         ]
       }
     },
-    "/join/lookup": {
-      "post": {
-        "description": "Turn a class code into the list of names a child picks from.",
-        "operationId": "lookup_class_join_lookup_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/JoinLookupIn"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JoinLookupOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Lookup Class",
-        "tags": [
-          "join"
-        ]
-      }
-    },
     "/lessons/{lesson_id}": {
       "patch": {
         "operationId": "update_lesson_lessons__lesson_id__patch",
@@ -9697,6 +10026,244 @@
         ]
       }
     },
+    "/me/folders": {
+      "get": {
+        "operationId": "list_folders_me_folders_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FolderOut"
+                  },
+                  "title": "Response List Folders Me Folders Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Folders",
+        "tags": [
+          "folders"
+        ]
+      },
+      "post": {
+        "operationId": "new_folder_me_folders_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FolderIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FolderOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "New Folder",
+        "tags": [
+          "folders"
+        ]
+      }
+    },
+    "/me/folders/{folder_id}": {
+      "patch": {
+        "operationId": "change_folder_me_folders__folder_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "folder_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Folder Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FolderPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FolderOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Change Folder",
+        "tags": [
+          "folders"
+        ]
+      }
+    },
+    "/me/folders/{folder_id}/delete": {
+      "post": {
+        "operationId": "remove_folder_me_folders__folder_id__delete_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "folder_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Folder Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FolderDeletedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Folder",
+        "tags": [
+          "folders"
+        ]
+      }
+    },
     "/me/home": {
       "get": {
         "description": "Everything the home screen shows: today's ladder, and homework \u2014 due, handed in,\nor given back. Soonest due first; returned work after everything still to do.",
@@ -10550,7 +11117,7 @@
         ]
       },
       "post": {
-        "description": "Add a student to the centre, without enrolling them anywhere.\n\nNo `student_credentials` row is written: the teacher sets the PIN at step 7, and a\nchild on the roster who cannot sign in yet is a normal intermediate state.",
+        "description": "Create a child's account at the centre, without enrolling them anywhere.",
         "operationId": "create_student_students_post",
         "parameters": [
           {
@@ -10585,7 +11152,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StudentOut"
+                  "$ref": "#/components/schemas/StudentCreatedOut"
                 }
               }
             },
@@ -10603,6 +11170,65 @@
           }
         },
         "summary": "Create Student",
+        "tags": [
+          "roster"
+        ]
+      }
+    },
+    "/students/username-suggestion": {
+      "get": {
+        "description": "What the Add student form fills in as the teacher types the name.",
+        "operationId": "suggest_a_username_students_username_suggestion_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsernameSuggestionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Suggest A Username",
         "tags": [
           "roster"
         ]
@@ -10795,6 +11421,69 @@
         ]
       }
     },
+    "/students/{student_id}/delete": {
+      "post": {
+        "description": "Delete a child entirely: their account and all their work, everywhere (Ken's\ndecision, 11 Oct 2026). Owner only, and only with the name typed out. See `app.erase`.",
+        "operationId": "delete_student_students__student_id__delete_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EraseIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Student",
+        "tags": [
+          "roster"
+        ]
+      }
+    },
     "/students/{student_id}/history": {
       "get": {
         "description": "A child's homework across every class they have been in, newest first.",
@@ -10855,10 +11544,10 @@
         ]
       }
     },
-    "/students/{student_id}/pin/reset": {
+    "/students/{student_id}/pin": {
       "post": {
-        "description": "Give one child a new PIN.\n\nA Year 4 student forgets theirs roughly weekly and the hash cannot be read back, so\nreplacing it is the only recovery there is. That makes this a primary flow: one\nrequest, one new PIN, printed and handed over.",
-        "operationId": "reset_student_pin_students__student_id__pin_reset_post",
+        "description": "Change a child's PIN \u2014 to one the teacher chose, or a random one.\n\nThe PIN is stored hashed, so when a child forgets theirs this is the remedy: set a new\none and tell them. The slip comes back once, to print.",
+        "operationId": "set_student_pin_students__student_id__pin_post",
         "parameters": [
           {
             "in": "path",
@@ -10887,6 +11576,16 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PinIn"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "201": {
             "content": {
@@ -10909,7 +11608,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Reset Student Pin",
+        "summary": "Set Student Pin",
         "tags": [
           "roster"
         ]
@@ -11398,6 +12097,244 @@
         "summary": "Restore Teacher Document",
         "tags": [
           "teacher documents"
+        ]
+      }
+    },
+    "/teacher/folders": {
+      "get": {
+        "operationId": "list_folders_teacher_folders_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FolderOut"
+                  },
+                  "title": "Response List Folders Teacher Folders Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Folders",
+        "tags": [
+          "folders"
+        ]
+      },
+      "post": {
+        "operationId": "new_folder_teacher_folders_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FolderIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FolderOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "New Folder",
+        "tags": [
+          "folders"
+        ]
+      }
+    },
+    "/teacher/folders/{folder_id}": {
+      "patch": {
+        "operationId": "change_folder_teacher_folders__folder_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "folder_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Folder Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FolderPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FolderOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Change Folder",
+        "tags": [
+          "folders"
+        ]
+      }
+    },
+    "/teacher/folders/{folder_id}/delete": {
+      "post": {
+        "operationId": "remove_folder_teacher_folders__folder_id__delete_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "folder_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Folder Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FolderDeletedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Folder",
+        "tags": [
+          "folders"
         ]
       }
     },

@@ -10,9 +10,13 @@
  * Returns `bind`, handed to the editor (`CodeSurface onModel`), and `isRemote`, true while
  * a teacher's edit is being written into the editor — so the event recorder can file it
  * as `teacher_edit` rather than as the child's own keystrokes.
+ *
+ * And `locked`: true while a teacher is helping in this editor (Ken's decision, 11 Oct
+ * 2026). The page makes the editor read-only meanwhile, so the child watches instead of
+ * typing over their teacher. The server unlocks it when the teacher stops or leaves.
  */
 
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as Y from 'yjs'
 import { MonacoYBinding, type BindableModel } from './monacoBinding'
 import { RemoteCaret } from './remoteCaret'
@@ -33,6 +37,8 @@ export function useLiveDoc(target: string | null, initialText: string | null) {
 
   const binding = useRef<MonacoYBinding | null>(null)
   const caret = useRef<RemoteCaret | null>(null)
+  // Which target the lock belongs to, so switching files never carries a lock across.
+  const [lockedTarget, setLockedTarget] = useState<string | null>(null)
 
   useEffect(() => {
     if (!doc || !target) return
@@ -45,6 +51,7 @@ export function useLiveDoc(target: string | null, initialText: string | null) {
       sendFull: () => live.sendDoc(target, Y.encodeStateAsUpdate(doc), true),
       receive: (update) => Y.applyUpdate(doc, update, REMOTE),
       cursor: (offset) => caret.current?.show(offset),
+      help: (on) => setLockedTarget(on ? target : null),
     })
     return () => {
       // Not destroyed: React's development mode mounts effects twice, and a destroyed doc
@@ -78,5 +85,5 @@ export function useLiveDoc(target: string | null, initialText: string | null) {
     [target],
   )
 
-  return { bind, isRemote, onCursor }
+  return { bind, isRemote, onCursor, locked: target !== null && lockedTarget === target }
 }

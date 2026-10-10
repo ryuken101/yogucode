@@ -25,10 +25,11 @@ from sqlmodel import select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.audit import audit_entry
-from app.auth.pin import generate_pin, hash_pin
-from app.auth.principal import CurrentTeacher, Principal
+from app.auth.pin import PIN_LENGTH, generate_pin, hash_pin, is_weak
+from app.auth.principal import CurrentOwner, CurrentTeacher, Principal
 from app.auth.student_session import revoke_live_sessions
 from app.db import get_session
+from app.erase import EraseIn, erase_student, names_match
 from app.models import (
     AuditLog,
     Class,
@@ -60,6 +61,12 @@ from app.scoping import (
     list_owned_students,
     list_student_enrolments,
 )
+from app.usernames import (
+    clean_username,
+    suggest_username,
+    taken_usernames,
+    username_taken,
+)
 
 students_router = APIRouter(prefix="/students", tags=["roster"])
 roster_router = APIRouter(prefix="/classes", tags=["roster"])
@@ -71,18 +78,38 @@ SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
 class StudentIn(BaseModel):
+    """A new account (Ken's decision, 11 Oct 2026): a name, a username and a PIN.
+
+    Leave `username` out and one is suggested from the name; leave `pin` out and a random
+    one is drawn. Either way the PIN comes back once, in the response, to print or tell.
+    """
+
     display_name: str = Field(min_length=1, max_length=MAX_NAME_LENGTH)
+    username: str | None = Field(default=None, max_length=40)
+    pin: str | None = Field(default=None, max_length=8)
 
 
 class StudentPatch(BaseModel):
     """Every field optional — an absent field means "leave it alone"."""
 
     display_name: str | None = Field(default=None, min_length=1, max_length=MAX_NAME_LENGTH)
+    username: str | None = Field(default=None, min_length=1, max_length=40)
+
+
+class PinIn(BaseModel):
+    """A PIN the teacher chose, or none for a random one."""
+
+    pin: str | None = Field(default=None, max_length=8)
+
+
+class UsernameSuggestionOut(BaseModel):
+    username: str
 
 
 class StudentOut(BaseModel):
     id: uuid.UUID
     display_name: str
+    username: str
     status: StudentStatus
     created_at: datetime
     updated_at: datetime
@@ -92,6 +119,7 @@ class StudentOut(BaseModel):
         return cls(
             id=record.id,
             display_name=record.display_name,
+            username=record.username,
             status=record.status,
             created_at=record.created_at,
             updated_at=record.updated_at,
@@ -138,16 +166,23 @@ class RosterEntryOut(BaseModel):
 
     student_id: uuid.UUID
     display_name: str
+    username: str
+    # Whether a PIN is set. The PIN itself is never readable after it is set.
+    has_pin: bool
     student_status: StudentStatus
     status: EnrolmentStatus
     joined_at: datetime
     withdrawn_at: datetime | None
 
     @classmethod
-    def build(cls, enrolment: Enrolment, student: Student) -> "RosterEntryOut":
+    def build(
+        cls, enrolment: Enrolment, student: Student, has_pin: bool = False
+    ) -> "RosterEntryOut":
         return cls(
             student_id=student.id,
             display_name=student.display_name,
+            username=student.username,
+            has_pin=has_pin,
             student_status=student.status,
             status=enrolment.status,
             joined_at=enrolment.joined_at,
@@ -249,6 +284,13 @@ class PinSlipOut(BaseModel):
 
     student_id: uuid.UUID
     display_name: str
+    username: str
+    pin: str
+
+
+class StudentCreatedOut(StudentOut):
+    """A new account, with its PIN — returned this once, to print or tell the child."""
+
     pin: str
 
 
@@ -263,6 +305,51 @@ class SessionsRevokedOut(BaseModel):
 def _audit(principal: Principal, action: str, student_id: uuid.UUID, **payload: object) -> AuditLog:
     """Roster actions are keyed to the child, not to the row — see `app.audit`."""
     return audit_entry(principal, action, "student", student_id, **payload)
+
+
+def _chosen_pin(raw: str | None) -> str:
+    """The teacher's PIN if they typed one (4 digits, not an obvious one), else random."""
+    if raw is None or not raw.strip():
+        return generate_pin()
+    pin = raw.strip()
+    if len(pin) != PIN_LENGTH or not pin.isdigit():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="A PIN is 4 digits",
+        )
+    if is_weak(pin):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="That PIN is too easy to guess — try another, or press Random",
+        )
+    return pin
+
+
+async def _username_for(
+    session: AsyncSession, display_name: str, requested: str | None, *, mine: Student | None = None
+) -> str:
+    """The username to use: the teacher's, checked; or one suggested from the name."""
+    taken = await taken_usernames(session)
+    if mine is not None:
+        taken.discard(mine.username.lower())
+    if requested is None or not requested.strip():
+        return suggest_username(display_name, taken)
+    username = clean_username(requested)
+    if username in taken:
+        raise username_taken(suggest_username(username, taken))
+    return username
+
+
+async def _pins_set(session: AsyncSession, student_ids: list[uuid.UUID]) -> set[uuid.UUID]:
+    """Which of these students have a PIN — the roster shows it, never the PIN."""
+    if not student_ids:
+        return set()
+    rows = await session.exec(
+        select(StudentCredential.student_id).where(
+            StudentCredential.student_id.in_(student_ids)  # type: ignore[attr-defined]
+        )
+    )
+    return set(rows.all())
 
 
 def _conflict(detail: str) -> HTTPException:
@@ -365,7 +452,8 @@ async def _roster_entry(
         session, principal, class_id, include_withdrawn=True
     ):
         if student.id == student_id:
-            return RosterEntryOut.build(enrolment, student)
+            has_pin = student_id in await _pins_set(session, [student_id])
+            return RosterEntryOut.build(enrolment, student, has_pin)
     raise HTTPException(  # pragma: no cover — the caller has just written this row
         status_code=status.HTTP_404_NOT_FOUND, detail="enrolment not found"
     )
@@ -374,22 +462,44 @@ async def _roster_entry(
 # --- students ----------------------------------------------------------------------
 
 
-@students_router.post("", response_model=StudentOut, status_code=status.HTTP_201_CREATED)
-async def create_student(
-    body: StudentIn, principal: CurrentTeacher, session: SessionDep
-) -> StudentOut:
-    """Add a student to the centre, without enrolling them anywhere.
-
-    No `student_credentials` row is written: the teacher sets the PIN at step 7, and a
-    child on the roster who cannot sign in yet is a normal intermediate state.
-    """
-    record = Student(centre_id=principal.centre_id, display_name=normalise_name(body.display_name))
+async def _new_account(
+    session: AsyncSession, principal: Principal, body: StudentIn
+) -> tuple[Student, str]:
+    """A child's account: name, username and PIN. Never commits."""
+    name = normalise_name(body.display_name)
+    pin = _chosen_pin(body.pin)
+    username = await _username_for(session, name, body.username)
+    record = Student(centre_id=principal.centre_id, display_name=name, username=username)
     session.add(record)
     await session.flush()
-    session.add(_audit(principal, "student.created", record.id, display_name=record.display_name))
+    session.add(
+        StudentCredential(
+            student_id=record.id, pin_hash=hash_pin(pin), pin_set_by=principal.subject_id
+        )
+    )
+    session.add(
+        _audit(principal, "student.created", record.id, display_name=name, username=username)
+    )
+    return record, pin
+
+
+@students_router.post("", response_model=StudentCreatedOut, status_code=status.HTTP_201_CREATED)
+async def create_student(
+    body: StudentIn, principal: CurrentTeacher, session: SessionDep
+) -> StudentCreatedOut:
+    """Create a child's account at the centre, without enrolling them anywhere."""
+    record, pin = await _new_account(session, principal, body)
     await session.commit()
     await session.refresh(record)
-    return StudentOut.build(record)
+    return StudentCreatedOut(**StudentOut.build(record).model_dump(), pin=pin)
+
+
+@students_router.get("/username-suggestion", response_model=UsernameSuggestionOut)
+async def suggest_a_username(
+    name: str, principal: CurrentTeacher, session: SessionDep
+) -> UsernameSuggestionOut:
+    """What the Add student form fills in as the teacher types the name."""
+    return UsernameSuggestionOut(username=suggest_username(name, await taken_usernames(session)))
 
 
 @students_router.get("", response_model=list[StudentOut])
@@ -423,6 +533,14 @@ async def rename_student(
             record.display_name = renamed
             session.add(record)
             session.add(_audit(principal, "student.renamed", record.id, display_name=renamed))
+            await session.commit()
+            await session.refresh(record)
+    if "username" in fields and fields["username"] is not None:
+        username = await _username_for(session, record.display_name, body.username, mine=record)
+        if username != record.username:
+            record.username = username
+            session.add(record)
+            session.add(_audit(principal, "student.username_changed", record.id, username=username))
             await session.commit()
             await session.refresh(record)
     return StudentOut.build(record)
@@ -488,6 +606,25 @@ async def archive_student(
     return StudentOut.build(record)
 
 
+@students_router.post("/{student_id}/delete", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_student(
+    student_id: uuid.UUID, body: EraseIn, principal: CurrentOwner, session: SessionDep
+) -> None:
+    """Delete a child entirely: their account and all their work, everywhere (Ken's
+    decision, 11 Oct 2026). Owner only, and only with the name typed out. See `app.erase`.
+    """
+    record = await get_owned_student(session, principal, student_id)
+    if not names_match(body.confirm_name, record.display_name):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Type the student’s name exactly to confirm.",
+        )
+    erased = await erase_student(session, record.id)
+    # Ids and counts only: the point of deleting is that the child's name goes too.
+    session.add(_audit(principal, "student.deleted", student_id, rows=erased.counts))
+    await session.commit()
+
+
 @students_router.post("/{student_id}/unarchive", response_model=StudentOut)
 async def unarchive_student(
     student_id: uuid.UUID, principal: CurrentTeacher, session: SessionDep
@@ -521,7 +658,37 @@ async def read_roster(
     """The class roster, alphabetically — the order it is read aloud in."""
     await get_owned_class(session, principal, class_id)
     entries = await list_class_roster(session, principal, class_id, include_withdrawn)
-    return [RosterEntryOut.build(enrolment, student) for enrolment, student in entries]
+    pins = await _pins_set(session, [student.id for _, student in entries])
+    return [
+        RosterEntryOut.build(enrolment, student, student.id in pins)
+        for enrolment, student in entries
+    ]
+
+
+@roster_router.post(
+    "/{class_id}/students", response_model=PinSlipOut, status_code=status.HTTP_201_CREATED
+)
+async def add_new_student(
+    class_id: uuid.UUID, body: StudentIn, principal: CurrentTeacher, session: SessionDep
+) -> PinSlipOut:
+    """Create a child's account and put them in this class — the class page's Add student.
+
+    Returns the slip (name, username, PIN) once: the PIN is stored hashed and cannot be
+    read back later (Ken's decision, 11 Oct 2026).
+    """
+    await get_owned_class(session, principal, class_id)
+    probe = Student(
+        centre_id=principal.centre_id,
+        display_name=normalise_name(body.display_name),
+        username="probe",
+    )
+    await _refuse_name_clash(session, principal, class_id, probe)
+    record, pin = await _new_account(session, principal, body)
+    await _enrol(session, principal, class_id, record)
+    await session.commit()
+    return PinSlipOut(
+        student_id=record.id, display_name=record.display_name, username=record.username, pin=pin
+    )
 
 
 @roster_router.post(
@@ -729,9 +896,14 @@ async def bulk_enrol(
         )
 
     touched: list[uuid.UUID] = []
+    taken = await taken_usernames(session)
     for target, name in planned:
         if target is None:
-            student = Student(centre_id=principal.centre_id, display_name=name)
+            # A suggested username; the teacher can edit it, and sets PINs next
+            # ("Issue missing PINs").
+            username = suggest_username(name, taken)
+            taken.add(username)
+            student = Student(centre_id=principal.centre_id, display_name=name, username=username)
             session.add(student)
             await session.flush()
             session.add(
@@ -746,8 +918,9 @@ async def bulk_enrol(
     await session.commit()
 
     wanted = set(touched)
+    pins = await _pins_set(session, touched)
     return [
-        RosterEntryOut.build(enrolment, student)
+        RosterEntryOut.build(enrolment, student, student.id in pins)
         for enrolment, student in await list_class_roster(session, principal, class_id)
         if student.id in wanted
     ]
@@ -762,9 +935,11 @@ def _set_pin(
     student: Student,
     credential: StudentCredential | None,
     action: str,
+    pin: str | None = None,
 ) -> PinSlipOut:
-    """Mint a PIN for one student and return the slip. Never commits."""
-    pin = generate_pin()
+    """Set a PIN for one student — the teacher's or a random one — and return the slip.
+    Never commits."""
+    pin = pin or generate_pin()
     if credential is None:
         credential = StudentCredential(student_id=student.id, pin_hash=hash_pin(pin))
     else:
@@ -782,7 +957,9 @@ def _set_pin(
     session.add(credential)
     # The PIN itself never reaches the audit row, a log, or an error message.
     session.add(_audit(principal, action, student.id))
-    return PinSlipOut(student_id=student.id, display_name=student.display_name, pin=pin)
+    return PinSlipOut(
+        student_id=student.id, display_name=student.display_name, username=student.username, pin=pin
+    )
 
 
 @roster_router.post(
@@ -814,21 +991,21 @@ async def issue_class_pins(
 
 
 @students_router.post(
-    "/{student_id}/pin/reset", response_model=PinSlipOut, status_code=status.HTTP_201_CREATED
+    "/{student_id}/pin", response_model=PinSlipOut, status_code=status.HTTP_201_CREATED
 )
-async def reset_student_pin(
-    student_id: uuid.UUID, principal: CurrentTeacher, session: SessionDep
+async def set_student_pin(
+    student_id: uuid.UUID, body: PinIn, principal: CurrentTeacher, session: SessionDep
 ) -> PinSlipOut:
-    """Give one child a new PIN.
+    """Change a child's PIN — to one the teacher chose, or a random one.
 
-    A Year 4 student forgets theirs roughly weekly and the hash cannot be read back, so
-    replacing it is the only recovery there is. That makes this a primary flow: one
-    request, one new PIN, printed and handed over.
+    The PIN is stored hashed, so when a child forgets theirs this is the remedy: set a new
+    one and tell them. The slip comes back once, to print.
     """
     student = await get_owned_student(session, principal, student_id)
+    pin = _chosen_pin(body.pin)
     credential = await session.get(StudentCredential, student.id)
     action = "pin.reset" if credential is not None else "pin.issued"
-    slip = _set_pin(session, principal, student, credential, action)
+    slip = _set_pin(session, principal, student, credential, action, pin)
     await session.commit()
     return slip
 

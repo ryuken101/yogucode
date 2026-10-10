@@ -51,7 +51,7 @@ test('signing out lands on the sign-in, ready for the next child', async () => {
 
   await user.click(await screen.findByRole('button', { name: 'Sign out' }))
 
-  expect(await screen.findByLabelText('Class code', {}, { timeout: 3000 })).toBeInTheDocument()
+  expect(await screen.findByLabelText('Username', {}, { timeout: 3000 })).toBeInTheDocument()
 })
 
 for (const start of ['/home', '/work', '/homework/018f0000-0000-7000-8000-0000000000a1']) {
@@ -69,7 +69,7 @@ for (const start of ['/home', '/work', '/homework/018f0000-0000-7000-8000-000000
     const errors = vi.spyOn(console, 'error')
     const { user } = renderScreen(<App />, { route: start })
     await user.click(await screen.findByRole('button', { name: 'Sign out' }))
-    expect(await screen.findByLabelText('Class code', {}, { timeout: 3000 })).toBeInTheDocument()
+    expect(await screen.findByLabelText('Username', {}, { timeout: 3000 })).toBeInTheDocument()
     expect(errors.mock.calls.map((c) => String(c[0])).filter((m) => !m.includes('act('))).toEqual([])
   })
 }

@@ -18,10 +18,11 @@ from sqlmodel import select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.audit import audit_entry
-from app.auth.principal import CurrentTeacher, Principal
+from app.auth.principal import CurrentOwner, CurrentTeacher, Principal
 from app.auth.student_session import revoke_live_sessions
 from app.classwork import ensure_classwork
 from app.db import get_session
+from app.erase import EraseIn, erase_class, names_match
 from app.join_codes import mint_code, rotate_code
 from app.models import (
     AuditLog,
@@ -274,6 +275,35 @@ async def archive_class(
     await session.commit()
     await session.refresh(record)
     return ClassOut.build(record, await _mine(session, principal, record.id))
+
+
+@router.post("/{class_id}/delete", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_class(
+    class_id: uuid.UUID, body: EraseIn, principal: CurrentOwner, session: SessionDep
+) -> None:
+    """Delete a class entirely: it and its homework, quizzes, submissions and marks (Ken's
+    decision, 11 Oct 2026). Student accounts and their own files stay — a child can be in
+    other classes. Owner only, with the class name typed out. See `app.erase`.
+    """
+    record = await get_owned_class(session, principal, class_id)
+    if not names_match(body.confirm_name, record.name):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Type the class name exactly to confirm.",
+        )
+    # Sign its children out first, as archiving does.
+    enrolled = (
+        await session.exec(
+            select(Enrolment.student_id).where(
+                Enrolment.class_id == record.id, Enrolment.status == EnrolmentStatus.ACTIVE
+            )
+        )
+    ).all()
+    for student_id in enrolled:
+        await revoke_live_sessions(session, student_id)
+    erased = await erase_class(session, record.id)
+    session.add(_audit(principal, "class.deleted", class_id, rows=erased.counts))
+    await session.commit()
 
 
 @router.post("/{class_id}/join-code/rotate", response_model=ClassDetailOut)

@@ -183,9 +183,11 @@ async def test_removing_a_child_from_the_class_signs_them_out(client, signed_in_
     # The session itself is gone, not just the class: their files are out of reach too.
     # (/auth/student/me alone would pass without the sign-out — it needs a class anyway.)
     assert (await client.get("/me/documents")).status_code == 401
-    # And the class code no longer offers them.
-    lookup = (await client.post("/join/lookup", json={"code": roster["code"]})).json()
-    assert roster["student_id"] not in str(lookup)
+    # And signing in again finds no class to go to.
+    again = await client.post(
+        "/auth/student/session", json={"username": roster["username"], "pin": roster["pin"]}
+    )
+    assert again.status_code == 403
 
 
 async def test_a_removed_child_can_be_put_back(client, student_on_roster, session: AsyncSession):
@@ -228,8 +230,11 @@ async def test_removing_a_class_signs_its_children_out_and_keeps_everything(
     assert archived.json()["status"] == "archived"
 
     assert (await client.get("/me/documents")).status_code == 401
-    # The code no longer opens the door, and the roster is untouched (history kept).
-    assert (await client.post("/join/lookup", json={"code": roster["code"]})).status_code != 200
+    # Signing in again finds no class, and the roster is untouched (history kept).
+    again = await client.post(
+        "/auth/student/session", json={"username": roster["username"], "pin": roster["pin"]}
+    )
+    assert again.status_code == 403
     everyone = (
         await client.get(f"/classes/{roster['class_id']}/roster", headers=roster["headers"])
     ).json()

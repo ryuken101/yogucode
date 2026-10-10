@@ -24,6 +24,10 @@ class Settings(BaseSettings):
 
     pin_max_failed_attempts: int = 5
     pin_lockout_minutes: int = 15
+    # Wrong PINs from one device (IP) across any usernames, before it must wait. Children
+    # sign in with a username and PIN only, so this stands in for the old class-code step.
+    pin_failures_per_device: int = 20
+    pin_failure_window_minutes: int = 10
 
     # The student session cookie's Secure flag. True everywhere real; false only for
     # local http development and tests, where a browser (and httpx) will silently refuse

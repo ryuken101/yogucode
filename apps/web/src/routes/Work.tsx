@@ -12,20 +12,24 @@
  * checks and hints, live in `ProblemAttempt` and save to attempts rather than to files.
  */
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '../components/Button'
 import { Console } from '../components/Console'
+import { FileExplorer } from '../components/FileExplorer'
 import { FileTabs } from '../components/FileTabs'
 import { Notice } from '../components/Notice'
 import { Spinner } from '../components/Spinner'
 import { CodeSurface } from '../editor/CodeSurface'
 import { useAutosave } from '../editor/useAutosave'
+import { useOpenTabs } from '../editor/useOpenTabs'
 import { messageFor } from '../lib/errors'
 import {
   useArchiveDocument,
   useCreateDocument,
   useDocument,
   useDocuments,
+  useFolderActions,
+  useFolders,
   useRenameDocument,
 } from '../lib/queries'
 import { studentLive } from '../collab/socket'
@@ -35,13 +39,22 @@ import { usePython } from '../runtime/usePython'
 
 export function Work() {
   const files = useDocuments()
+  const folders = useFolders('me')
+  const folderActions = useFolderActions('me')
   const create = useCreateDocument()
   const archive = useArchiveDocument()
   const rename = useRenameDocument()
 
-  const [activeId, setActiveId] = useState<string | null>(null)
+  // The autosave needs the open file, and switching files needs the autosave's flush:
+  // a ref breaks the loop, updated after render.
+  const flushRef = useRef<() => void>(() => {})
+  const flush = useCallback(() => flushRef.current(), [])
+  const { tabs, activeId, open, close } = useOpenTabs(files.data, flush)
   const active = useDocument(activeId)
   const autosave = useAutosave(activeId)
+  useEffect(() => {
+    flushRef.current = autosave.flush
+  })
   // My files are recorded too, by Ken's decision (Phase 5 planning): edits, runs, errors.
   const record = useEventRecorder(activeId ? { documentId: activeId } : null)
   const { state, output, run, stop, answer } = usePython({
@@ -55,27 +68,30 @@ export function Work() {
   // The live classroom: this file's text streams to the teacher, who can type into it.
   const target = activeId ? `document:${activeId}` : null
   const live = useLiveDoc(target, active.data ? active.data.content : null)
-  const fileTitle = active.data?.title ?? null
+  // Shown on the teacher's tile as "week 1 / squares", so they know which file it is.
+  const fileTitle = active.data ? pathOf(active.data, folders.data ?? []) : null
   useEffect(() => {
     studentLive().setFocus(target && fileTitle ? { target, kind: 'file', title: fileTitle } : null)
   }, [target, fileTitle])
 
   /**
-   * Reopen whatever they were last editing.
+   * Reopen whatever they were last editing — once, when the page loads.
    *
-   * The list comes back ordered by `updated_at`, so the first tab is the one they left
+   * The list comes back ordered by `updated_at`, so the first file is the one they left
    * off in. A child mid-task last week simply carries on.
    */
+  const [started, setStarted] = useState(false)
   useEffect(() => {
-    if (activeId !== null || !files.data) return
+    if (started || !files.data) return
+    setStarted(true)
     if (files.data.length > 0) {
-      setActiveId(files.data[0]!.id)
-    } else if (!create.isPending && !create.isSuccess) {
+      open(files.data[0]!.id)
+    } else {
       // A brand-new student has nothing to reopen. The server supplies the starter
       // content, so "what a new file contains" is defined in one place.
-      create.mutate(undefined, { onSuccess: (created) => setActiveId(created.id) })
+      create.mutate(null, { onSuccess: (created) => open(created.id) })
     }
-  }, [activeId, files.data, create])
+  }, [started, files.data, create, open])
 
   // Tell the autosave what the server already has, so opening a file does not save it
   // straight back.
@@ -85,12 +101,33 @@ export function Work() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active.data?.id, active.data?.content])
 
-  function switchTo(documentId: string) {
-    // Flush before leaving, or the last couple of seconds of typing vanish at exactly the
-    // moment a child thinks they have finished with a file.
-    autosave.flush()
-    setActiveId(documentId)
-  }
+  const explorer = (
+    <FileExplorer
+      files={files.data ?? []}
+      folders={folders.data ?? []}
+      activeId={activeId}
+      onOpen={open}
+      onCreateFile={(folderId) =>
+        create.mutate(folderId, { onSuccess: (created) => open(created.id) })
+      }
+      onCreateFolder={(name, parentId) => folderActions.create.mutate({ name, parentId })}
+      onRenameFile={(id, title) => rename.mutate({ documentId: id, title })}
+      onRenameFolder={(folderId, name) => folderActions.update.mutate({ folderId, name })}
+      onMove={(item, folderId) =>
+        item.kind === 'file'
+          ? folderActions.moveFile.mutate({ documentId: item.id, folderId })
+          : folderActions.update.mutate({ folderId: item.id, parent_id: folderId })
+      }
+      onDeleteFile={(id) => archive.mutate(id)}
+      onDeleteFolder={(folderId) => folderActions.remove.mutate(folderId)}
+      busy={create.isPending}
+    />
+  )
+  const folderError =
+    folderActions.create.error ??
+    folderActions.update.error ??
+    folderActions.moveFile.error ??
+    folderActions.remove.error
 
   const busy = state.status === 'running' || state.status === 'asking'
   const loading = state.status === 'loading'
@@ -105,7 +142,10 @@ export function Work() {
   }
 
   return (
-    <div className="flex h-full flex-col gap-2 p-3">
+    <div className="flex h-full gap-3 p-3">
+      {/* The explorer: folders and files, VS Code style (Ken's decision, 11 Oct 2026). */}
+      <aside className="hidden w-56 shrink-0 sm:block">{explorer}</aside>
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
       <div className="flex shrink-0 flex-wrap items-center gap-2">
         <Button
           variant="primary"
@@ -146,30 +186,36 @@ export function Work() {
           nothing explained why. TanStack clears the error on the next attempt. */}
       {rename.error ? <Notice tone="not-yet">{messageFor(rename.error)}</Notice> : null}
 
+      {folderError ? <Notice tone="not-yet">{messageFor(folderError)}</Notice> : null}
+
       <FileTabs
-        files={files.data ?? []}
+        files={tabs}
         activeId={activeId}
-        onSelect={switchTo}
+        onSelect={open}
         onCreate={() =>
-          create.mutate(undefined, { onSuccess: (created) => switchTo(created.id) })
-        }
-        onClose={(id) =>
-          archive.mutate(id, {
-            onSuccess: () => {
-              if (id !== activeId) return
-              const next = (files.data ?? []).find((file) => file.id !== id)
-              setActiveId(next?.id ?? null)
-            },
+          create.mutate(active.data?.folder_id ?? null, {
+            onSuccess: (created) => open(created.id),
           })
         }
+        onClose={close}
         onRename={(id, title) => rename.mutate({ documentId: id, title })}
         busy={create.isPending}
       />
 
       {/* The editor gets roughly two thirds; the terminal is legible at a third and grows
           when there is room. min-h-0 is what lets both scroll instead of overflowing. */}
+      {live.locked ? (
+        <Notice tone="info">
+          Your teacher is helping — watch your code. You can type again when they’re done.
+        </Notice>
+      ) : null}
+
       <div className="min-h-0 flex-[2] overflow-hidden rounded-b-lg rounded-tr-lg ring-1 ring-grape/25">
-        {active.isPending && activeId ? (
+        {!activeId && started && !create.isPending ? (
+          <div className="flex h-full items-center justify-center bg-night p-6 text-center text-cream/70">
+            Open a file from the list on the left, or press + File to start a new one.
+          </div>
+        ) : active.isPending && activeId ? (
           <div className="flex h-full items-center justify-center bg-night">
             <Spinner label="Opening your file" />
           </div>
@@ -180,6 +226,8 @@ export function Work() {
             // program into a child's work.
             key={activeId ?? 'none'}
             value={code}
+            // Locked while the teacher helps (Ken's decision, 11 Oct 2026).
+            readOnly={live.locked}
             onChange={autosave.onChange}
             onModel={live.bind}
             onCursor={live.onCursor}
@@ -198,6 +246,23 @@ export function Work() {
       {files.error ? (
         <Notice tone="system-error">{messageFor(files.error)}</Notice>
       ) : null}
+      </div>
     </div>
   )
+}
+
+/** "week 1 / loops / squares" — where a file sits, for the teacher's live tile. */
+function pathOf(
+  file: { title: string; folder_id?: string | null },
+  folders: { id: string; name: string; parent_id?: string | null }[],
+): string {
+  const parts = [file.title]
+  let at = file.folder_id ?? null
+  for (let depth = 0; at && depth < 20; depth++) {
+    const folder = folders.find((f) => f.id === at)
+    if (!folder) break
+    parts.unshift(folder.name)
+    at = folder.parent_id ?? null
+  }
+  return parts.join(' / ')
 }

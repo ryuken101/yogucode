@@ -27,7 +27,7 @@ async def as_student(client, roster: dict) -> None:
     """Put the roster's child's cookie back on the client."""
     response = await client.post(
         "/auth/student/session",
-        json={"code": roster["code"], "student_id": roster["student_id"], "pin": roster["pin"]},
+        json={"username": roster["username"], "pin": roster["pin"]},
     )
     assert response.status_code == 200, response.text
 

@@ -110,8 +110,8 @@ across the very boundary this design exists to keep intact. Provisioning happens
 the auth dependency itself never writes.
 
 **Students** never touch Supabase. A teacher builds the roster, sets each student's PIN
-and hands out slips; the student picks their name behind a class join code and enters the
-PIN. The API verifies the PIN against an Argon2id hash and mints an opaque session token,
+and hands out slips; the student types their username and PIN (since 11 Oct 2026;
+before that they picked their name behind a class join code). The API verifies the PIN against an Argon2id hash and mints an opaque session token,
 storing only its SHA-256 hash and returning the token as an httpOnly cookie.
 
 The session is opaque rather than a JWT for one reason: **it has to be revocable.** A
@@ -451,6 +451,16 @@ join by the owner's invite on the Teachers page (`/teachers`), sign up at `/sign
 (name, email, password; email verified by link), reset at `/reset-password`. The owner can
 cancel invites and remove teachers. No service key on the server: inviting sends no
 email — the owner copies the sign-up link to the teacher.
+
+**Permanent student accounts (11 Oct 2026).** Teachers create each child's account on the
+class page — a username (suggested from the name) and a PIN (typed or random) — and
+children sign in with just those two. PINs stay hashed: shown once on the slip, replaced
+with Change PIN if forgotten. Existing students were given usernames and kept their PINs.
+
+**After the first class (11 Oct 2026).** Help now locks the child's editor until the
+teacher is done; the owner can **delete entirely** (a child with all their work, or a
+class with its work) as well as archive; and My files / My code have **folders** with a
+VS Code-style explorer.
 
 **My code (10 Oct 2026).** Teachers have their own private files at `/my-code` to write
 and run Python, with a **Present** mode for the projector (full screen, big text).

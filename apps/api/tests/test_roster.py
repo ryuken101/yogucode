@@ -60,15 +60,20 @@ async def test_a_new_student_is_enrolled_nowhere(client, signed_in) -> None:
     assert detail["classes"] == []
 
 
-async def test_creating_a_student_writes_no_credential_row(
+async def test_creating_a_student_makes_a_complete_account(
     client, signed_in, session: AsyncSession
 ) -> None:
-    """PINs are step 7. A roster entry that cannot sign in yet is a normal state."""
+    """A permanent account (Ken's decision, 11 Oct 2026): a suggested username and a PIN,
+    returned once. The PIN is stored hashed, never as typed."""
     from app.models import StudentCredential
 
     headers = await signed_in()
-    await make_student(client, headers, "Aria K")
-    assert (await session.exec(select(StudentCredential))).all() == []
+    created = await client.post("/students", json={"display_name": "Aria Kim"}, headers=headers)
+    body = created.json()
+    assert body["username"] == "aria.k"
+    assert len(body["pin"]) == 4 and body["pin"].isdigit()
+    credential = (await session.exec(select(StudentCredential))).one()
+    assert credential.pin_hash != body["pin"] and credential.pin_hash.startswith("$argon2id$")
 
 
 async def test_whitespace_in_a_name_is_normalised(client, signed_in) -> None:

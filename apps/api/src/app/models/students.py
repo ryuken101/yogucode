@@ -1,8 +1,14 @@
 """Students, their PIN credentials, and their sessions.
 
-PII minimisation (product-spec §10): a student has a display name and nothing else. No
-email, no date of birth, no surname where a first name plus last initial will do. Data
-never collected is data that never has to be protected, disclosed, or deleted.
+PII minimisation (product-spec §10): a student has a display name, a username to sign in
+with, and nothing else. No email, no date of birth, no surname where a first name plus last
+initial will do. Data never collected is data that never has to be protected, disclosed,
+or deleted.
+
+**Permanent accounts** (Ken's decision, 11 Oct 2026): the teacher creates each child's
+account — a username and a 4-digit PIN — and the child signs in with those two alone, no
+class code. Usernames are unique across the whole system (case-insensitive), so a sign-in
+needs nothing else to find the account.
 
 A student belongs to a *centre*, not to a class, and is enrolled in classes term by
 term. That is what lets mastery follow a child across terms in Phase 8; the alternative
@@ -13,7 +19,7 @@ import uuid
 from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import CheckConstraint, DateTime, String
+from sqlalchemy import CheckConstraint, DateTime, Index, String, text
 from sqlmodel import Field, SQLModel
 
 from app.models.base import TimestampMixin, new_uuid, utcnow
@@ -26,25 +32,29 @@ class StudentStatus(StrEnum):
 
 class Student(TimestampMixin, table=True):
     __tablename__ = "students"
-    __table_args__ = (CheckConstraint("status IN ('active', 'archived')", name="status"),)
+    __table_args__ = (
+        CheckConstraint("status IN ('active', 'archived')", name="status"),
+        # Lower-case letters, digits and dots, 2–30 long. Stored lower-case, and the index
+        # is on lower() anyway, so "Aria.K" and "aria.k" can never both exist.
+        CheckConstraint("username ~ '^[a-z0-9.]{2,30}$'", name="username"),
+        Index("uq_students_username", text("lower(username)"), unique=True),
+    )
 
     id: uuid.UUID = Field(default_factory=new_uuid, primary_key=True)
     centre_id: uuid.UUID = Field(foreign_key="centres.id", index=True)
     display_name: str
+    username: str
     status: StudentStatus = Field(default=StudentStatus.ACTIVE, sa_type=String)
 
 
 class StudentCredential(TimestampMixin, table=True):
     """A student's PIN, as an Argon2id hash. Never plaintext, anywhere, ever.
 
-    The teacher sets the PIN when building the roster and hands out slips — students do
-    not claim a name on first login, which would let one child claim another's name
-    before they ever signed in.
-
-    `must_change_pin` drives the reset flow: a teacher resetting a PIN invalidates the
-    old one and the student is prompted to choose a new one at next sign-in. Resets will
-    be frequent — a Year 4 student forgets a PIN roughly weekly — so this is a primary
-    flow, not an edge case.
+    The teacher sets the PIN — choosing one or pressing random — when creating the account
+    or changing it, and sees it at that moment only, to print or tell the child. It cannot
+    be read back afterwards (Ken's decision, 11 Oct 2026: kept hashed rather than made
+    readable); a forgotten PIN is replaced. Students never set their own: that would let
+    whoever reaches a laptop first take over another child's account.
     """
 
     __tablename__ = "student_credentials"

@@ -14,7 +14,7 @@ import { beforeEach, expect, test, vi } from 'vitest'
 import { clearStudentTab, isStudentTab } from '../lib/tabSession'
 import { renderScreen } from '../test/render'
 import type { Schemas } from '../lib/api'
-import { ARIA_ID, ARIA_PIN, CLASS_ID, CODE, server } from '../test/server'
+import { ARIA_ID, ARIA_PIN, ARIA_USERNAME, CLASS_ID, server } from '../test/server'
 import { Join } from './Join'
 import { Landing } from './Landing'
 import { RequireStudent } from './RequireStudent'
@@ -66,7 +66,7 @@ test('reopening after the tab was closed signs the child out and asks them to si
   clearStudentTab() // a fresh tab: the old one, and its marker, are gone
   app('/') // the default handler still has a live session cookie
 
-  expect(await screen.findByLabelText('Class code')).toBeInTheDocument()
+  expect(await screen.findByLabelText('Username')).toBeInTheDocument()
   expect(screen.queryByText('Today page')).not.toBeInTheDocument()
   await waitFor(() => expect(signedOut).toBe(1), { timeout: 2000 })
 })
@@ -75,7 +75,7 @@ test('a bookmarked student page in a fresh tab also goes to the sign-in', async 
   clearStudentTab()
   app('/home')
 
-  expect(await screen.findByLabelText('Class code')).toBeInTheDocument()
+  expect(await screen.findByLabelText('Username')).toBeInTheDocument()
   expect(screen.queryByText('Today page')).not.toBeInTheDocument()
   expect(signedOut).toBe(1)
 })
@@ -96,11 +96,9 @@ test('signing in marks this tab as the child’s', async () => {
   )
   const { user } = renderScreen(<Join />)
 
-  await user.type(await screen.findByLabelText('Class code'), CODE)
-  await user.click(screen.getByRole('button', { name: 'Next' }))
-  await user.click(await screen.findByRole('button', { name: /Aria K/ }))
-  await user.type(await screen.findByLabelText('Your 4-digit PIN'), ARIA_PIN)
-  await user.click(screen.getByRole('button', { name: 'Start' }))
+  await user.type(await screen.findByLabelText('Username'), ARIA_USERNAME)
+  await user.type(screen.getByLabelText('PIN'), ARIA_PIN)
+  await user.click(screen.getByRole('button', { name: 'Sign in' }))
 
   await screen.findByText(/You’re in/)
   expect(isStudentTab()).toBe(true)

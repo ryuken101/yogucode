@@ -31,6 +31,7 @@ from app.models.concepts import Concept, ConceptStatus
 from app.models.curriculum import Course, CurriculumStatus, Lesson, LessonConcept, Unit
 from app.models.documents import DocumentStatus, StudentDocument
 from app.models.events import Event, EventType
+from app.models.folders import StudentFolder, TeacherFolder
 from app.models.marking import (
     AssignmentNote,
     FeedbackSnippet,
@@ -90,12 +91,14 @@ __all__ = [
     "SnippetStatus",
     "Student",
     "StudentDocument",
+    "StudentFolder",
     "StudentCredential",
     "StudentSession",
     "StudentStatus",
     "Submission",
     "SubmissionSource",
     "TeacherDocument",
+    "TeacherFolder",
     "TeacherInvite",
     "TestCase",
     "TestKind",

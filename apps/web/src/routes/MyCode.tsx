@@ -13,18 +13,22 @@
  * full-window overlay where it cannot; Esc or Exit leaves either.
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '../components/Button'
 import { Console } from '../components/Console'
+import { FileExplorer } from '../components/FileExplorer'
 import { FileTabs } from '../components/FileTabs'
 import { Notice } from '../components/Notice'
 import { Spinner } from '../components/Spinner'
 import { CodeSurface } from '../editor/CodeSurface'
 import { useAutosave } from '../editor/useAutosave'
+import { useOpenTabs } from '../editor/useOpenTabs'
 import { messageFor } from '../lib/errors'
 import {
   useArchiveTeacherDocument,
   useCreateTeacherDocument,
+  useFolderActions,
+  useFolders,
   useRenameTeacherDocument,
   useSaveTeacherDocument,
   useTeacherDocument,
@@ -42,25 +46,33 @@ export function MyCode() {
   const rename = useRenameTeacherDocument()
   const save = useSaveTeacherDocument()
 
-  const [activeId, setActiveId] = useState<string | null>(null)
+  const folders = useFolders('teacher')
+  const folderActions = useFolderActions('teacher')
+
+  // As on My files: switching files needs the autosave's flush, which needs the open file.
+  const flushRef = useRef<() => void>(() => {})
+  const flush = useCallback(() => flushRef.current(), [])
+  const { tabs, activeId, open, close } = useOpenTabs(files.data, flush)
   const active = useTeacherDocument(activeId)
   const autosave = useAutosave(activeId, (id, content) =>
     save.mutateAsync({ documentId: id, content }),
   )
+  useEffect(() => {
+    flushRef.current = autosave.flush
+  })
   const { state, output, run, stop, answer } = usePython()
 
   const [presenting, setPresenting] = useState(false)
   const stage = useRef<HTMLDivElement>(null)
 
-  // Reopen whatever was last edited; a first visit gets a starter file.
+  // Reopen whatever was last edited, once; a first visit gets a starter file.
+  const [started, setStarted] = useState(false)
   useEffect(() => {
-    if (activeId !== null || !files.data) return
-    if (files.data.length > 0) {
-      setActiveId(files.data[0]!.id)
-    } else if (!create.isPending && !create.isSuccess) {
-      create.mutate(undefined, { onSuccess: (created) => setActiveId(created.id) })
-    }
-  }, [activeId, files.data, create])
+    if (started || !files.data) return
+    setStarted(true)
+    if (files.data.length > 0) open(files.data[0]!.id)
+    else create.mutate(null, { onSuccess: (created) => open(created.id) })
+  }, [started, files.data, create, open])
 
   useEffect(() => {
     if (active.data) autosave.adopt(active.data.id, active.data.content)
@@ -98,10 +110,11 @@ export function MyCode() {
     if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined)
   }
 
-  function switchTo(documentId: string) {
-    autosave.flush()
-    setActiveId(documentId)
-  }
+  const folderError =
+    folderActions.create.error ??
+    folderActions.update.error ??
+    folderActions.moveFile.error ??
+    folderActions.remove.error
 
   const busy = state.status === 'running' || state.status === 'asking'
   const loading = state.status === 'loading'
@@ -123,15 +136,42 @@ export function MyCode() {
     </>
   )
 
+  const explorer = (
+    <FileExplorer
+      files={files.data ?? []}
+      folders={folders.data ?? []}
+      activeId={activeId}
+      onOpen={open}
+      onCreateFile={(folderId) =>
+        create.mutate(folderId, { onSuccess: (created) => open(created.id) })
+      }
+      onCreateFolder={(name, parentId) => folderActions.create.mutate({ name, parentId })}
+      onRenameFile={(id, title) => rename.mutate({ documentId: id, title })}
+      onRenameFolder={(folderId, name) => folderActions.update.mutate({ folderId, name })}
+      onMove={(item, folderId) =>
+        item.kind === 'file'
+          ? folderActions.moveFile.mutate({ documentId: item.id, folderId })
+          : folderActions.update.mutate({ folderId: item.id, parent_id: folderId })
+      }
+      onDeleteFile={(id) => archive.mutate(id)}
+      onDeleteFolder={(folderId) => folderActions.remove.mutate(folderId)}
+      busy={create.isPending}
+      restoreNote=""
+    />
+  )
+
   return (
     <div
       ref={stage}
       className={
         presenting
           ? 'fixed inset-0 z-50 flex flex-col gap-3 bg-night p-4'
-          : 'flex h-[calc(100dvh-9.5rem)] min-h-96 flex-col gap-2'
+          : 'flex h-[calc(100dvh-9.5rem)] min-h-96 gap-3'
       }
     >
+      {/* The explorer, hidden while presenting so the code fills the projector. */}
+      {!presenting ? <aside className="hidden w-56 shrink-0 sm:block">{explorer}</aside> : null}
+      <div className={presenting ? 'contents' : 'flex min-w-0 flex-1 flex-col gap-2'}>
       {presenting ? (
         <div className="flex shrink-0 flex-wrap items-center gap-3">
           <span className="font-display text-xl font-semibold text-cream">
@@ -168,22 +208,18 @@ export function MyCode() {
           ) : null}
           {rename.error ? <Notice tone="not-yet">{messageFor(rename.error)}</Notice> : null}
 
+          {folderError ? <Notice tone="not-yet">{messageFor(folderError)}</Notice> : null}
+
           <FileTabs
-            files={files.data ?? []}
+            files={tabs}
             activeId={activeId}
-            onSelect={switchTo}
+            onSelect={open}
             onCreate={() =>
-              create.mutate(undefined, { onSuccess: (created) => switchTo(created.id) })
-            }
-            onClose={(id) =>
-              archive.mutate(id, {
-                onSuccess: () => {
-                  if (id !== activeId) return
-                  const next = (files.data ?? []).find((file) => file.id !== id)
-                  setActiveId(next?.id ?? null)
-                },
+              create.mutate(active.data?.folder_id ?? null, {
+                onSuccess: (created) => open(created.id),
               })
             }
+            onClose={close}
             onRename={(id, title) => rename.mutate({ documentId: id, title })}
             busy={create.isPending}
           />
@@ -218,6 +254,7 @@ export function MyCode() {
       </div>
 
       {files.error ? <Notice tone="system-error">{messageFor(files.error)}</Notice> : null}
+      </div>
     </div>
   )
 }

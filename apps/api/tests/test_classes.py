@@ -226,7 +226,7 @@ async def test_archiving_leaves_enrolments_alone(client, signed_in, session: Asy
     class_id = uuid.UUID(created["id"])
 
     teacher = (await session.exec(select(User))).one()
-    student = Student(centre_id=teacher.centre_id, display_name="Aria K")
+    student = Student(centre_id=teacher.centre_id, display_name="Aria K", username="aria.k")
     session.add(student)
     await session.flush()
     session.add(Enrolment(class_id=class_id, student_id=student.id))

@@ -41,11 +41,11 @@ function renderAt(route: string) {
   )
 }
 
-test('nobody signed in: the class code, and a side door for teachers', async () => {
+test('nobody signed in: the username and PIN form, and a side door for teachers', async () => {
   signedOutStudent()
   renderAt('/')
 
-  expect(await screen.findByLabelText('Class code')).toBeInTheDocument()
+  expect(await screen.findByLabelText('Username')).toBeInTheDocument()
   expect(screen.getByRole('link', { name: 'Sign in here' })).toHaveAttribute('href', '/sign-in')
 })
 
@@ -63,5 +63,5 @@ test('a teacher with a session goes to their classes', async () => {
 
 test('/join still works for anyone with the old link', async () => {
   renderAt('/join')
-  expect(await screen.findByLabelText('Class code')).toBeInTheDocument()
+  expect(await screen.findByLabelText('Username')).toBeInTheDocument()
 })

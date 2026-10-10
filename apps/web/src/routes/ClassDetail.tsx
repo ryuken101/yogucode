@@ -27,18 +27,21 @@ import {
   useCourses,
   useSetClassCurriculum,
   useIssuePins,
-  useResetPin,
   useArchiveClass,
+  useDeleteClass,
+  useDeleteStudent,
+  useMe,
   useReinstateStudent,
   useRevokeSessions,
   useRoster,
   useRosterWithWithdrawn,
   useWithdrawStudent,
-  useRotateJoinCode,
 } from '../lib/queries'
 import { Select } from '../components/Field'
 import { BulkPasteDialog } from './BulkPasteDialog'
 import { ClassTeachersCard } from './ClassTeachersCard'
+import { RemoveDialog } from '../components/RemoveDialog'
+import { AddStudentDialog, ChangePinDialog, UsernameDialog } from './StudentAccountDialogs'
 import type { SlipState } from './SlipSheet'
 
 export function ClassDetail() {
@@ -46,26 +49,32 @@ export function ClassDetail() {
   const navigate = useNavigate()
   const klass = useClass(classId)
   const roster = useRoster(classId)
-  const rotate = useRotateJoinCode(classId)
   const issuePins = useIssuePins(classId)
-  const resetPin = useResetPin(classId)
   const revoke = useRevokeSessions()
 
   const [pasteOpen, setPasteOpen] = useState(false)
-  const [confirmRotate, setConfirmRotate] = useState(false)
   const [confirmReissue, setConfirmReissue] = useState(false)
   const [kicked, setKicked] = useState<string | null>(null)
   const withdraw = useWithdrawStudent(classId)
   const [removing, setRemoving] = useState<{ id: string; name: string } | null>(null)
   const archive = useArchiveClass()
+  const deleteClass = useDeleteClass()
+  const deleteStudent = useDeleteStudent(classId)
+  const isOwner = useMe({ retry: false }).data?.role === 'owner'
   const [confirmRemoveClass, setConfirmRemoveClass] = useState(false)
+  const [addOpen, setAddOpen] = useState(false)
+  const [pinFor, setPinFor] = useState<{ id: string; name: string } | null>(null)
+  const [usernameFor, setUsernameFor] = useState<{
+    id: string
+    name: string
+    username: string
+  } | null>(null)
 
   function goToSlips(slips: SlipState['slips']) {
     navigate(`/classes/${classId}/slips`, {
       state: {
         slips,
         className: klass.data?.name ?? '',
-        joinCode: klass.data?.join_code ?? null,
       } satisfies SlipState,
     })
   }
@@ -73,7 +82,7 @@ export function ClassDetail() {
   if (klass.isPending) return <Spinner label="Loading class" />
   if (klass.error) return <Notice tone="system-error">{messageFor(klass.error)}</Notice>
 
-  const withoutPins = roster.data?.length ?? 0
+  const withoutPins = roster.data?.filter((entry) => !entry.has_pin).length ?? 0
 
   const removed = klass.data.status === 'archived'
 
@@ -100,45 +109,21 @@ export function ClassDetail() {
         <Button variant="secondary" onClick={() => navigate(`/classes/${classId}/progress`)}>
           Progress
         </Button>
-        <Button variant="secondary" onClick={() => setPasteOpen(true)}>
-          Add students
+        <Button variant="secondary" onClick={() => setAddOpen(true)}>
+          Add a student
+        </Button>
+        <Button variant="quiet" onClick={() => setPasteOpen(true)}>
+          Paste a list
         </Button>
       </PageHeader>
 
-      <Card className="mb-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h2 className="text-sm font-medium text-muted">Join code</h2>
-            {klass.data.join_code ? (
-<>
-              <p className="font-mono text-3xl tracking-[0.35em] text-grape">
-                {klass.data.join_code}
-              </p>
-              <p className="mt-1 text-sm text-muted">
-                Students go to <span className="font-mono text-grape">{window.location.host}</span>{' '}
-                and type this code.
-              </p>
-              </>
-            ) : (
-              <p className="text-sm text-muted">
-                This class has no code yet. Create one to let students join.
-              </p>
-            )}
-          </div>
-          <Button
-            variant="secondary"
-            onClick={() => setConfirmRotate(true)}
-            disabled={rotate.isPending}
-          >
-            {klass.data.join_code ? 'New code' : 'Create code'}
-          </Button>
-        </div>
-        {rotate.error ? (
-          <div className="mt-3">
-            <Notice tone="system-error">{messageFor(rotate.error)}</Notice>
-          </div>
-        ) : null}
-      </Card>
+      {/* Children sign in with their own username and PIN (Ken's decision, 11 Oct 2026):
+          no class code any more. */}
+      <Notice tone="info">
+        Students go to <span className="font-mono">{window.location.host}</span> and sign in
+        with the username and PIN on their slip.
+      </Notice>
+      <div className="mb-6" />
 
       <ClassTeachersCard classId={classId} />
 
@@ -155,9 +140,10 @@ export function ClassDetail() {
       <Card className="mb-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="font-display font-semibold text-lg text-grape">PINs</h2>
+            <h2 className="font-display font-semibold text-lg text-grape">Logins</h2>
             <p className="text-sm text-muted">
-              Each student needs one to sign in. You’ll see them once, to print.
+              Each student signs in with their username and PIN. PINs are shown once, when
+              they’re set — print the slips then.
             </p>
           </div>
           <div className="flex gap-2">
@@ -207,21 +193,32 @@ export function ClassDetail() {
               key={entry.student_id}
               className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-surface px-5 py-3 ring-1 ring-line"
             >
-              <Link to={`/students/${entry.student_id}`} className="font-medium text-grape hover:text-grape-deep hover:underline">
-                {entry.display_name}
-              </Link>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-baseline gap-x-3">
+                <Link to={`/students/${entry.student_id}`} className="font-medium text-grape hover:text-grape-deep hover:underline">
+                  {entry.display_name}
+                </Link>
+                <span className="font-mono text-sm text-muted">{entry.username}</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
                 {entry.student_status === 'archived' ? <Badge variant="muted">Archived</Badge> : null}
+                {!entry.has_pin ? <Badge variant="not-yet">No PIN yet</Badge> : null}
                 <Button
                   variant="quiet"
-                  disabled={resetPin.isPending}
                   onClick={() =>
-                    resetPin.mutate(entry.student_id, {
-                      onSuccess: (slip) => goToSlips([slip]),
+                    setUsernameFor({
+                      id: entry.student_id,
+                      name: entry.display_name,
+                      username: entry.username,
                     })
                   }
                 >
-                  Reset PIN
+                  Username
+                </Button>
+                <Button
+                  variant="quiet"
+                  onClick={() => setPinFor({ id: entry.student_id, name: entry.display_name })}
+                >
+                  {entry.has_pin ? 'Change PIN' : 'Set PIN'}
                 </Button>
                 <Button
                   variant="quiet"
@@ -282,65 +279,93 @@ export function ClassDetail() {
         </div>
       ) : null}
 
-      <Dialog
+      <RemoveDialog
         open={confirmRemoveClass}
-        title={`Remove ${klass.data.name}?`}
         onClose={() => setConfirmRemoveClass(false)}
-        confirm={{
-          label: 'Remove class',
-          disabled: archive.isPending,
-          onConfirm: () =>
-            archive.mutate(
-              { classId, archive: true },
-              {
-                onSuccess: () => {
-                  setConfirmRemoveClass(false)
-                  navigate('/classes')
-                },
+        title={`Remove ${klass.data.name}?`}
+        name={klass.data.name}
+        isOwner={isOwner}
+        archiveLabel="Archive class"
+        archiveText="Archive it: it disappears from your classes, its join code stops working, and anyone signed in to it is signed out. Every student’s work, homework and marks are kept, and you can put the class back from “Show removed classes”."
+        onArchive={() =>
+          archive.mutate(
+            { classId, archive: true },
+            {
+              onSuccess: () => {
+                setConfirmRemoveClass(false)
+                navigate('/classes')
               },
-            ),
-        }}
-      >
-        It disappears from your classes, its join code stops working, and anyone signed in to
-        it is signed out. Every student’s work, homework and marks are kept, and you can put
-        the class back from “Show removed classes”.
-      </Dialog>
+            },
+          )
+        }
+        deleteText="This deletes the class with all its homework, quizzes, handed-in work and marks. The students’ accounts and their own files stay."
+        onDelete={(confirmName) =>
+          deleteClass.mutate(
+            { classId, confirmName },
+            {
+              onSuccess: () => {
+                setConfirmRemoveClass(false)
+                navigate('/classes')
+              },
+            },
+          )
+        }
+        busy={archive.isPending || deleteClass.isPending}
+        error={deleteClass.error ? messageFor(deleteClass.error) : null}
+      />
 
       <BulkPasteDialog classId={classId} open={pasteOpen} onClose={() => setPasteOpen(false)} />
 
-      <Dialog
-        open={removing !== null}
-        title={removing ? `Remove ${removing.name} from this class?` : ''}
-        onClose={() => setRemoving(null)}
-        confirm={{
-          label: 'Remove from class',
-          disabled: withdraw.isPending,
-          onConfirm: () => {
-            if (!removing) return
-            withdraw.mutate(removing.id, { onSuccess: () => setRemoving(null) })
-          },
+      <AddStudentDialog
+        classId={classId}
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onCreated={(slip) => {
+          setAddOpen(false)
+          goToSlips([slip])
         }}
-      >
-        They’ll be signed out straight away and won’t be able to sign in to this class. Their
-        saved work, homework and marks are kept, and you can put them back any time from
-        “Show removed students”.
-      </Dialog>
+      />
+      <ChangePinDialog
+        classId={classId}
+        student={pinFor}
+        onClose={() => setPinFor(null)}
+        onChanged={(slip) => {
+          setPinFor(null)
+          goToSlips([slip])
+        }}
+      />
+      <UsernameDialog
+        key={usernameFor?.id ?? 'none'}
+        classId={classId}
+        student={usernameFor}
+        onClose={() => setUsernameFor(null)}
+      />
 
-      <Dialog
-        open={confirmRotate}
-        title="Give this class a new code?"
-        onClose={() => setConfirmRotate(false)}
-        confirm={{
-          label: 'New code',
-          onConfirm: () => {
-            rotate.mutate()
-            setConfirmRotate(false)
-          },
+      <RemoveDialog
+        key={removing?.id ?? 'none'}
+        open={removing !== null}
+        onClose={() => setRemoving(null)}
+        title={removing ? `Remove ${removing.name} from this class?` : ''}
+        name={removing?.name ?? ''}
+        isOwner={isOwner}
+        archiveLabel="Remove from class"
+        archiveText="They’ll be signed out straight away and won’t be able to sign in to this class. Their saved work, homework and marks are kept, and you can put them back any time from “Show removed students”."
+        onArchive={() => {
+          if (!removing) return
+          withdraw.mutate(removing.id, { onSuccess: () => setRemoving(null) })
         }}
-      >
-        The current code stops working straight away, so anyone part-way through joining
-        will need the new one.
-      </Dialog>
+        deleteText="This deletes their account and everything they made, in every class: their files, homework, quiz answers, marks and history."
+        onDelete={(confirmName) => {
+          if (!removing) return
+          deleteStudent.mutate(
+            { studentId: removing.id, confirmName },
+            { onSuccess: () => setRemoving(null) },
+          )
+        }}
+        busy={withdraw.isPending || deleteStudent.isPending}
+        error={deleteStudent.error ? messageFor(deleteStudent.error) : null}
+      />
+
 
       <Dialog
         open={confirmReissue}

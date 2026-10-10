@@ -14,17 +14,8 @@ export const CLASS_ID = '018f0000-0000-7000-8000-000000000001'
 export const ARIA_ID = '018f0000-0000-7000-8000-000000000002'
 export const BELLA_ID = '018f0000-0000-7000-8000-000000000003'
 export const CODE = 'WNPXYZ'
+export const ARIA_USERNAME = 'aria.k'
 export const ARIA_PIN = '4827'
-
-const lookup: Schemas['JoinLookupOut'] = {
-  class_id: CLASS_ID,
-  class_name: 'Year 4-6 Python',
-  term_label: '2026 T4',
-  students: [
-    { id: ARIA_ID, display_name: 'Aria K', has_pin: true },
-    { id: BELLA_ID, display_name: 'Bella N', has_pin: false },
-  ],
-}
 
 const signedIn: Schemas['StudentMeOut'] = {
   student_id: ARIA_ID,
@@ -34,8 +25,8 @@ const signedIn: Schemas['StudentMeOut'] = {
   term_label: '2026 T4',
 }
 
-/** Matches the API: a wrong PIN, an unknown id and a foreign child all fail alike. */
-const WRONG = { detail: 'that name and PIN do not match' }
+/** Matches the API: a wrong PIN, an unknown username and a foreign child all fail alike. */
+const WRONG = { detail: 'that username and PIN do not match' }
 
 /* --- teacher-side fixtures ---------------------------------------------------------- */
 
@@ -137,6 +128,7 @@ const documents: Record<string, Schemas['DocumentOut']> = {
   [DOC_ID]: {
     id: DOC_ID,
     title: 'spiral',
+    folder_id: null,
     content: 'print("spiral")\n',
     status: 'active',
     created_at: '2026-10-01T00:00:00Z',
@@ -145,6 +137,7 @@ const documents: Record<string, Schemas['DocumentOut']> = {
   [OTHER_DOC_ID]: {
     id: OTHER_DOC_ID,
     title: 'squares',
+    folder_id: null,
     content: 'print("squares")\n',
     status: 'active',
     created_at: '2026-10-01T00:00:00Z',
@@ -167,17 +160,11 @@ export const liveSockets = ws.link('*/api/live/*')
 
 export const handlers = [
   liveSockets.addEventListener('connection', () => {}),
-  http.post('/api/join/lookup', async ({ request }) => {
-    const body = (await request.json()) as Schemas['JoinLookupIn']
-    if (body.code.trim().toUpperCase() !== CODE) {
-      return HttpResponse.json({ detail: 'class code not found' }, { status: 404 })
-    }
-    return HttpResponse.json(lookup)
-  }),
-
   http.post('/api/auth/student/session', async ({ request }) => {
     const body = (await request.json()) as Schemas['StudentSignInIn']
-    if (body.pin !== ARIA_PIN) return HttpResponse.json(WRONG, { status: 401 })
+    if (body.username.trim().toLowerCase() !== ARIA_USERNAME || body.pin !== ARIA_PIN) {
+      return HttpResponse.json(WRONG, { status: 401 })
+    }
     return HttpResponse.json(signedIn)
   }),
 
@@ -211,6 +198,9 @@ export const handlers = [
   http.get('/api/me/quiz', () => HttpResponse.json(null)),
 
   http.get('/api/me/documents', () => HttpResponse.json(summaries())),
+  // Folders (11 Oct 2026): none by default; tests about folders add their own.
+  http.get('/api/me/folders', () => HttpResponse.json([])),
+  http.get('/api/teacher/folders', () => HttpResponse.json([])),
   http.get('/api/me/documents/:id', ({ params }) => {
     const found = documents[params.id as string]
     return found
@@ -240,7 +230,7 @@ export function lockedOut() {
 
 /** The API unreachable, which is the only case allowed to show system-error. */
 export function unreachable() {
-  return http.post('/api/join/lookup', () => HttpResponse.error())
+  return http.post('/api/auth/student/session', () => HttpResponse.error())
 }
 
 /** A paste with nothing to resolve, so the commit path is actually reachable. */
@@ -322,10 +312,12 @@ export function bulkRefused() {
 }
 
 /** A student with no files yet — a brand-new account, which must create one. */
+/** Files made by `createsDocument` since the last `noDocuments()`, as the real API keeps them. */
+let createdSinceEmpty: Schemas['DocumentSummaryOut'][] = []
+
 export function noDocuments() {
-  return http.get('/api/me/documents', () =>
-    HttpResponse.json([] satisfies Schemas['DocumentSummaryOut'][]),
-  )
+  createdSinceEmpty = []
+  return http.get('/api/me/documents', () => HttpResponse.json(createdSinceEmpty))
 }
 
 /** Counts saves, so a test can prove the autosave debounce coalesces typing. */
@@ -341,19 +333,21 @@ export function countSaves() {
 
 /** Creating a file, for the brand-new-student path. */
 export function createsDocument(id = 'new-doc-id') {
-  return http.post('/api/me/documents', () =>
-    HttpResponse.json(
-      {
-        id,
-        title: 'Untitled',
-        content: '# Write your Python here, then press Run.\nprint("Hello!")\n',
-        status: 'active',
-        created_at: '2026-10-02T00:00:00Z',
-        updated_at: '2026-10-02T00:00:00Z',
-      } satisfies Schemas['DocumentOut'],
-      { status: 201 },
-    ),
-  )
+  return http.post('/api/me/documents', () => {
+    const created = {
+      id,
+      title: 'Untitled',
+      folder_id: null,
+      content: '# Write your Python here, then press Run.\nprint("Hello!")\n',
+      status: 'active',
+      created_at: '2026-10-02T00:00:00Z',
+      updated_at: '2026-10-02T00:00:00Z',
+    } satisfies Schemas['DocumentOut']
+    // Afterwards the file list includes it, as it would from the real API.
+    const { content: _content, ...summary } = created
+    createdSinceEmpty = [summary, ...createdSinceEmpty.filter((file) => file.id !== id)]
+    return HttpResponse.json(created, { status: 201 })
+  })
 }
 
 /** A signed-out student: every student route refuses. */

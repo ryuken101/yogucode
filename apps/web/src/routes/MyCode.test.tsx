@@ -53,6 +53,7 @@ const { MyCode } = await import('./MyCode')
 const DOC: Schemas['DocumentOut'] = {
   id: 'd1',
   title: 'Squares',
+  folder_id: null,
   status: 'active',
   content: 'for i in range(5):\n    print(i * i)\n',
   created_at: '2026-10-10T00:00:00Z',

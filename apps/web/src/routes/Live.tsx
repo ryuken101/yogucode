@@ -102,6 +102,7 @@ function Expanded({
   canHelp,
   childCursor,
   sendCursor,
+  sendHelp,
   onClose,
 }: {
   student: LiveStudent
@@ -109,6 +110,7 @@ function Expanded({
   canHelp: boolean
   childCursor: number | undefined
   sendCursor: (target: string, offset: number | null) => void
+  sendHelp: (target: string, on: boolean) => void
   onClose: () => void
 }) {
   const [helping, setHelping] = useState(false)
@@ -125,6 +127,15 @@ function Expanded({
     if (!helping || !target) return
     return () => sendCursor(target, null)
   }, [helping, target, sendCursor])
+
+  // Lock the child's editor while helping. The cleanup unlocks it on Done helping, on
+  // closing this panel, when the child switches file, and when the page goes — and the
+  // server unlocks it too if this connection drops, so a child is never left stuck.
+  useEffect(() => {
+    if (!helping || !target) return
+    sendHelp(target, true)
+    return () => sendHelp(target, false)
+  }, [helping, target, sendHelp])
   return (
     <Card className="mb-6">
       <div className="mb-3 flex flex-wrap items-center gap-3">
@@ -134,7 +145,7 @@ function Expanded({
         <span className="ml-auto flex gap-2">
           {canHelp && doc ? (
             <Button variant={helping ? 'primary' : 'secondary'} onClick={() => setHelping(!helping)}>
-              {helping ? 'Done helping' : 'Help — type in their editor'}
+              {helping ? 'Done helping' : 'Help — take over their editor'}
             </Button>
           ) : null}
           <Button variant="quiet" onClick={onClose}>
@@ -281,6 +292,7 @@ export function Live() {
           canHelp={canHelp}
           childCursor={opened.focus ? live.cursors.get(opened.focus.target) : undefined}
           sendCursor={live.sendCursor}
+          sendHelp={live.sendHelp}
           onClose={() => setOpen(null)}
         />
       ) : null}

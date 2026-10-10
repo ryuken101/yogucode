@@ -281,3 +281,94 @@ async def test_cursors_travel_both_ways_but_only_for_an_open_editor(
             )
             with pytest.raises(TimeoutError):
                 await next_of(teacher, "cursor", timeout=0.5)
+
+
+# --- Help locks the child's editor (Ken's decision, 11 Oct 2026) -----------------------
+
+
+async def test_help_locks_the_childs_editor_and_leaving_unlocks_it(
+    client, session, signed_in_student
+) -> None:
+    aria = await signed_in_student()
+    await today(client, session, aria)
+    target = f"attempt:{(await open_first(client))['leaves'][0]['attempt']['id']}"
+
+    async with (
+        sockets(client) as ws_client,
+        aconnect_ws("http://test/live/student", ws_client) as child,
+    ):
+        await next_of(child, "ready")
+        await child.send_json({"type": "doc", "target": target, "update": "FULL", "full": True})
+        await asyncio.sleep(0.2)
+        async with aconnect_ws("http://test/live/teacher", ws_client) as teacher:
+            await teacher.send_json(
+                {"type": "auth", "token": token_of(aria["headers"]), "class_id": aria["class_id"]}
+            )
+            await next_of(teacher, "snapshot")
+
+            await teacher.send_json({"type": "help", "target": target, "on": True})
+            locked = await next_of(child, "help")
+            assert (locked["target"], locked["on"]) == (target, True)
+
+            await teacher.send_json({"type": "help", "target": target, "on": False})
+            assert (await next_of(child, "help"))["on"] is False
+
+            # On again, then the teacher simply goes (tab closed, connection lost)...
+            await teacher.send_json({"type": "help", "target": target, "on": True})
+            assert (await next_of(child, "help"))["on"] is True
+        # ...and the child is never left locked.
+        unlocked = await next_of(child, "help")
+        assert (unlocked["target"], unlocked["on"]) == (target, False)
+
+
+class FakeSocket:
+    def __init__(self) -> None:
+        self.sent: list[dict] = []
+
+    async def send_json(self, data) -> None:
+        self.sent.append(data)
+
+    def helps(self) -> list[tuple[str, bool]]:
+        return [(m["target"], m["on"]) for m in self.sent if m["type"] == "help"]
+
+
+async def _room_with_child():
+    import uuid
+
+    from app.live.hub import Hub, StudentPresence
+
+    local = Hub()
+    class_id, student_id = uuid.uuid4(), uuid.uuid4()
+    child = FakeSocket()
+    await local.join_student(class_id, StudentPresence(child, student_id, "Aria K"))
+    await local.student_doc(class_id, student_id, "document:d1", "FULL", full=True)
+    return local, class_id, student_id, child
+
+
+async def test_two_helpers_unlock_only_when_both_stop() -> None:
+    local, class_id, _, child = await _room_with_child()
+    ken, sam = FakeSocket(), FakeSocket()
+    await local.help(class_id, ken, "document:d1", on=True)
+    await local.help(class_id, sam, "document:d1", on=True)
+    await local.help(class_id, ken, "document:d1", on=False)
+    assert child.helps() == [("document:d1", True)], "still locked while Sam helps"
+    await local.leave_teacher(class_id, sam)
+    assert child.helps() == [("document:d1", True), ("document:d1", False)]
+
+
+async def test_a_child_reconnecting_mid_help_is_told_they_are_locked() -> None:
+    from app.live.hub import StudentPresence
+
+    local, class_id, student_id, _ = await _room_with_child()
+    await local.help(class_id, FakeSocket(), "document:d1", on=True)
+
+    again = FakeSocket()  # the child's new connection, after a reload
+    await local.join_student(class_id, StudentPresence(again, student_id, "Aria K"))
+    await local.student_doc(class_id, student_id, "document:d1", "FULL", full=True)
+    assert again.helps() == [("document:d1", True)]
+
+
+async def test_help_on_an_editor_nobody_has_open_is_refused() -> None:
+    local, class_id, _, child = await _room_with_child()
+    assert await local.help(class_id, FakeSocket(), "document:nope", on=True) is False
+    assert child.helps() == []

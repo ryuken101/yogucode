@@ -18,6 +18,10 @@ import type { components } from './api-types'
 
 export type Schemas = components['schemas']
 
+/** Whose folders: a child's (`/me`, by their cookie) or a teacher's (`/teacher`). */
+export type FolderScope = 'me' | 'teacher'
+const folderBase = (scope: FolderScope) => (scope === 'me' ? '/me/folders' : '/teacher/folders')
+
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api'
 
 interface RequestOptions {
@@ -118,6 +122,17 @@ export const api = {
   /** "Remove class": hidden, code turned off, children signed out — all history kept. */
   archiveClass: (classId: string) =>
     request<Schemas['ClassOut']>(`/classes/${classId}/archive`, { method: 'POST' }),
+  /** Delete entirely — owner only, with the name typed. Can't be undone. */
+  deleteClass: (classId: string, confirmName: string) =>
+    request<void>(`/classes/${classId}/delete`, {
+      method: 'POST',
+      body: { confirm_name: confirmName },
+    }),
+  deleteStudent: (studentId: string, confirmName: string) =>
+    request<void>(`/students/${studentId}/delete`, {
+      method: 'POST',
+      body: { confirm_name: confirmName },
+    }),
   unarchiveClass: (classId: string) =>
     request<Schemas['ClassOut']>(`/classes/${classId}/unarchive`, { method: 'POST' }),
   createClass: (body: Schemas['ClassIn']) =>
@@ -285,6 +300,28 @@ export const api = {
       method: 'POST',
     }),
 
+  /* --- folders: a child's My files (/me) and a teacher's My code (/teacher) -------- */
+
+  listFolders: (scope: FolderScope) =>
+    request<Schemas['FolderOut'][]>(folderBase(scope), { anonymous: scope === 'me' }),
+  createFolder: (scope: FolderScope, body: Schemas['FolderIn']) =>
+    request<Schemas['FolderOut']>(folderBase(scope), {
+      method: 'POST',
+      body,
+      anonymous: scope === 'me',
+    }),
+  updateFolder: (scope: FolderScope, folderId: string, body: Schemas['FolderPatch']) =>
+    request<Schemas['FolderOut']>(`${folderBase(scope)}/${folderId}`, {
+      method: 'PATCH',
+      body,
+      anonymous: scope === 'me',
+    }),
+  deleteFolder: (scope: FolderScope, folderId: string) =>
+    request<Schemas['FolderDeletedOut']>(`${folderBase(scope)}/${folderId}/delete`, {
+      method: 'POST',
+      anonymous: scope === 'me',
+    }),
+
   /* --- teacher: My code (their own private files) --------------------------------- */
 
   listTeacherDocuments: () => request<Schemas['DocumentSummaryOut'][]>('/teacher/documents'),
@@ -340,8 +377,24 @@ export const api = {
       method: 'POST',
       body: { reset_existing: resetExisting } satisfies Schemas['IssuePinsIn'],
     }),
-  resetPin: (studentId: string) =>
-    request<Schemas['PinSlipOut']>(`/students/${studentId}/pin/reset`, { method: 'POST' }),
+  /** Change a child's PIN: to `pin`, or a random one if it's left out. Returns the slip once. */
+  setPin: (studentId: string, pin?: string) =>
+    request<Schemas['PinSlipOut']>(`/students/${studentId}/pin`, {
+      method: 'POST',
+      body: { pin: pin?.trim() || null } satisfies Schemas['PinIn'],
+    }),
+  /** Create a child's account and put them in this class. Returns the slip once. */
+  addStudentToClass: (classId: string, body: Schemas['StudentIn']) =>
+    request<Schemas['PinSlipOut']>(`/classes/${classId}/students`, { method: 'POST', body }),
+  suggestUsername: (name: string) =>
+    request<Schemas['UsernameSuggestionOut']>(
+      `/students/username-suggestion?name=${encodeURIComponent(name)}`,
+    ),
+  changeUsername: (studentId: string, username: string) =>
+    request<Schemas['StudentOut']>(`/students/${studentId}`, {
+      method: 'PATCH',
+      body: { username } satisfies Schemas['StudentPatch'],
+    }),
   revokeSessions: (studentId: string) =>
     request<Schemas['SessionsRevokedOut']>(`/students/${studentId}/sessions/revoke`, {
       method: 'POST',
@@ -349,12 +402,6 @@ export const api = {
 
   /* --- student ------------------------------------------------------------------- */
 
-  joinLookup: (code: string) =>
-    request<Schemas['JoinLookupOut']>('/join/lookup', {
-      method: 'POST',
-      body: { code } satisfies Schemas['JoinLookupIn'],
-      anonymous: true,
-    }),
   studentSignIn: (body: Schemas['StudentSignInIn']) =>
     request<Schemas['StudentMeOut']>('/auth/student/session', {
       method: 'POST',

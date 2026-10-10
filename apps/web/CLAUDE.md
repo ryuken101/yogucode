@@ -73,15 +73,17 @@ it: a child gets `JoinShell` with no navigation, no sign-out and no centre name.
 flow must keep working when Supabase is unconfigured or unreachable, because it does not
 use Supabase at all.
 
-**The bare address `/` is the children's front door** (Ken's decision, 8 Oct 2026; it
-replaced a QR code on the PIN slips). `Landing.tsx` sends a child who is still signed in
-to `/home` and a teacher with a session to `/classes`, and otherwise shows the `/join`
-flow with a "Teacher? Sign in here" link to `/sign-in`. `/join` remains as an alias. The
-slips and the class page print the site's host so children know what to type.
+**The bare address `/` is the children's front door** (Ken's decision, 8 Oct 2026).
+`Landing.tsx` sends a child who is still signed in to `/home` and a teacher with a session
+to `/classes`, and otherwise shows the sign-in with a "Teacher? Sign in here" link to
+`/sign-in`. `/join` remains as an alias.
 
-**The class code never goes in a URL.** `/join` keeps its steps in component state. A code
-in a query string lands in browser history on a shared centre laptop, in proxy logs, and
-in the `Referer` of the next request — which is also why the API takes it in a POST body.
+**Children sign in with a username and a PIN** (Ken's decision, 11 Oct 2026) — permanent
+accounts the teacher creates on the class page (`StudentAccountDialogs.tsx`: Add a
+student, Change PIN, Username). No class code and no name picker any more. PINs stay
+hashed on the server, so a PIN is shown once, on the slip, when it is set; a forgotten PIN
+is replaced, never looked up. Sign-in errors are `not-yet` (lemon) — a wrong PIN, a
+lockout, a child in no class — and only an unreachable server is `system-error`.
 
 ## Local development and production
 
@@ -144,6 +146,17 @@ after they press Run.
 **Monaco is uncontrolled after mount.** `value` is the initial document; the editor owns
 the text thereafter, which is what keeps typing off the network. Anything mocking
 `CodeSurface` must use `defaultValue`, or it is not testing the real contract.
+
+## Files and folders (My files, My code)
+
+`components/FileExplorer.tsx` is the VS Code-style explorer both pages share: nested
+folders, New file / New folder into the selected folder, rename (double-click or F2),
+delete with a confirm, HTML5 drag-and-drop to move. `FileTabs` shows **only open files**
+(`editor/useOpenTabs.ts`); × closes the tab, never the file. Creating a file writes it
+into the cached list straight away so it can open as a tab before the refetch.
+
+While a teacher helps, `useLiveDoc().locked` is true and the child's editor is read-only
+with a calm `info` banner (Work, ProblemAttempt).
 
 ## My code (teachers' own files)
 

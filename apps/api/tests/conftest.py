@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.auth.rate_limit import pin_failures
 from app.auth.supabase_jwt import SupabaseJWKSVerifier, get_verifier
 from app.config import Settings, get_settings
 from app.db import get_session
@@ -274,7 +275,9 @@ async def foreign_centre(session: AsyncSession) -> dict:
     await session.flush()
 
     klass = Class(centre_id=centre.id, name="Someone else's class", term_label="2026 T4")
-    student = Student(centre_id=centre.id, display_name="Someone else's child")
+    student = Student(
+        centre_id=centre.id, display_name="Someone else's child", username="someone.else"
+    )
     session.add_all([klass, student])
     await session.flush()
 
@@ -286,36 +289,29 @@ async def foreign_centre(session: AsyncSession) -> dict:
 
 @pytest.fixture
 async def student_on_roster(client: httpx.AsyncClient, signed_in):
-    """A class with a join code, one enrolled student, and that student's PIN.
+    """A class with one child's account in it — their username and PIN.
 
-    Everything a child needs at /join, built the way a teacher would build it: create the
-    class, add the name, issue the PINs, read the slip.
+    Built the way a teacher would build it (Ken's decision, 11 Oct 2026): create the
+    class, then Add student with a name, which suggests the username and draws the PIN.
     """
 
     async def _build(display_name: str = "Aria K", class_name: str = "Year 4-6 Python") -> dict:
         headers = await signed_in()
         created = (await client.post("/classes", json={"name": class_name}, headers=headers)).json()
-        student = (
-            await client.post("/students", json={"display_name": display_name}, headers=headers)
-        ).json()
-        await client.post(
-            f"/classes/{created['id']}/enrolments",
-            json={"student_id": student["id"]},
+        slip = await client.post(
+            f"/classes/{created['id']}/students",
+            json={"display_name": display_name},
             headers=headers,
         )
-        slips = (
-            await client.post(
-                f"/classes/{created['id']}/pins", json={"reset_existing": False}, headers=headers
-            )
-        ).json()
-        slip = next(s for s in slips if s["student_id"] == student["id"])
+        assert slip.status_code == 201, slip.text
         return {
             "headers": headers,
             "class_id": created["id"],
             "code": created["join_code"],
-            "student_id": student["id"],
+            "student_id": slip.json()["student_id"],
             "display_name": display_name,
-            "pin": slip["pin"],
+            "username": slip.json()["username"],
+            "pin": slip.json()["pin"],
         }
 
     return _build
@@ -323,19 +319,23 @@ async def student_on_roster(client: httpx.AsyncClient, signed_in):
 
 @pytest.fixture
 async def signed_in_student(client: httpx.AsyncClient, student_on_roster):
-    """Sign a student in and leave the session cookie on the client."""
+    """Sign a student in with their username and PIN; leave the cookie on the client."""
 
     async def _sign_in(display_name: str = "Aria K") -> dict:
         roster = await student_on_roster(display_name)
         response = await client.post(
             "/auth/student/session",
-            json={
-                "code": roster["code"],
-                "student_id": roster["student_id"],
-                "pin": roster["pin"],
-            },
+            json={"username": roster["username"], "pin": roster["pin"]},
         )
         assert response.status_code == 200, response.text
         return roster
 
     return _sign_in
+
+
+@pytest.fixture(autouse=True)
+def fresh_pin_limits():
+    """The per-device limit on wrong PINs is in memory; each test starts clean."""
+    pin_failures.reset()
+    yield
+    pin_failures.reset()

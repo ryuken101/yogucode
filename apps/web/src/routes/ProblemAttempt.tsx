@@ -365,6 +365,11 @@ export function ProblemAttempt() {
             Your work is not saving. Tell your teacher — you may need to sign in again.
           </Notice>
         ) : null}
+        {live.locked ? (
+          <Notice tone="info">
+            Your teacher is helping — watch your code. You can type again when they’re done.
+          </Notice>
+        ) : null}
         <div className="min-h-64 flex-[2] overflow-hidden rounded-lg ring-1 ring-grape/25">
           <CodeSurface
             // One editor per part: Monaco's undo stack must not carry one part's history
@@ -372,6 +377,8 @@ export function ProblemAttempt() {
             key={leaf.item_id}
             value={code}
             completions={data.completions}
+            // Locked while the teacher helps (Ken's decision, 11 Oct 2026).
+            readOnly={live.locked}
             onChange={(next) => {
               latest.current[leaf.item_id] = next
               autosave.onChange(next)

@@ -18,96 +18,44 @@ from app.models.base import utcnow
 WRONG_PIN = "0000"  # weak, so the generator can never have issued it
 
 
-# --- /join/lookup -------------------------------------------------------------------
+# --- usernames (Ken's decision, 11 Oct 2026) ---------------------------------------
 
 
-async def test_a_code_returns_the_names_to_pick_from(client, student_on_roster) -> None:
+async def test_the_username_is_case_insensitive(client, student_on_roster) -> None:
     roster = await student_on_roster()
-
-    response = await client.post("/join/lookup", json={"code": roster["code"]})
+    response = await client.post(
+        "/auth/student/session",
+        json={"username": f"  {roster['username'].upper()} ", "pin": roster["pin"]},
+    )
     assert response.status_code == 200
-    body = response.json()
-    assert body["class_name"] == "Year 4-6 Python"
-    assert [s["display_name"] for s in body["students"]] == ["Aria K"]
-    assert body["students"][0]["has_pin"] is True
 
 
-async def test_lookup_returns_names_and_nothing_else(client, student_on_roster) -> None:
-    """Anyone with the code sees this, so it must carry no more than the picker needs."""
-    roster = await student_on_roster()
-
-    body = (await client.post("/join/lookup", json={"code": roster["code"]})).json()
-    assert set(body) == {"class_id", "class_name", "term_label", "students"}
-    assert set(body["students"][0]) == {"id", "display_name", "has_pin"}
-    serialised = str(body)
-    assert roster["pin"] not in serialised
-    assert "centre" not in serialised
-
-
-async def test_a_student_without_a_pin_is_listed_but_flagged(
-    client, signed_in, student_on_roster
+async def test_a_child_in_no_class_is_told_to_ask_their_teacher(
+    client, signed_in, session: AsyncSession
 ) -> None:
-    """The UI can say 'your teacher hasn't set your PIN yet' instead of just failing."""
-    roster = await student_on_roster()
-    headers = roster["headers"]
-    late = (
-        await client.post("/students", json={"display_name": "Bella N"}, headers=headers)
+    """Said only after the right PIN, so it reveals nothing to someone guessing."""
+    headers = await signed_in()
+    child = (
+        await client.post("/students", json={"display_name": "Chen W"}, headers=headers)
     ).json()
-    await client.post(
-        f"/classes/{roster['class_id']}/enrolments",
-        json={"student_id": late["id"]},
-        headers=headers,
+    response = await client.post(
+        "/auth/student/session", json={"username": child["username"], "pin": child["pin"]}
     )
-
-    body = (await client.post("/join/lookup", json={"code": roster["code"]})).json()
-    flags = {s["display_name"]: s["has_pin"] for s in body["students"]}
-    assert flags == {"Aria K": True, "Bella N": False}
-
-
-async def test_lookup_is_case_insensitive(client, student_on_roster) -> None:
-    roster = await student_on_roster()
-    response = await client.post("/join/lookup", json={"code": roster["code"].lower()})
-    assert response.status_code == 200
-
-
-async def test_an_unknown_code_is_404(client) -> None:
-    assert (await client.post("/join/lookup", json={"code": "ZZZZZZ"})).status_code == 404
-
-
-async def test_a_rotated_code_stops_working(client, student_on_roster) -> None:
-    roster = await student_on_roster()
-    await client.post(f"/classes/{roster['class_id']}/join-code/rotate", headers=roster["headers"])
-
-    assert (await client.post("/join/lookup", json={"code": roster["code"]})).status_code == 404
-
-
-async def test_an_archived_classs_code_stops_working(client, student_on_roster) -> None:
-    roster = await student_on_roster()
-    await client.post(f"/classes/{roster['class_id']}/archive", headers=roster["headers"])
-
-    assert (await client.post("/join/lookup", json={"code": roster["code"]})).status_code == 404
-
-
-async def test_a_withdrawn_student_is_not_on_the_picker(client, student_on_roster) -> None:
-    roster = await student_on_roster()
-    await client.post(
-        f"/classes/{roster['class_id']}/enrolments/{roster['student_id']}/withdraw",
-        headers=roster["headers"],
-    )
-
-    body = (await client.post("/join/lookup", json={"code": roster["code"]})).json()
-    assert body["students"] == []
+    assert response.status_code == 403
+    assert "teacher" in response.json()["detail"]
+    assert STUDENT_SESSION_COOKIE not in response.cookies
+    assert (await session.exec(select(StudentSession))).all() == []
 
 
 # --- signing in ---------------------------------------------------------------------
 
 
-async def test_a_name_and_pin_behind_a_code_signs_in(client, student_on_roster) -> None:
+async def test_a_username_and_pin_sign_in(client, student_on_roster) -> None:
     roster = await student_on_roster()
 
     response = await client.post(
         "/auth/student/session",
-        json={"code": roster["code"], "student_id": roster["student_id"], "pin": roster["pin"]},
+        json={"username": roster["username"], "pin": roster["pin"]},
     )
     assert response.status_code == 200
     assert response.json()["display_name"] == "Aria K"
@@ -119,7 +67,7 @@ async def test_the_cookie_is_httponly_and_lax(client, student_on_roster) -> None
     roster = await student_on_roster()
     response = await client.post(
         "/auth/student/session",
-        json={"code": roster["code"], "student_id": roster["student_id"], "pin": roster["pin"]},
+        json={"username": roster["username"], "pin": roster["pin"]},
     )
 
     header = response.headers["set-cookie"].lower()
@@ -134,7 +82,7 @@ async def test_only_the_hash_of_the_token_is_stored(
     roster = await student_on_roster()
     response = await client.post(
         "/auth/student/session",
-        json={"code": roster["code"], "student_id": roster["student_id"], "pin": roster["pin"]},
+        json={"username": roster["username"], "pin": roster["pin"]},
     )
     token = response.cookies[STUDENT_SESSION_COOKIE]
 
@@ -152,41 +100,25 @@ async def test_the_session_reaches_a_student_route(client, signed_in_student) ->
     assert me.json()["display_name"] == "Aria K"
 
 
-async def test_signing_in_needs_the_code_as_well(client, student_on_roster) -> None:
-    """Defence in depth: a roster id and a PIN are not enough on their own."""
-    roster = await student_on_roster()
-
-    response = await client.post(
-        "/auth/student/session",
-        json={"code": "ZZZZZZ", "student_id": roster["student_id"], "pin": roster["pin"]},
-    )
-    assert response.status_code == 404
-    assert STUDENT_SESSION_COOKIE not in response.cookies
-
-
 async def test_a_wrong_pin_is_refused(client, student_on_roster) -> None:
     roster = await student_on_roster()
     response = await client.post(
         "/auth/student/session",
-        json={"code": roster["code"], "student_id": roster["student_id"], "pin": WRONG_PIN},
+        json={"username": roster["username"], "pin": WRONG_PIN},
     )
     assert response.status_code == 401
     assert STUDENT_SESSION_COOKIE not in response.cookies
 
 
-async def test_a_wrong_pin_an_unknown_id_and_a_foreign_child_fail_alike(
+async def test_a_wrong_pin_an_unknown_username_and_a_foreign_child_fail_alike(
     client, student_on_roster, foreign_centre
 ) -> None:
     """The route must not become an oracle for which children exist."""
     roster = await student_on_roster()
     attempts = [
-        {"code": roster["code"], "student_id": roster["student_id"], "pin": WRONG_PIN},
-        {"code": roster["code"], "student_id": str(uuid.uuid4()), "pin": roster["pin"]},
-        {
-            "code": roster["code"],
-            "student_id": str(foreign_centre["student"].id),
-            "pin": roster["pin"],
-        },
+        {"username": roster["username"], "pin": WRONG_PIN},
+        {"username": "nobody.here", "pin": roster["pin"]},
+        {"username": foreign_centre["student"].username, "pin": roster["pin"]},
     ]
     responses = [await client.post("/auth/student/session", json=body) for body in attempts]
 
@@ -194,21 +126,16 @@ async def test_a_wrong_pin_an_unknown_id_and_a_foreign_child_fail_alike(
     assert len({r.json()["detail"] for r in responses}) == 1
 
 
-async def test_a_student_with_no_pin_cannot_sign_in(client, signed_in, student_on_roster) -> None:
+async def test_a_student_with_no_pin_cannot_sign_in(
+    client, student_on_roster, session: AsyncSession
+) -> None:
     roster = await student_on_roster()
-    headers = roster["headers"]
-    late = (
-        await client.post("/students", json={"display_name": "Bella N"}, headers=headers)
-    ).json()
-    await client.post(
-        f"/classes/{roster['class_id']}/enrolments",
-        json={"student_id": late["id"]},
-        headers=headers,
-    )
+    credential = await session.get(StudentCredential, uuid.UUID(roster["student_id"]))
+    await session.delete(credential)
+    await session.flush()
 
     response = await client.post(
-        "/auth/student/session",
-        json={"code": roster["code"], "student_id": late["id"], "pin": "4827"},
+        "/auth/student/session", json={"username": roster["username"], "pin": roster["pin"]}
     )
     assert response.status_code == 401
 
@@ -220,7 +147,7 @@ async def test_an_archived_student_cannot_sign_in(client, student_on_roster) -> 
 
     response = await client.post(
         "/auth/student/session",
-        json={"code": roster["code"], "student_id": roster["student_id"], "pin": roster["pin"]},
+        json={"username": roster["username"], "pin": roster["pin"]},
     )
     assert response.status_code == 401
 
@@ -242,7 +169,7 @@ async def test_five_wrong_pins_lock_the_account(
     client, student_on_roster, session: AsyncSession
 ) -> None:
     roster = await student_on_roster()
-    wrong = {"code": roster["code"], "student_id": roster["student_id"], "pin": WRONG_PIN}
+    wrong = {"username": roster["username"], "pin": WRONG_PIN}
 
     for _ in range(5):
         assert (await client.post("/auth/student/session", json=wrong)).status_code == 401
@@ -259,13 +186,13 @@ async def test_five_wrong_pins_lock_the_account(
 
 async def test_the_right_pin_is_refused_while_locked(client, student_on_roster) -> None:
     roster = await student_on_roster()
-    wrong = {"code": roster["code"], "student_id": roster["student_id"], "pin": WRONG_PIN}
+    wrong = {"username": roster["username"], "pin": WRONG_PIN}
     for _ in range(5):
         await client.post("/auth/student/session", json=wrong)
 
     right = await client.post(
         "/auth/student/session",
-        json={"code": roster["code"], "student_id": roster["student_id"], "pin": roster["pin"]},
+        json={"username": roster["username"], "pin": roster["pin"]},
     )
     assert right.status_code == 429
 
@@ -274,7 +201,7 @@ async def test_the_lock_releases_after_the_window(
     client, student_on_roster, session: AsyncSession
 ) -> None:
     roster = await student_on_roster()
-    wrong = {"code": roster["code"], "student_id": roster["student_id"], "pin": WRONG_PIN}
+    wrong = {"username": roster["username"], "pin": WRONG_PIN}
     for _ in range(5):
         await client.post("/auth/student/session", json=wrong)
 
@@ -285,7 +212,7 @@ async def test_the_lock_releases_after_the_window(
 
     response = await client.post(
         "/auth/student/session",
-        json={"code": roster["code"], "student_id": roster["student_id"], "pin": roster["pin"]},
+        json={"username": roster["username"], "pin": roster["pin"]},
     )
     assert response.status_code == 200
 
@@ -294,13 +221,13 @@ async def test_a_correct_pin_clears_the_failure_count(
     client, student_on_roster, session: AsyncSession
 ) -> None:
     roster = await student_on_roster()
-    wrong = {"code": roster["code"], "student_id": roster["student_id"], "pin": WRONG_PIN}
+    wrong = {"username": roster["username"], "pin": WRONG_PIN}
     for _ in range(3):
         await client.post("/auth/student/session", json=wrong)
 
     await client.post(
         "/auth/student/session",
-        json={"code": roster["code"], "student_id": roster["student_id"], "pin": roster["pin"]},
+        json={"username": roster["username"], "pin": roster["pin"]},
     )
     credential = await session.get(StudentCredential, uuid.UUID(roster["student_id"]))
     assert credential.failed_attempts == 0
@@ -312,7 +239,7 @@ async def test_lockout_is_audited_once_when_it_engages(
 ) -> None:
     """Auditing every failure would flood the table; the lock is the signal."""
     roster = await student_on_roster()
-    wrong = {"code": roster["code"], "student_id": roster["student_id"], "pin": WRONG_PIN}
+    wrong = {"username": roster["username"], "pin": WRONG_PIN}
     for _ in range(5):
         await client.post("/auth/student/session", json=wrong)
 
@@ -320,6 +247,39 @@ async def test_lockout_is_audited_once_when_it_engages(
         await session.exec(select(AuditLog).where(AuditLog.action == "student.locked_out"))
     ).all()
     assert len(entries) == 1
+
+
+async def test_too_many_wrong_pins_from_one_device_blocks_it(
+    client, student_on_roster, test_settings
+) -> None:
+    """With no class code in front, guessing across many usernames is stopped per device
+    (IP). Only failures count, so a class signing in at once is never slowed."""
+    test_settings.pin_failures_per_device = 3
+    aria = await student_on_roster("Aria K")
+    bella = await student_on_roster("Bella N", class_name="Other class")
+
+    for username in ["aria.k", "bella.n", "nobody.at.all"]:
+        await client.post("/auth/student/session", json={"username": username, "pin": WRONG_PIN})
+
+    # Even the right PIN is refused from this device now — for any child.
+    blocked = await client.post(
+        "/auth/student/session", json={"username": bella["username"], "pin": bella["pin"]}
+    )
+    assert blocked.status_code == 429
+    assert "computer" in blocked.json()["detail"]
+    assert aria["username"] == "aria.k"
+
+
+async def test_successful_sign_ins_do_not_count_against_the_device(
+    client, student_on_roster, test_settings
+) -> None:
+    test_settings.pin_failures_per_device = 2
+    roster = await student_on_roster()
+    for _ in range(5):
+        ok = await client.post(
+            "/auth/student/session", json={"username": roster["username"], "pin": roster["pin"]}
+        )
+        assert ok.status_code == 200
 
 
 # --- sessions -----------------------------------------------------------------------
@@ -353,11 +313,7 @@ async def test_archiving_a_student_signs_them_out(client, signed_in_student) -> 
 
 async def test_signing_in_again_ends_the_first_session(client, student_on_roster) -> None:
     roster = await student_on_roster()
-    body = {
-        "code": roster["code"],
-        "student_id": roster["student_id"],
-        "pin": roster["pin"],
-    }
+    body = {"username": roster["username"], "pin": roster["pin"]}
     first = await client.post("/auth/student/session", json=body)
     first_token = first.cookies[STUDENT_SESSION_COOKIE]
     second = await client.post("/auth/student/session", json=body)
@@ -439,7 +395,7 @@ async def test_a_signed_in_student_cannot_reach_teacher_routes(client, signed_in
         ("get", "/auth/me", None),
         ("post", f"/classes/{roster['class_id']}/join-code/rotate", None),
         ("post", f"/classes/{roster['class_id']}/pins", {"reset_existing": True}),
-        ("post", f"/students/{roster['student_id']}/pin/reset", None),
+        ("post", f"/students/{roster['student_id']}/pin", {}),
         ("post", f"/students/{roster['student_id']}/sessions/revoke", None),
         ("post", f"/classes/{roster['class_id']}/roster/preview", {"names": "Ghost"}),
     ]
@@ -479,7 +435,7 @@ async def test_the_session_cookie_ends_with_the_browser(client, student_on_roste
     roster = await student_on_roster()
     response = await client.post(
         "/auth/student/session",
-        json={"code": roster["code"], "student_id": roster["student_id"], "pin": roster["pin"]},
+        json={"username": roster["username"], "pin": roster["pin"]},
     )
     cookie = response.headers["set-cookie"].lower()
     assert "student_session=" in cookie

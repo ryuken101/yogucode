@@ -87,13 +87,13 @@ test('student routes never send a teacher token, even when one exists', async ()
   // A teacher testing the join flow in their own browser has a live Supabase session.
   // Sending it to an unauthenticated route is noise at best and confusing at worst.
   currentAccessToken.mockResolvedValue('a-real-token')
-  const lookup = captureRequest('/api/join/lookup', 'post')
+  const signIn = captureRequest('/api/auth/student/session', 'post')
   const me = captureRequest('/api/auth/student/me')
 
-  await api.joinLookup('WNPXYZ')
+  await api.studentSignIn({ username: 'aria.k', pin: '4827' })
   await api.studentMe()
 
-  expect(lookup[0]?.auth).toBeNull()
+  expect(signIn[0]?.auth).toBeNull()
   expect(me[0]?.auth).toBeNull()
   expect(currentAccessToken).not.toHaveBeenCalled()
 })

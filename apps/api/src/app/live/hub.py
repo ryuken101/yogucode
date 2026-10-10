@@ -67,6 +67,10 @@ class Room:
     students: dict[uuid.UUID, StudentPresence] = field(default_factory=dict)
     teachers: set[Socket] = field(default_factory=set)
     docs: dict[str, DocLog] = field(default_factory=dict)
+    # Which teachers are helping in which child's editor. While a target has anyone in its
+    # set, the child's editor is locked (Ken's decision, 11 Oct 2026): they watch rather
+    # than type over the teacher.
+    helping: dict[str, set[Socket]] = field(default_factory=dict)
 
 
 async def _send(socket: Socket, message: dict[str, Any]) -> None:
@@ -142,6 +146,12 @@ class Hub:
         if log is None or full or log.student_id != student_id:
             log = room.docs[target] = DocLog(student_id)
             log.updates = [update]
+            if room.helping.get(target):
+                # A child (re)connecting mid-help learns their editor is locked: they send
+                # their full state on every connect, so this is where to tell them.
+                presence = room.students.get(student_id)
+                if presence is not None:
+                    await _send(presence.socket, {"type": "help", "target": target, "on": True})
         else:
             log.updates.append(update)
         if len(log.updates) > MAX_LOG:
@@ -192,10 +202,43 @@ class Hub:
             },
         )
 
-    def leave_teacher(self, class_id: uuid.UUID, socket: Socket) -> None:
+    async def leave_teacher(self, class_id: uuid.UUID, socket: Socket) -> None:
+        """A teacher went: their tab closed, they navigated away, or the connection dropped.
+
+        Every editor they were helping in unlocks, so a child is never left stuck unable to
+        type because a teacher walked off.
+        """
         room = self.rooms.get(class_id)
-        if room is not None:
-            room.teachers.discard(socket)
+        if room is None:
+            return
+        room.teachers.discard(socket)
+        for target in [t for t, helpers in room.helping.items() if socket in helpers]:
+            await self.help(class_id, socket, target, on=False)
+
+    async def help(self, class_id: uuid.UUID, socket: Socket, target: str, *, on: bool) -> bool:
+        """A teacher starts or stops helping in a child's editor. False if no such editor.
+
+        The child is told only when their editor changes state: locked when the first
+        teacher starts helping, unlocked when the last one stops.
+        """
+        room = self.rooms.get(class_id)
+        log = room.docs.get(target) if room else None
+        if room is None or log is None:
+            return False
+        helpers = room.helping.setdefault(target, set())
+        was_locked = bool(helpers)
+        if on:
+            helpers.add(socket)
+        else:
+            helpers.discard(socket)
+        if not helpers:
+            del room.helping[target]
+        now_locked = bool(room.helping.get(target))
+        if now_locked != was_locked:
+            presence = room.students.get(log.student_id)
+            if presence is not None:
+                await _send(presence.socket, {"type": "help", "target": target, "on": now_locked})
+        return True
 
     async def teacher_doc(
         self, class_id: uuid.UUID, socket: Socket, target: str, update: str

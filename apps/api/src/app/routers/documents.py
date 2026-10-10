@@ -31,6 +31,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.auth.principal import CurrentStudent
 from app.db import get_session
+from app.folders import STUDENT, get_folder, live_folder
 from app.models import DocumentStatus, StudentDocument, TeacherDocument
 from app.models.base import utcnow
 from app.quiz import running_quiz_for
@@ -53,6 +54,8 @@ STARTER_CONTENT = '# Write your Python here, then press Run.\nprint("Hello!")\n'
 class DocumentIn(BaseModel):
     title: str | None = Field(default=None, max_length=MAX_TITLE_LENGTH)
     content: str | None = Field(default=None, max_length=MAX_CONTENT_BYTES)
+    # The folder to create it in; absent or null is the top level.
+    folder_id: uuid.UUID | None = None
 
 
 class DocumentPatch(BaseModel):
@@ -60,6 +63,8 @@ class DocumentPatch(BaseModel):
 
     title: str | None = Field(default=None, min_length=1, max_length=MAX_TITLE_LENGTH)
     content: str | None = Field(default=None, max_length=MAX_CONTENT_BYTES)
+    # Present means "move it": a folder id, or null for the top level.
+    folder_id: uuid.UUID | None = None
 
 
 class DocumentSummaryOut(BaseModel):
@@ -71,6 +76,7 @@ class DocumentSummaryOut(BaseModel):
 
     id: uuid.UUID
     title: str
+    folder_id: uuid.UUID | None
     status: DocumentStatus
     created_at: datetime
     updated_at: datetime
@@ -80,6 +86,7 @@ class DocumentSummaryOut(BaseModel):
         return cls(
             id=record.id,
             title=record.title,
+            folder_id=record.folder_id,
             status=record.status,
             created_at=record.created_at,
             updated_at=record.updated_at,
@@ -92,6 +99,17 @@ class DocumentOut(DocumentSummaryOut):
     @classmethod
     def build_full(cls, record: StudentDocument | TeacherDocument) -> "DocumentOut":
         return cls(**DocumentSummaryOut.build(record).model_dump(), content=record.content)
+
+
+def default_title(existing: set[str]) -> str:
+    """ "Untitled", then "Untitled 2", and so on — never colliding with `existing`
+    (the casefolded titles of the live files in the same folder)."""
+    if DEFAULT_TITLE.casefold() not in existing:
+        return DEFAULT_TITLE
+    suffix = 2
+    while f"{DEFAULT_TITLE} {suffix}".casefold() in existing:
+        suffix += 1
+    return f"{DEFAULT_TITLE} {suffix}"
 
 
 def _duplicate_title() -> HTTPException:
@@ -109,7 +127,7 @@ def _duplicate_title() -> HTTPException:
     """
     return HTTPException(
         status_code=status.HTTP_409_CONFLICT,
-        detail="You already have a file with that name",
+        detail="You already have a file with that name here",
     )
 
 
@@ -132,10 +150,12 @@ async def create_document(
     unique index would refuse a second "Untitled", and a 409 in response to pressing a
     plus button is not an error a ten-year-old can act on.
     """
-    title = (body.title or "").strip() or await _next_default_title(session, principal)
+    folder_id = await live_folder(session, STUDENT, principal, body.folder_id)
+    title = (body.title or "").strip() or await _next_default_title(session, principal, folder_id)
     record = StudentDocument(
         centre_id=principal.centre_id,
         student_id=principal.subject_id,
+        folder_id=folder_id,
         title=title,
         content=body.content if body.content is not None else STARTER_CONTENT,
     )
@@ -151,18 +171,16 @@ async def create_document(
     return DocumentOut.build_full(record)
 
 
-async def _next_default_title(session: AsyncSession, principal: CurrentStudent) -> str:
-    """ "Untitled", then "Untitled 2", and so on — never a collision."""
-    existing = {
-        record.title.casefold()
-        for record in await list_student_documents(session, principal, include_archived=False)
-    }
-    if DEFAULT_TITLE.casefold() not in existing:
-        return DEFAULT_TITLE
-    suffix = 2
-    while f"{DEFAULT_TITLE} {suffix}".casefold() in existing:
-        suffix += 1
-    return f"{DEFAULT_TITLE} {suffix}"
+async def _next_default_title(
+    session: AsyncSession, principal: CurrentStudent, folder_id: uuid.UUID | None
+) -> str:
+    return default_title(
+        {
+            record.title.casefold()
+            for record in await list_student_documents(session, principal, include_archived=False)
+            if record.folder_id == folder_id
+        }
+    )
 
 
 @router.get("/{document_id}", response_model=DocumentOut)
@@ -202,6 +220,12 @@ async def save_document(
     if "content" in fields and fields["content"] is not None and body.content != record.content:
         record.content = body.content
         changed = True
+    if "folder_id" in fields:
+        # Moving between folders (Ken's decision, 11 Oct 2026). Only into one of their own.
+        target = await live_folder(session, STUDENT, principal, body.folder_id)
+        if target != record.folder_id:
+            record.folder_id = target
+            changed = True
 
     if changed:
         session.add(record)
@@ -245,6 +269,7 @@ async def restore_document(
     if record.status != DocumentStatus.ACTIVE:
         record.status = DocumentStatus.ACTIVE
         record.updated_at = utcnow()
+        record.folder_id = await _still_live(session, principal, record.folder_id)
         session.add(record)
         try:
             await session.commit()
@@ -253,3 +278,13 @@ async def restore_document(
             raise _duplicate_title() from exc
         await session.refresh(record)
     return DocumentOut.build_full(record)
+
+
+async def _still_live(
+    session: AsyncSession, principal: CurrentStudent, folder_id: uuid.UUID | None
+) -> uuid.UUID | None:
+    """The file's folder if it still exists; the top level if it was deleted meanwhile."""
+    if folder_id is None:
+        return None
+    folder = await get_folder(session, STUDENT, principal, folder_id)
+    return folder.id if folder.status == DocumentStatus.ACTIVE else None

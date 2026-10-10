@@ -11,7 +11,7 @@
  * rather than failing. Waiting two seconds for real is slower and tells the truth.
  */
 
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router'
 import { expect, test, vi } from 'vitest'
@@ -99,19 +99,32 @@ test('it reopens the file they were last editing', async () => {
   expect(screen.getByRole('tab', { name: 'spiral' })).toHaveAttribute('aria-selected', 'true')
 })
 
-test('every file they have appears as a tab', async () => {
+test('every file they have is in the explorer; the last one edited opens as a tab', async () => {
   renderScreen(<Work />, { route: '/work' })
+  const tree = await screen.findByRole('tree', { name: 'Your files and folders' })
+  expect(await within(tree).findByRole('button', { name: 'spiral' })).toBeInTheDocument()
+  expect(within(tree).getByRole('button', { name: 'squares' })).toBeInTheDocument()
+  // Tabs are only the open files (Ken's decision, 11 Oct 2026): just the one reopened.
   expect(await screen.findByRole('tab', { name: 'spiral' })).toBeInTheDocument()
-  expect(screen.getByRole('tab', { name: 'squares' })).toBeInTheDocument()
+  expect(screen.queryByRole('tab', { name: 'squares' })).not.toBeInTheDocument()
 })
 
-test('switching tabs loads the other file', async () => {
+test('opening another file from the explorer adds a tab and loads it', async () => {
   const { user } = renderScreen(<Work />, { route: '/work' })
   await editorWithValue('print("spiral")\n')
 
-  await user.click(screen.getByRole('tab', { name: 'squares' }))
+  const tree = screen.getByRole('tree', { name: 'Your files and folders' })
+  await user.click(within(tree).getByRole('button', { name: 'squares' }))
 
   await editorWithValue('print("squares")\n')
+  expect(screen.getByRole('tab', { name: 'spiral' })).toBeInTheDocument()
+  expect(screen.getByRole('tab', { name: 'squares' })).toBeInTheDocument()
+
+  // Closing a tab only closes it; the file stays in the explorer.
+  await user.click(screen.getByRole('button', { name: 'Close squares' }))
+  expect(screen.queryByRole('tab', { name: 'squares' })).not.toBeInTheDocument()
+  expect(within(tree).getByRole('button', { name: 'squares' })).toBeInTheDocument()
+  await editorWithValue('print("spiral")\n')
 })
 
 test('a brand-new student gets a file made for them', async () => {

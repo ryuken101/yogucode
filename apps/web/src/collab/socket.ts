@@ -122,6 +122,8 @@ type DocListener = {
   receive: (update: Uint8Array) => void
   /** Where the helping teacher's cursor is; null when they stop. */
   cursor?: (offset: number | null) => void
+  /** The teacher started (true) or stopped (false) helping: the editor locks meanwhile. */
+  help?: (on: boolean) => void
 }
 
 type QuizListener = (message: Message) => void
@@ -136,7 +138,12 @@ class StudentLive {
     this.socket = new LiveSocket('/live/student', {
       onOpen: (socket) => {
         if (this.focus) socket.send(this.focus)
-        for (const listener of this.docs.values()) listener.sendFull()
+        for (const listener of this.docs.values()) {
+          // Unlock first: a lock that ended while the connection was down would otherwise
+          // never be lifted. The server re-sends "help on" for any still in force.
+          listener.help?.(false)
+          listener.sendFull()
+        }
       },
       onMessage: (message) => {
         const target = typeof message.target === 'string' ? message.target : null
@@ -144,6 +151,8 @@ class StudentLive {
           this.docs.get(target)?.receive(fromBase64(message.update))
         } else if (message.type === 'cursor' && target) {
           this.docs.get(target)?.cursor?.(typeof message.offset === 'number' ? message.offset : null)
+        } else if (message.type === 'help' && target) {
+          this.docs.get(target)?.help?.(message.on === true)
         } else if (message.type === 'resync' && target) {
           this.docs.get(target)?.sendFull()
         } else if (

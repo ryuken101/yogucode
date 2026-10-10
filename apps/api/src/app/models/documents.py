@@ -46,9 +46,14 @@ class StudentDocument(TimestampMixin, table=True):
         # Autogenerate did render this functional partial index correctly, which is not
         # guaranteed for expression indexes — read the generated revision rather than
         # assuming, and `test_schema.py` asserts the constraint actually bites.
+        #
+        # Per folder since folders arrived (11 Oct 2026): "squares" may exist in both
+        # "week 1" and "week 2". The top level is folded to the nil UUID, because Postgres
+        # treats NULLs as distinct and the rule would otherwise never bite there.
         Index(
             "uq_student_documents_live_title",
             "student_id",
+            text("coalesce(folder_id, '00000000-0000-0000-0000-000000000000'::uuid)"),
             text("lower(title)"),
             unique=True,
             postgresql_where=text("status = 'active'"),
@@ -58,6 +63,8 @@ class StudentDocument(TimestampMixin, table=True):
     id: uuid.UUID = Field(default_factory=new_uuid, primary_key=True)
     centre_id: uuid.UUID = Field(foreign_key="centres.id", index=True)
     student_id: uuid.UUID = Field(foreign_key="students.id", index=True)
+    # The folder it sits in (`student_folders`); None is the top level.
+    folder_id: uuid.UUID | None = Field(default=None, foreign_key="student_folders.id", index=True)
     title: str
     # Text rather than the default AutoString: this holds a Python file, not a label, and
     # the column should read as unbounded to anyone who opens the schema. The practical

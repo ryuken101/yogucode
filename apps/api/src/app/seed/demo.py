@@ -45,6 +45,7 @@ from app.models import (
     User,
     UserRole,
 )
+from app.usernames import suggest_username, taken_usernames
 
 DEMO_CLASS_NAME = "Demo Year 4-6 Python"
 DEMO_TERM = "2026 T4"
@@ -64,6 +65,8 @@ class DemoResult:
     """(display_name, pin) for students whose PIN this run issued."""
     existing: list[str] = field(default_factory=list)
     """Students who already had a PIN, which cannot be read back to print."""
+    usernames: dict[str, str] = field(default_factory=dict)
+    """display_name → username, for printing the logins."""
 
 
 def assert_local(database_url: str) -> None:
@@ -134,10 +137,12 @@ async def seed_demo(session: AsyncSession) -> DemoResult:
             )
         ).one_or_none()
         if student is None:
-            student = Student(centre_id=centre.id, display_name=name)
+            username = suggest_username(name, await taken_usernames(session))
+            student = Student(centre_id=centre.id, display_name=name, username=username)
             session.add(student)
             await session.flush()
 
+        result.usernames[name] = student.username
         enrolment = (
             await session.exec(
                 select(Enrolment).where(
@@ -187,8 +192,11 @@ def main() -> None:
     print(f"class    {DEMO_CLASS_NAME}")
     print(f"code     {result.join_code}")
     for name, pin in result.created:
-        print(f"  {name:<10} {pin}")
+        print(f"  {name:<10} {result.usernames.get(name, ''):<12} {pin}")
     for name in result.existing:
-        print(f"  {name:<10} (PIN already set — reissue it in the app to see one)")
+        print(
+            f"  {name:<10} {result.usernames.get(name, ''):<12} "
+            "(PIN already set — change it in the app to see one)"
+        )
     if not result.created and not result.existing:  # pragma: no cover — always populated
         print("  no students")

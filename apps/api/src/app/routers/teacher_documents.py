@@ -21,16 +21,17 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.auth.principal import CurrentTeacher, Principal
 from app.db import get_session
+from app.folders import TEACHER, get_folder, live_folder
 from app.models import DocumentStatus, TeacherDocument
 from app.models.base import utcnow
 from app.routers.documents import (
-    DEFAULT_TITLE,
     STARTER_CONTENT,
     DocumentIn,
     DocumentOut,
     DocumentPatch,
     DocumentSummaryOut,
     _duplicate_title,
+    default_title,
 )
 from app.scoping import get_own_teacher_document, list_own_teacher_documents
 
@@ -47,28 +48,30 @@ async def list_teacher_documents(
     return [DocumentSummaryOut.build(record) for record in records]
 
 
-async def _next_default_title(session: AsyncSession, principal: Principal) -> str:
-    """ "Untitled", then "Untitled 2", and so on — never a collision."""
-    existing = {
-        record.title.casefold()
-        for record in await list_own_teacher_documents(session, principal, include_archived=False)
-    }
-    if DEFAULT_TITLE.casefold() not in existing:
-        return DEFAULT_TITLE
-    suffix = 2
-    while f"{DEFAULT_TITLE} {suffix}".casefold() in existing:
-        suffix += 1
-    return f"{DEFAULT_TITLE} {suffix}"
+async def _next_default_title(
+    session: AsyncSession, principal: Principal, folder_id: uuid.UUID | None
+) -> str:
+    return default_title(
+        {
+            record.title.casefold()
+            for record in await list_own_teacher_documents(
+                session, principal, include_archived=False
+            )
+            if record.folder_id == folder_id
+        }
+    )
 
 
 @router.post("", response_model=DocumentOut, status_code=status.HTTP_201_CREATED)
 async def create_teacher_document(
     body: DocumentIn, principal: CurrentTeacher, session: SessionDep
 ) -> DocumentOut:
-    title = (body.title or "").strip() or await _next_default_title(session, principal)
+    folder_id = await live_folder(session, TEACHER, principal, body.folder_id)
+    title = (body.title or "").strip() or await _next_default_title(session, principal, folder_id)
     record = TeacherDocument(
         centre_id=principal.centre_id,
         user_id=principal.subject_id,
+        folder_id=folder_id,
         title=title,
         content=body.content if body.content is not None else STARTER_CONTENT,
     )
@@ -108,6 +111,11 @@ async def save_teacher_document(
     if "content" in fields and fields["content"] is not None and body.content != record.content:
         record.content = body.content
         changed = True
+    if "folder_id" in fields:
+        target = await live_folder(session, TEACHER, principal, body.folder_id)
+        if target != record.folder_id:
+            record.folder_id = target
+            changed = True
 
     if changed:
         session.add(record)
@@ -142,6 +150,11 @@ async def restore_teacher_document(
     if record.status != DocumentStatus.ACTIVE:
         record.status = DocumentStatus.ACTIVE
         record.updated_at = utcnow()
+        if record.folder_id is not None:
+            # Back to the top level if its folder was deleted meanwhile.
+            folder = await get_folder(session, TEACHER, principal, record.folder_id)
+            if folder.status != DocumentStatus.ACTIVE:
+                record.folder_id = None
         session.add(record)
         try:
             await session.commit()

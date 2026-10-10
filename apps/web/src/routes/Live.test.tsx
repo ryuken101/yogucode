@@ -128,3 +128,49 @@ test('a large paste into the open problem is shown, as information', () => {
 test('a child who is not connected has no flags', () => {
   expect(flagsFor(student([{ kind: 'error', text: 'x' }], { online: false }))).toEqual([])
 })
+
+/* --- Help locks the child's editor (Ken's decision, 11 Oct 2026) ----------------------- */
+
+test('Help tells the relay to lock the child’s editor, and Done helping unlocks it', async () => {
+  const doc = new Y.Doc()
+  doc.getText('code').insert(0, 'print(1)\n')
+  const sent: Array<{ type: string; target?: string; on?: boolean }> = []
+  let authed = false
+
+  server.use(
+    liveSockets.addEventListener('connection', ({ client }) => {
+      client.addEventListener('message', (event) => {
+        const message = JSON.parse(String(event.data))
+        sent.push(message)
+        if (!authed) {
+          authed = true
+          client.send(
+            JSON.stringify({
+              type: 'snapshot',
+              students: [{ student_id: ARIA, display_name: 'Aria K', focus: { target: TARGET, kind: 'problem', title: 'Q1' }, recent: [] }],
+              docs: [{ target: TARGET, student_id: ARIA, updates: [toBase64(Y.encodeStateAsUpdate(doc))] }],
+            }),
+          )
+        }
+      })
+    }),
+  )
+
+  const { user } = renderScreen(
+    <Routes>
+      <Route path="/classes/:classId/live" element={<Live />} />
+    </Routes>,
+    { route: `/classes/${CLASS}/live` },
+  )
+
+  await user.click(await screen.findByRole('button', { name: /Aria K/ }))
+  await user.click(await screen.findByRole('button', { name: /Help/ }))
+  await waitFor(() =>
+    expect(sent).toContainEqual({ type: 'help', target: TARGET, on: true }),
+  )
+
+  await user.click(screen.getByRole('button', { name: 'Done helping' }))
+  await waitFor(() =>
+    expect(sent).toContainEqual({ type: 'help', target: TARGET, on: false }),
+  )
+})

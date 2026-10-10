@@ -28,9 +28,11 @@ class TeacherDocument(TimestampMixin, table=True):
         CheckConstraint("status IN ('active', 'archived')", name="status"),
         # The same rule as a child's files: two live files cannot share a name, ignoring
         # case. Archived ones are history and do not count.
+        # Per folder, the top level folded to the nil UUID (see models/folders.py).
         Index(
             "uq_teacher_documents_live_title",
             "user_id",
+            text("coalesce(folder_id, '00000000-0000-0000-0000-000000000000'::uuid)"),
             text("lower(title)"),
             unique=True,
             postgresql_where=text("status = 'active'"),
@@ -40,6 +42,8 @@ class TeacherDocument(TimestampMixin, table=True):
     id: uuid.UUID = Field(default_factory=new_uuid, primary_key=True)
     centre_id: uuid.UUID = Field(foreign_key="centres.id", index=True)
     user_id: uuid.UUID = Field(foreign_key="users.id", index=True)
+    # The folder it sits in (`teacher_folders`); None is the top level.
+    folder_id: uuid.UUID | None = Field(default=None, foreign_key="teacher_folders.id", index=True)
     title: str
     content: str = Field(default="", sa_type=Text)
     status: DocumentStatus = Field(default=DocumentStatus.ACTIVE, sa_type=String)

@@ -25,18 +25,18 @@ function renderAt(state: SlipState | null) {
 
 const state: SlipState = {
   className: 'Year 4-6 Python',
-  joinCode: 'WNPXYZ',
   slips: [
-    { student_id: 's1', display_name: 'Aria K', pin: '4827' },
-    { student_id: 's2', display_name: 'Bella N', pin: '9130' },
+    { student_id: 's1', display_name: 'Aria K', username: 'aria.k', pin: '4827' },
+    { student_id: 's2', display_name: 'Bella N', username: 'bella.n', pin: '9130' },
   ],
 }
 
-test('a slip carries the name, the class code and the PIN', () => {
+test('a slip carries the name, the username and the PIN — the whole login', () => {
   renderAt(state)
   expect(screen.getByText('Aria K')).toBeInTheDocument()
+  expect(screen.getByText('aria.k')).toBeInTheDocument()
   expect(screen.getByText('4827')).toBeInTheDocument()
-  expect(screen.getAllByText('WNPXYZ')).toHaveLength(2)
+  expect(screen.queryByText('WNPXYZ')).not.toBeInTheDocument()
 })
 
 test('the teacher is warned that this is the only time they will see them', () => {

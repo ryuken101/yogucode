@@ -38,7 +38,9 @@ async def a_student(session: AsyncSession, name: str = "Aria K") -> Student:
         centre = Centre(name="Magikid Castle Hill", slug="castle-hill")
         session.add(centre)
         await session.flush()
-    student = Student(centre_id=centre.id, display_name=name)
+    student = Student(
+        centre_id=centre.id, display_name=name, username=name.lower().replace(" ", ".")
+    )
     session.add(student)
     await session.flush()
     return student
@@ -293,21 +295,19 @@ async def test_revoking_reports_zero_when_there_is_nothing_live(
 
 
 async def make_class_with_students(client, headers, *names: str) -> tuple[str, list[str]]:
+    """A class whose children were pasted in as a list — so they have usernames but no
+    PINs yet, which "Issue missing PINs" then sets for the whole class at once."""
     created = (
         await client.post("/classes", json={"name": "Year 4-6 Python"}, headers=headers)
     ).json()
-    ids = []
-    for name in names:
-        student = (
-            await client.post("/students", json={"display_name": name}, headers=headers)
-        ).json()
-        await client.post(
-            f"/classes/{created['id']}/enrolments",
-            json={"student_id": student["id"]},
-            headers=headers,
-        )
-        ids.append(student["id"])
-    return created["id"], ids
+    added = await client.post(
+        f"/classes/{created['id']}/roster/bulk",
+        json={"entries": [{"display_name": name} for name in names]},
+        headers=headers,
+    )
+    assert added.status_code == 201, added.text
+    by_name = {entry["display_name"]: entry["student_id"] for entry in added.json()}
+    return created["id"], [by_name[name] for name in names]
 
 
 async def test_issuing_pins_covers_the_whole_class_in_one_request(client, signed_in) -> None:
@@ -348,11 +348,10 @@ async def test_issuing_again_skips_students_who_already_have_one(client, signed_
     class_id, _ = await make_class_with_students(client, headers, "Aria K")
     await client.post(f"/classes/{class_id}/pins", json={"reset_existing": False}, headers=headers)
 
-    late = (
-        await client.post("/students", json={"display_name": "Bella N"}, headers=headers)
-    ).json()
     await client.post(
-        f"/classes/{class_id}/enrolments", json={"student_id": late["id"]}, headers=headers
+        f"/classes/{class_id}/roster/bulk",
+        json={"entries": [{"display_name": "Bella N"}]},
+        headers=headers,
     )
 
     slips = (
@@ -406,7 +405,7 @@ async def test_must_change_pin_is_never_set(client, signed_in, session: AsyncSes
     headers = await signed_in()
     class_id, [student_id] = await make_class_with_students(client, headers, "Aria K")
     await client.post(f"/classes/{class_id}/pins", json={"reset_existing": False}, headers=headers)
-    await client.post(f"/students/{student_id}/pin/reset", headers=headers)
+    await client.post(f"/students/{student_id}/pin", json={}, headers=headers)
 
     credential = await session.get(StudentCredential, UUID(student_id))
     assert credential.must_change_pin is False
@@ -424,7 +423,7 @@ async def test_reset_returns_a_new_pin(client, signed_in) -> None:
         )
     ).json()[0]["pin"]
 
-    response = await client.post(f"/students/{student_id}/pin/reset", headers=headers)
+    response = await client.post(f"/students/{student_id}/pin", json={}, headers=headers)
     assert response.status_code == 201
     assert response.json()["pin"] != issued
     assert not is_weak(response.json()["pin"])
@@ -433,7 +432,7 @@ async def test_reset_returns_a_new_pin(client, signed_in) -> None:
 async def test_reset_works_for_a_student_who_never_had_one(client, signed_in) -> None:
     headers = await signed_in()
     _, [student_id] = await make_class_with_students(client, headers, "Aria K")
-    response = await client.post(f"/students/{student_id}/pin/reset", headers=headers)
+    response = await client.post(f"/students/{student_id}/pin", json={}, headers=headers)
     assert response.status_code == 201
 
 
@@ -449,7 +448,7 @@ async def test_reset_clears_a_lockout(client, signed_in, session: AsyncSession) 
     session.add(credential)
     await session.flush()
 
-    await client.post(f"/students/{student_id}/pin/reset", headers=headers)
+    await client.post(f"/students/{student_id}/pin", json={}, headers=headers)
     assert credential.locked_until is None
     assert credential.failed_attempts == 0
 
@@ -459,11 +458,34 @@ async def test_reset_records_who_did_it(client, signed_in, session: AsyncSession
 
     headers = await signed_in()
     _, [student_id] = await make_class_with_students(client, headers, "Aria K")
-    await client.post(f"/students/{student_id}/pin/reset", headers=headers)
+    await client.post(f"/students/{student_id}/pin", json={}, headers=headers)
 
     teacher = (await session.exec(select(User))).one()
     credential = await session.get(StudentCredential, UUID(student_id))
     assert credential.pin_set_by == teacher.id
+
+
+async def test_the_teacher_can_choose_the_pin(client, signed_in, session: AsyncSession) -> None:
+    """Ken's decision, 11 Oct 2026: the teacher types a PIN, or leaves it for a random one."""
+    headers = await signed_in()
+    _, [student_id] = await make_class_with_students(client, headers, "Aria K")
+    chosen = await client.post(f"/students/{student_id}/pin", json={"pin": "4827"}, headers=headers)
+    assert chosen.status_code == 201
+    assert chosen.json()["pin"] == "4827"
+    assert chosen.json()["username"] == "aria.k"
+    credential = await session.get(StudentCredential, UUID(student_id))
+    assert verify_pin(credential.pin_hash, "4827")
+    assert credential.pin_hash != "4827", "still stored hashed"
+
+
+async def test_an_easy_or_malformed_pin_is_refused(client, signed_in) -> None:
+    headers = await signed_in()
+    _, [student_id] = await make_class_with_students(client, headers, "Aria K")
+    for pin in ["1234", "0000", "12a4", "123", "12345"]:
+        response = await client.post(
+            f"/students/{student_id}/pin", json={"pin": pin}, headers=headers
+        )
+        assert response.status_code == 422, pin
 
 
 # --- the tenancy boundary -----------------------------------------------------------
@@ -475,7 +497,7 @@ async def test_another_centres_student_cannot_be_given_a_pin(
     headers = await signed_in()
     foreign = foreign_centre["student"]
     assert (
-        await client.post(f"/students/{foreign.id}/pin/reset", headers=headers)
+        await client.post(f"/students/{foreign.id}/pin", json={}, headers=headers)
     ).status_code == 404
 
 
@@ -501,7 +523,7 @@ async def test_another_centres_class_cannot_have_pins_issued(
 async def test_the_pin_routes_require_a_teacher(client) -> None:
     calls = [
         ("post", f"/classes/{uuid4()}/pins", {"reset_existing": False}),
-        ("post", f"/students/{uuid4()}/pin/reset", None),
+        ("post", f"/students/{uuid4()}/pin", {}),
         ("post", f"/students/{uuid4()}/sessions/revoke", None),
     ]
     for method, path, payload in calls:

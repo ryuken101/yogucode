@@ -101,10 +101,34 @@ table from `users` (no email, no Supabase identity, different PII posture), and 
 belong to a **centre**, not a class — enrolments are per-term, which is what lets mastery
 follow a child across terms in Phase 8.
 
+**Folders** (11 Oct 2026): `student_folders` / `teacher_folders` (parent_id tree), and
+`folder_id` on both file tables. File and folder names are unique **per folder** (partial
+unique indexes over `coalesce(folder_id, nil-uuid)`, since NULLs never collide). The rules
+live once in `app/folders.py`, mounted twice by `routers/folders.py` (`/me/folders`,
+`/teacher/folders`); every lookup filters on centre **and** owner. Deleting a folder
+archives its whole branch and files.
+
+**Delete entirely** (owner only, name typed to confirm) is the one exception to
+archive-never-delete: `app/erase.py` removes a child's account and all their work, or a
+class and its work (accounts and files stay), children-first in foreign-key order. A new
+table pointing at `students` or `classes` must be added there. Audit rows stay, with any
+`display_name` stripped from an erased child's.
+
+**Help locks the child's editor** (`app/live/hub.py`, `Room.helping`): a teacher's
+`{type: "help", on}` locks it; the last helper stopping — or their socket going — unlocks
+it, and a reconnecting child is told the current state.
+
 **`teacher_documents`** are a teacher's private "My code" files, scoped to the centre and
 `user_id` (`scoping.get_own_teacher_document`): another teacher at the same centre gets a
 404. A separate table from `student_documents` for the same reason `users` is separate from
 `students`.
+
+**Student accounts are username + PIN** (11 Oct 2026, `routers/join.py`): usernames are
+unique system-wide, case-insensitive (`app/usernames.py` suggests them from the name);
+PINs stay Argon2id-hashed — Ken chose that over teacher-readable PINs — so a PIN is shown
+once when set. No class code: the defences are identical refusals for every failure, the
+per-child lockout, and a per-device limit on wrong PINs (`app/auth/rate_limit.py`, in
+memory, failures only). A child in no active class gets a 403 after a correct PIN.
 
 **Closing the app signs everyone out** (Ken's decision, 10 Oct 2026): teachers'
 supabase-js session lives in `sessionStorage`; a child's session is tied to the tab they

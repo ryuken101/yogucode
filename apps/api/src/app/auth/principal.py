@@ -181,3 +181,16 @@ async def require_student(principal: CurrentPrincipal) -> Principal:
 
 
 CurrentStudent = Annotated[Principal, Depends(require_student)]
+
+
+async def require_owner(principal: CurrentTeacher) -> Principal:
+    """For the few actions only the centre's owner may take — deleting entirely."""
+    if principal.role != UserRole.OWNER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the centre’s owner can do this.",
+        )
+    return principal
+
+
+CurrentOwner = Annotated[Principal, Depends(require_owner)]

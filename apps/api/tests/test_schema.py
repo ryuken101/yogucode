@@ -57,7 +57,7 @@ async def test_roster_round_trip(session: AsyncSession) -> None:
     teacher = await _teacher(session, centre)
 
     klass = Class(centre_id=centre.id, name="Year 4-6 Python", term_label="2026 T4")
-    student = Student(centre_id=centre.id, display_name="Aria K")
+    student = Student(centre_id=centre.id, display_name="Aria K", username="aria.k")
     session.add_all([klass, student])
     await session.flush()
 
@@ -95,7 +95,10 @@ async def test_uuid_primary_keys_are_uuid7_and_sort_by_creation(session: AsyncSe
     centre = await _centre(session)
     assert centre.id.version == 7
 
-    students = [Student(centre_id=centre.id, display_name=f"Student {i}") for i in range(5)]
+    students = [
+        Student(centre_id=centre.id, display_name=f"Student {i}", username=f"student{i}")
+        for i in range(5)
+    ]
     for student in students:
         session.add(student)
         await session.flush()
@@ -107,7 +110,7 @@ async def test_uuid_primary_keys_are_uuid7_and_sort_by_creation(session: AsyncSe
 async def test_duplicate_enrolment_is_rejected(session: AsyncSession) -> None:
     centre = await _centre(session)
     klass = Class(centre_id=centre.id, name="Year 4-6 Python")
-    student = Student(centre_id=centre.id, display_name="Aria K")
+    student = Student(centre_id=centre.id, display_name="Aria K", username="aria.k")
     session.add_all([klass, student])
     await session.flush()
 
@@ -185,7 +188,7 @@ async def test_a_centre_may_override_a_global_concept_key(session: AsyncSession)
 
 async def test_check_constraint_rejects_an_invalid_status(session: AsyncSession) -> None:
     centre = await _centre(session)
-    student = Student(centre_id=centre.id, display_name="Aria K")
+    student = Student(centre_id=centre.id, display_name="Aria K", username="aria.k")
     student.status = "expelled"  # type: ignore[assignment]
     session.add(student)
     with pytest.raises((IntegrityError, DBAPIError)):
@@ -209,7 +212,7 @@ async def test_archiving_a_student_preserves_their_enrolment(session: AsyncSessi
     """Archive, never delete — a student leaving mid-term keeps a term of history."""
     centre = await _centre(session)
     klass = Class(centre_id=centre.id, name="Year 4-6 Python")
-    student = Student(centre_id=centre.id, display_name="Aria K")
+    student = Student(centre_id=centre.id, display_name="Aria K", username="aria.k")
     session.add_all([klass, student])
     await session.flush()
     session.add(Enrolment(class_id=klass.id, student_id=student.id))
@@ -228,7 +231,7 @@ async def test_archiving_a_student_preserves_their_enrolment(session: AsyncSessi
 async def test_student_session_carries_both_expiry_clocks(session: AsyncSession) -> None:
     """Absolute expiry (12h) and idle expiry (90min from last_seen_at)."""
     centre = await _centre(session)
-    student = Student(centre_id=centre.id, display_name="Aria K")
+    student = Student(centre_id=centre.id, display_name="Aria K", username="aria.k")
     session.add(student)
     await session.flush()
 

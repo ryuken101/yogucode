@@ -16,7 +16,7 @@ import {
   useQueryClient,
   type UseQueryOptions,
 } from '@tanstack/react-query'
-import { api, type ProblemFilters, type Schemas } from './api'
+import { api, type FolderScope, type ProblemFilters, type Schemas } from './api'
 import { ApiError } from './errors'
 import { isStudentTab } from './tabSession'
 
@@ -24,6 +24,7 @@ export const keys = {
   me: ['me'] as const,
   teachers: ['teachers'] as const,
   teacherDocuments: ['teacher-documents'] as const,
+  folders: (scope: FolderScope) => ['folders', scope] as const,
   teacherDocument: (documentId: string) => ['teacher-document', documentId] as const,
   classes: ['classes'] as const,
   /** Under `classes`, so invalidating the list refreshes this too. */
@@ -138,6 +139,26 @@ export function useWithdrawStudent(classId: string) {
   })
 }
 
+/** Delete a child entirely (owner only). Refreshes the roster. */
+export function useDeleteStudent(classId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ studentId, confirmName }: { studentId: string; confirmName: string }) =>
+      api.deleteStudent(studentId, confirmName),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.roster(classId) }),
+  })
+}
+
+/** Delete a class entirely (owner only). Refreshes the class list. */
+export function useDeleteClass() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ classId, confirmName }: { classId: string; confirmName: string }) =>
+      api.deleteClass(classId, confirmName),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.classes }),
+  })
+}
+
 export function useReinstateStudent(classId: string) {
   const client = useQueryClient()
   return useMutation({
@@ -207,10 +228,30 @@ export function useIssuePins(classId: string) {
   })
 }
 
-export function useResetPin(classId: string) {
+/** Change a child's PIN — to one the teacher typed, or random. */
+export function useSetPin(classId: string) {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: (studentId: string) => api.resetPin(studentId),
+    mutationFn: ({ studentId, pin }: { studentId: string; pin?: string }) =>
+      api.setPin(studentId, pin),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.roster(classId) }),
+  })
+}
+
+/** Add student: a new account straight into this class. */
+export function useAddStudent(classId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (body: Schemas['StudentIn']) => api.addStudentToClass(classId, body),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.roster(classId) }),
+  })
+}
+
+export function useChangeUsername(classId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ studentId, username }: { studentId: string; username: string }) =>
+      api.changeUsername(studentId, username),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.roster(classId) }),
   })
 }
@@ -295,9 +336,15 @@ export function useDocument(documentId: string | null) {
 export function useCreateDocument() {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: () => api.createDocument(),
+    mutationFn: (folderId?: string | null) =>
+      api.createDocument({ title: null, content: null, folder_id: folderId ?? null }),
     onSuccess: (created) => {
       client.setQueryData(keys.document(created.id), created)
+      // Into the list straight away, so the new file can open as a tab without waiting
+      // for the refetch.
+      client.setQueryData<Schemas['DocumentSummaryOut'][]>(keys.documents, (list) =>
+        list ? [created, ...list.filter((file) => file.id !== created.id)] : list,
+      )
       return client.invalidateQueries({ queryKey: keys.documents })
     },
   })
@@ -359,9 +406,13 @@ export function useTeacherDocument(documentId: string | null) {
 export function useCreateTeacherDocument() {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: () => api.createTeacherDocument(),
+    mutationFn: (folderId?: string | null) =>
+      api.createTeacherDocument({ title: null, content: null, folder_id: folderId ?? null }),
     onSuccess: (created) => {
       client.setQueryData(keys.teacherDocument(created.id), created)
+      client.setQueryData<Schemas['DocumentSummaryOut'][]>(keys.teacherDocuments, (list) =>
+        list ? [created, ...list.filter((file) => file.id !== created.id)] : list,
+      )
       return client.invalidateQueries({ queryKey: keys.teacherDocuments })
     },
   })
@@ -394,6 +445,46 @@ export function useArchiveTeacherDocument() {
     mutationFn: (documentId: string) => api.archiveTeacherDocument(documentId),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.teacherDocuments }),
   })
+}
+
+/* --- folders (My files and My code) ---------------------------------------------------- */
+
+/** The file list each scope's folder changes can affect (deleting a folder archives files). */
+const filesKey = (scope: FolderScope) => (scope === 'me' ? keys.documents : keys.teacherDocuments)
+
+export function useFolders(scope: FolderScope) {
+  return useQuery({ queryKey: keys.folders(scope), queryFn: () => api.listFolders(scope) })
+}
+
+/** Create, rename/move, delete folders, and move files — each refreshes folders and files. */
+export function useFolderActions(scope: FolderScope) {
+  const client = useQueryClient()
+  const refresh = () => {
+    void client.invalidateQueries({ queryKey: keys.folders(scope) })
+    void client.invalidateQueries({ queryKey: filesKey(scope) })
+  }
+  const create = useMutation({
+    mutationFn: ({ name, parentId }: { name: string; parentId: string | null }) =>
+      api.createFolder(scope, { name, parent_id: parentId }),
+    onSuccess: refresh,
+  })
+  const update = useMutation({
+    mutationFn: ({ folderId, ...body }: { folderId: string } & Schemas['FolderPatch']) =>
+      api.updateFolder(scope, folderId, body),
+    onSuccess: refresh,
+  })
+  const remove = useMutation({
+    mutationFn: (folderId: string) => api.deleteFolder(scope, folderId),
+    onSuccess: refresh,
+  })
+  const moveFile = useMutation({
+    mutationFn: ({ documentId, folderId }: { documentId: string; folderId: string | null }) =>
+      scope === 'me'
+        ? api.saveDocument(documentId, { folder_id: folderId })
+        : api.saveTeacherDocument(documentId, { folder_id: folderId }),
+    onSuccess: refresh,
+  })
+  return { create, update, remove, moveFile }
 }
 
 /* --- teacher: curriculum ------------------------------------------------------------ */

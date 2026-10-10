@@ -20,7 +20,6 @@ import type { Schemas } from '../lib/api'
 export interface SlipState {
   slips: Schemas['PinSlipOut'][]
   className: string
-  joinCode: string | null
 }
 
 export function SlipSheet() {
@@ -90,12 +89,11 @@ export function SlipSheet() {
                 <dt className="text-muted">Class</dt>
                 <dd className="font-mono">{state.className}</dd>
               </div>
-              {state.joinCode ? (
-                <div className="flex gap-2">
-                  <dt className="text-muted">Code</dt>
-                  <dd className="font-mono tracking-widest">{state.joinCode}</dd>
-                </div>
-              ) : null}
+              {/* Username + PIN is the whole login (Ken's decision, 11 Oct 2026). */}
+              <div className="flex gap-2">
+                <dt className="text-muted">Username</dt>
+                <dd className="font-mono">{slip.username}</dd>
+              </div>
               <div className="flex gap-2">
                 <dt className="text-muted">PIN</dt>
                 <dd className="font-mono text-xl tracking-[0.3em]">{slip.pin}</dd>

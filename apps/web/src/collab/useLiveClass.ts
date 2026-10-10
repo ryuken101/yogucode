@@ -198,10 +198,22 @@ export function useLiveClass(classId: string) {
     [store],
   )
 
+  /**
+   * Start or stop helping in a child's editor. Their editor is locked while anyone helps;
+   * the server also unlocks it if this connection drops (Ken's decision, 11 Oct 2026).
+   */
+  const sendHelp = useCallback(
+    (target: string, on: boolean) => {
+      if (store.ready && store.socket?.open) store.socket.send({ type: 'help', target, on })
+    },
+    [store],
+  )
+
   return {
     state,
     version,
     sendCursor,
+    sendHelp,
     cursors: store.cursors,
     students: store.students,
     docs: store.docs,

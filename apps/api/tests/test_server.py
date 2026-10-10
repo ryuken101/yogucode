@@ -119,7 +119,7 @@ async def test_www_and_the_old_address_redirect_to_the_one_address(dist: Path) -
 async def test_a_post_is_redirected_as_a_post(dist: Path) -> None:
     transport = httpx.ASGITransport(app=on_domain(dist))
     async with httpx.AsyncClient(transport=transport, base_url="http://www.yogucode.com") as c:
-        response = await c.post("/api/join/lookup", json={"code": "x"})
+        response = await c.post("/api/auth/student/session", json={"username": "x", "pin": "1"})
     assert response.status_code == 308, "308, not 301: a POST must not become a GET"
 
 

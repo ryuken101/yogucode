@@ -10,6 +10,7 @@ from app.routers import (
     curriculum,
     documents,
     events,
+    folders,
     homework,
     items,
     join,
@@ -44,6 +45,8 @@ app.include_router(live.router)
 app.include_router(quiz.router)
 app.include_router(teachers.router)
 app.include_router(teacher_documents.router)
+app.include_router(folders.student_router)
+app.include_router(folders.teacher_router)
 
 
 @app.get("/health")

@@ -321,7 +321,7 @@ export interface paths {
         put?: never;
         /**
          * Student Sign In
-         * @description Name plus PIN plus class code, in exchange for a session cookie.
+         * @description Username plus PIN, in exchange for a session cookie.
          */
         post: operations["student_sign_in_auth_student_session_post"];
         delete?: never;
@@ -464,6 +464,28 @@ export interface paths {
          */
         put: operations["set_class_curriculum_classes__class_id__curriculum_put"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classes/{class_id}/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete Class
+         * @description Delete a class entirely: it and its homework, quizzes, submissions and marks (Ken's
+         *     decision, 11 Oct 2026). Student accounts and their own files stay — a child can be in
+         *     other classes. Owner only, with the class name typed out. See `app.erase`.
+         */
+        post: operations["delete_class_classes__class_id__delete_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -702,6 +724,29 @@ export interface paths {
          *     into two requests at all.
          */
         post: operations["preview_roster_paste_classes__class_id__roster_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classes/{class_id}/students": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add New Student
+         * @description Create a child's account and put them in this class — the class page's Add student.
+         *
+         *     Returns the slip (name, username, PIN) once: the PIN is stored hashed and cannot be
+         *     read back later (Ken's decision, 11 Oct 2026).
+         */
+        post: operations["add_new_student_classes__class_id__students_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1109,26 +1154,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/join/lookup": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Lookup Class
-         * @description Turn a class code into the list of names a child picks from.
-         */
-        post: operations["lookup_class_join_lookup_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/lessons/{lesson_id}": {
         parameters: {
             query?: never;
@@ -1446,6 +1471,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/folders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Folders */
+        get: operations["list_folders_me_folders_get"];
+        put?: never;
+        /** New Folder */
+        post: operations["new_folder_me_folders_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/folders/{folder_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change Folder */
+        patch: operations["change_folder_me_folders__folder_id__patch"];
+        trace?: never;
+    };
+    "/me/folders/{folder_id}/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Remove Folder */
+        post: operations["remove_folder_me_folders__folder_id__delete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/home": {
         parameters: {
             query?: never;
@@ -1672,12 +1749,29 @@ export interface paths {
         put?: never;
         /**
          * Create Student
-         * @description Add a student to the centre, without enrolling them anywhere.
-         *
-         *     No `student_credentials` row is written: the teacher sets the PIN at step 7, and a
-         *     child on the roster who cannot sign in yet is a normal intermediate state.
+         * @description Create a child's account at the centre, without enrolling them anywhere.
          */
         post: operations["create_student_students_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/students/username-suggestion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Suggest A Username
+         * @description What the Add student form fills in as the teacher types the name.
+         */
+        get: operations["suggest_a_username_students_username_suggestion_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1735,6 +1829,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/students/{student_id}/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete Student
+         * @description Delete a child entirely: their account and all their work, everywhere (Ken's
+         *     decision, 11 Oct 2026). Owner only, and only with the name typed out. See `app.erase`.
+         */
+        post: operations["delete_student_students__student_id__delete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/students/{student_id}/history": {
         parameters: {
             query?: never;
@@ -1755,7 +1870,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/students/{student_id}/pin/reset": {
+    "/students/{student_id}/pin": {
         parameters: {
             query?: never;
             header?: never;
@@ -1765,14 +1880,13 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Reset Student Pin
-         * @description Give one child a new PIN.
+         * Set Student Pin
+         * @description Change a child's PIN — to one the teacher chose, or a random one.
          *
-         *     A Year 4 student forgets theirs roughly weekly and the hash cannot be read back, so
-         *     replacing it is the only recovery there is. That makes this a primary flow: one
-         *     request, one new PIN, printed and handed over.
+         *     The PIN is stored hashed, so when a child forgets theirs this is the remedy: set a new
+         *     one and tell them. The slip comes back once, to print.
          */
-        post: operations["reset_student_pin_students__student_id__pin_reset_post"];
+        post: operations["set_student_pin_students__student_id__pin_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1897,6 +2011,58 @@ export interface paths {
         put?: never;
         /** Restore Teacher Document */
         post: operations["restore_teacher_document_teacher_documents__document_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/teacher/folders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Folders */
+        get: operations["list_folders_teacher_folders_get"];
+        put?: never;
+        /** New Folder */
+        post: operations["new_folder_teacher_folders_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/teacher/folders/{folder_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change Folder */
+        patch: operations["change_folder_teacher_folders__folder_id__patch"];
+        trace?: never;
+    };
+    "/teacher/folders/{folder_id}/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Remove Folder */
+        post: operations["remove_folder_teacher_folders__folder_id__delete_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2366,6 +2532,8 @@ export interface components {
         DocumentIn: {
             /** Content */
             content?: string | null;
+            /** Folder Id */
+            folder_id?: string | null;
             /** Title */
             title?: string | null;
         };
@@ -2378,6 +2546,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Folder Id */
+            folder_id: string | null;
             /**
              * Id
              * Format: uuid
@@ -2399,6 +2569,8 @@ export interface components {
         DocumentPatch: {
             /** Content */
             content?: string | null;
+            /** Folder Id */
+            folder_id?: string | null;
             /** Title */
             title?: string | null;
         };
@@ -2420,6 +2592,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Folder Id */
+            folder_id: string | null;
             /**
              * Id
              * Format: uuid
@@ -2447,6 +2621,14 @@ export interface components {
          * @enum {string}
          */
         EnrolmentStatus: "active" | "withdrawn";
+        /**
+         * EraseIn
+         * @description Delete entirely: the name, typed out, as the confirmation (case and spaces ignored).
+         */
+        EraseIn: {
+            /** Confirm Name */
+            confirm_name: string;
+        };
         /** EventBatchIn */
         EventBatchIn: {
             /** Events */
@@ -2504,6 +2686,50 @@ export interface components {
              * @enum {string}
              */
             outcome: "good" | "not_yet";
+        };
+        /** FolderDeletedOut */
+        FolderDeletedOut: {
+            /** Files Archived */
+            files_archived: number;
+        };
+        /** FolderIn */
+        FolderIn: {
+            /** Name */
+            name: string;
+            /** Parent Id */
+            parent_id?: string | null;
+        };
+        /** FolderOut */
+        FolderOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Parent Id */
+            parent_id: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * FolderPatch
+         * @description Rename and/or move. An absent field is left alone; `parent_id: null` is the top.
+         */
+        FolderPatch: {
+            /** Name */
+            name?: string | null;
+            /** Parent Id */
+            parent_id?: string | null;
         };
         /**
          * FunctionTest
@@ -2870,40 +3096,6 @@ export interface components {
          * @enum {string}
          */
         ItemStatus: "draft" | "published" | "superseded" | "archived";
-        /** JoinLookupIn */
-        JoinLookupIn: {
-            /** Code */
-            code: string;
-        };
-        /** JoinLookupOut */
-        JoinLookupOut: {
-            /**
-             * Class Id
-             * Format: uuid
-             */
-            class_id: string;
-            /** Class Name */
-            class_name: string;
-            /** Students */
-            students: components["schemas"]["JoinStudentOut"][];
-            /** Term Label */
-            term_label: string | null;
-        };
-        /**
-         * JoinStudentOut
-         * @description A name on the picker, and whether it can be signed in to yet.
-         */
-        JoinStudentOut: {
-            /** Display Name */
-            display_name: string;
-            /** Has Pin */
-            has_pin: boolean;
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-        };
         /** LadderIn */
         LadderIn: {
             /** Item Ids */
@@ -3187,6 +3379,14 @@ export interface components {
             names: string;
         };
         /**
+         * PinIn
+         * @description A PIN the teacher chose, or none for a random one.
+         */
+        PinIn: {
+            /** Pin */
+            pin?: string | null;
+        };
+        /**
          * PinSlipOut
          * @description A PIN in plaintext. Returned exactly once, to be printed and handed over.
          *
@@ -3203,6 +3403,8 @@ export interface components {
              * Format: uuid
              */
             student_id: string;
+            /** Username */
+            username: string;
         };
         /** PreviewEntryOut */
         PreviewEntryOut: {
@@ -3467,6 +3669,8 @@ export interface components {
         RosterEntryOut: {
             /** Display Name */
             display_name: string;
+            /** Has Pin */
+            has_pin: boolean;
             /**
              * Joined At
              * Format: date-time
@@ -3479,6 +3683,8 @@ export interface components {
              */
             student_id: string;
             student_status: components["schemas"]["StudentStatus"];
+            /** Username */
+            username: string;
             /** Withdrawn At */
             withdrawn_at: string | null;
         };
@@ -3627,6 +3833,34 @@ export interface components {
             /** Withdrawn At */
             withdrawn_at: string | null;
         };
+        /**
+         * StudentCreatedOut
+         * @description A new account, with its PIN — returned this once, to print or tell the child.
+         */
+        StudentCreatedOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Display Name */
+            display_name: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Pin */
+            pin: string;
+            status: components["schemas"]["StudentStatus"];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Username */
+            username: string;
+        };
         /** StudentDetailOut */
         StudentDetailOut: {
             /** Classes */
@@ -3649,6 +3883,8 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Username */
+            username: string;
         };
         /** StudentHistoryOut */
         StudentHistoryOut: {
@@ -3662,10 +3898,20 @@ export interface components {
              */
             student_id: string;
         };
-        /** StudentIn */
+        /**
+         * StudentIn
+         * @description A new account (Ken's decision, 11 Oct 2026): a name, a username and a PIN.
+         *
+         *     Leave `username` out and one is suggested from the name; leave `pin` out and a random
+         *     one is drawn. Either way the PIN comes back once, in the response, to print or tell.
+         */
         StudentIn: {
             /** Display Name */
             display_name: string;
+            /** Pin */
+            pin?: string | null;
+            /** Username */
+            username?: string | null;
         };
         /** StudentLeafOut */
         StudentLeafOut: {
@@ -3724,6 +3970,8 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Username */
+            username: string;
         };
         /**
          * StudentPatch
@@ -3732,6 +3980,8 @@ export interface components {
         StudentPatch: {
             /** Display Name */
             display_name?: string | null;
+            /** Username */
+            username?: string | null;
         };
         /** StudentProblemOut */
         StudentProblemOut: {
@@ -3764,15 +4014,10 @@ export interface components {
         };
         /** StudentSignInIn */
         StudentSignInIn: {
-            /** Code */
-            code: string;
             /** Pin */
             pin: string;
-            /**
-             * Student Id
-             * Format: uuid
-             */
-            student_id: string;
+            /** Username */
+            username: string;
         };
         /**
          * StudentStatus
@@ -3884,6 +4129,11 @@ export interface components {
          * @enum {string}
          */
         UserRole: "owner" | "teacher";
+        /** UsernameSuggestionOut */
+        UsernameSuggestionOut: {
+            /** Username */
+            username: string;
+        };
         /** ValidationError */
         ValidationError: {
             /** Context */
@@ -4733,6 +4983,41 @@ export interface operations {
             };
         };
     };
+    delete_class_classes__class_id__delete_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                class_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EraseIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     enrol_student_classes__class_id__enrolments_post: {
         parameters: {
             query?: never;
@@ -5144,6 +5429,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RosterPreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_new_student_classes__class_id__students_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                class_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PinSlipOut"];
                 };
             };
             /** @description Validation Error */
@@ -5969,39 +6291,6 @@ export interface operations {
             };
         };
     };
-    lookup_class_join_lookup_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["JoinLookupIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["JoinLookupOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     update_lesson_lessons__lesson_id__patch: {
         parameters: {
             query?: never;
@@ -6629,6 +6918,142 @@ export interface operations {
             };
         };
     };
+    list_folders_me_folders_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FolderOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    new_folder_me_folders_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FolderIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FolderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_folder_me_folders__folder_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                folder_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FolderPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FolderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_folder_me_folders__folder_id__delete_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                folder_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FolderDeletedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     home_me_home_get: {
         parameters: {
             query?: never;
@@ -7120,7 +7545,40 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["StudentOut"];
+                    "application/json": components["schemas"]["StudentCreatedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    suggest_a_username_students_username_suggestion_get: {
+        parameters: {
+            query: {
+                name: string;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsernameSuggestionOut"];
                 };
             };
             /** @description Validation Error */
@@ -7237,6 +7695,41 @@ export interface operations {
             };
         };
     };
+    delete_student_students__student_id__delete_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EraseIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     student_history_students__student_id__history_get: {
         parameters: {
             query?: never;
@@ -7270,7 +7763,7 @@ export interface operations {
             };
         };
     };
-    reset_student_pin_students__student_id__pin_reset_post: {
+    set_student_pin_students__student_id__pin_post: {
         parameters: {
             query?: never;
             header?: {
@@ -7281,7 +7774,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PinIn"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             201: {
@@ -7560,6 +8057,142 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DocumentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_folders_teacher_folders_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FolderOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    new_folder_teacher_folders_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FolderIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FolderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_folder_teacher_folders__folder_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                folder_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FolderPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FolderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_folder_teacher_folders__folder_id__delete_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                folder_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FolderDeletedOut"];
                 };
             };
             /** @description Validation Error */

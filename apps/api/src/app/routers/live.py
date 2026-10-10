@@ -215,7 +215,17 @@ async def teacher_socket(
                     and not await hub.teacher_doc(klass.id, socket, target, update)
                 ):
                     await socket.send_json({"type": "refused", "target": target})
+            elif kind == "help":
+                # Start or stop helping: the child's editor locks while anyone helps.
+                target, on = message.get("target"), message.get("on")
+                if (
+                    isinstance(on, bool)
+                    and parse_target(target) is not None
+                    and not await hub.help(klass.id, socket, target, on=on)
+                ):
+                    await socket.send_json({"type": "refused", "target": target})
     except WebSocketDisconnect:
         pass
     finally:
-        hub.leave_teacher(klass.id, socket)
+        # Unlocks every editor this teacher was helping in (hub.leave_teacher).
+        await hub.leave_teacher(klass.id, socket)
