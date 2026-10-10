@@ -35,19 +35,19 @@ async def test_a_new_file_arrives_with_something_to_run(client, signed_in_studen
     await signed_in_student()
     created = await new_file(client)
 
-    assert created["title"] == "Untitled"
+    assert created["title"] == "untitled.py"
     assert created["content"] == STARTER_CONTENT
     assert created["status"] == "active"
     assert uuid.UUID(created["id"]).version == 7
 
 
 async def test_pressing_new_twice_never_collides(client, signed_in_student) -> None:
-    """The partial unique index would refuse a second "Untitled"; a 409 in response to a
+    """The partial unique index would refuse a second "untitled.py"; a 409 in response to a
     plus button is not something a ten-year-old can act on, so the titles are numbered."""
     await signed_in_student()
 
     titles = [(await new_file(client))["title"] for _ in range(3)]
-    assert titles == ["Untitled", "Untitled 2", "Untitled 3"]
+    assert titles == ["untitled.py", "untitled2.py", "untitled3.py"]
 
 
 async def test_a_named_file_keeps_its_name(client, signed_in_student) -> None:

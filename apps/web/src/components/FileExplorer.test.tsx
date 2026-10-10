@@ -125,3 +125,68 @@ test('dragging a folder onto "Files" brings it to the top level', () => {
   drag(loops, top)
   expect(props.onMove).toHaveBeenCalledWith({ kind: 'folder', id: 'loops' }, null)
 })
+
+// --- moving out of folders (Ken's feedback, 11 Oct 2026) ------------------------------------
+
+test('dropping a file on empty space in the list moves it out to the top level', () => {
+  const { props, tree } = setup({ activeId: 'sq' })
+  const squares = within(tree).getByRole('button', { name: 'squares' }).parentElement!
+  drag(squares, tree)
+  expect(props.onMove).toHaveBeenCalledWith({ kind: 'file', id: 'sq' }, null)
+})
+
+test('dropping on a top-level file moves it out to the top level too', () => {
+  const { props, tree } = setup({ activeId: 'sq' })
+  const squares = within(tree).getByRole('button', { name: 'squares' }).parentElement!
+  const scratch = within(tree).getByRole('button', { name: 'scratch' }).parentElement!
+  drag(squares, scratch)
+  expect(props.onMove).toHaveBeenCalledWith({ kind: 'file', id: 'sq' }, null)
+})
+
+test('dropping on a file inside a folder moves it into that folder', () => {
+  const { props, tree } = setup({ activeId: 'sq' })
+  const scratch = within(tree).getByRole('button', { name: 'scratch' }).parentElement!
+  const squares = within(tree).getByRole('button', { name: 'squares' }).parentElement!
+  drag(scratch, squares)
+  expect(props.onMove).toHaveBeenCalledWith({ kind: 'file', id: 'top' }, 'loops')
+})
+
+test('dropping where it already is, or a folder inside itself, does nothing', () => {
+  const { props, tree } = setup({ activeId: 'sq' })
+  const scratch = within(tree).getByRole('button', { name: 'scratch' }).parentElement!
+  drag(scratch, tree) // already at the top
+  const week1 = within(tree).getByRole('button', { name: 'week 1' }).parentElement!
+  const loops = within(tree).getByRole('button', { name: 'loops' }).parentElement!
+  drag(week1, loops) // into its own child
+  expect(props.onMove).not.toHaveBeenCalled()
+})
+
+test('Move to… moves without dragging — into a folder, or out to the top', async () => {
+  const { props, user } = setup({ activeId: 'sq' })
+  await user.click(screen.getByRole('button', { name: 'Move squares' }))
+  let dialog = screen.getByRole('dialog')
+  expect(within(dialog).getByRole('option', { name: 'week 1 / loops' })).toBeInTheDocument()
+  await user.selectOptions(within(dialog).getByLabelText('Move to'), 'w2')
+  await user.click(within(dialog).getByRole('button', { name: 'Move' }))
+  expect(props.onMove).toHaveBeenLastCalledWith({ kind: 'file', id: 'sq' }, 'w2')
+
+  await user.click(screen.getByRole('button', { name: 'Move squares' }))
+  dialog = screen.getByRole('dialog')
+  await user.selectOptions(within(dialog).getByLabelText('Move to'), 'Top level (no folder)')
+  await user.click(within(dialog).getByRole('button', { name: 'Move' }))
+  expect(props.onMove).toHaveBeenLastCalledWith({ kind: 'file', id: 'sq' }, null)
+})
+
+test('a folder cannot be offered a place inside itself', async () => {
+  const { user } = setup()
+  await user.click(screen.getByRole('button', { name: 'Move week 1' }))
+  const options = within(screen.getByRole('dialog')).getAllByRole('option').map((o) => o.textContent)
+  expect(options).toEqual(['Top level (no folder)', 'week 2'])
+})
+
+test('every icon button keeps a name a screen reader can say', () => {
+  setup()
+  for (const name of ['New file', 'New folder', 'Edit name of scratch', 'Move scratch', 'Delete scratch']) {
+    expect(screen.getByRole('button', { name })).toBeInTheDocument()
+  }
+})

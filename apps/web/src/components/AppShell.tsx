@@ -16,15 +16,28 @@ interface Props {
   centreName?: string
   /** The owner also manages who teaches here. */
   isOwner?: boolean
+  /**
+   * Full width and full height, for pages that are an editor rather than a document — My
+   * code. Everything else keeps the readable centred column.
+   */
+  wide?: boolean
   onSignOut?: () => void
   children: ReactNode
 }
 
-export function AppShell({ centreName, isOwner = false, onSignOut, children }: Props) {
+export function AppShell({
+  centreName,
+  isOwner = false,
+  wide = false,
+  onSignOut,
+  children,
+}: Props) {
   return (
-    <div className="min-h-dvh bg-cream">
-      <header className="border-b border-line bg-surface">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-6 py-3">
+    <div className={wide ? 'flex h-dvh flex-col bg-cream' : 'min-h-dvh bg-cream'}>
+      <header className="shrink-0 border-b border-line bg-surface">
+        <div
+          className={`mx-auto flex items-center justify-between gap-4 px-6 py-3 ${wide ? '' : 'max-w-5xl'}`}
+        >
           <div className="flex items-center gap-5">
             <Link to="/classes" className="flex items-center gap-3 text-grape">
               <Lockup size={30} />
@@ -55,7 +68,9 @@ export function AppShell({ centreName, isOwner = false, onSignOut, children }: P
           ) : null}
         </div>
       </header>
-      <main className="mx-auto max-w-5xl px-6 py-8">{children}</main>
+      <main className={wide ? 'min-h-0 flex-1 px-4 py-3' : 'mx-auto max-w-5xl px-6 py-8'}>
+        {children}
+      </main>
     </div>
   )
 }

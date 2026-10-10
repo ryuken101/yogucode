@@ -5,13 +5,15 @@
  * vertically on a laptop, and horizontal space is where Python lines want room. A term
  * produces a handful of files, not twenty, so a strip is enough.
  *
- * Closing a tab **archives** the file; it does not delete it. Nothing in this product is
- * deleted, and a child tidying up mid-term must not be able to lose a term of their own
- * work in one tap. The word is "Close" rather than "Delete" for the same reason.
+ * Since folders arrived (11 Oct 2026) these are only the files you have open, as in VS
+ * Code: closing a tab just closes it, and the file stays in the explorer. Deleting is the
+ * explorer's job.
  */
 
+import { FileCode2, FileText, Plus, X } from 'lucide-react'
 import { useState } from 'react'
 import type { Schemas } from '../lib/api'
+import { isPythonFile } from '../lib/fileType'
 
 interface Props {
   files: Schemas['DocumentSummaryOut'][]
@@ -83,22 +85,35 @@ export function FileTabs({
                 // A second click on the file you are already in renames it, which is where
                 // a child looks for that rather than in a menu.
                 onDoubleClick={() => active && startRename(file)}
-                className="max-w-40 truncate font-mono"
+                className="flex max-w-44 items-center gap-1.5 font-mono"
               >
-                {file.title}
+                {isPythonFile(file.title) ? (
+                  <FileCode2
+                    size={14}
+                    aria-hidden="true"
+                    className={`shrink-0 ${active ? 'text-lavender' : 'text-muted'}`}
+                  />
+                ) : (
+                  <FileText
+                    size={14}
+                    aria-hidden="true"
+                    className={`shrink-0 ${active ? 'text-lavender' : 'text-muted'}`}
+                  />
+                )}
+                <span className="truncate">{file.title}</span>
               </button>
             )}
-            {files.length > 1 ? (
+            {files.length > 0 ? (
               <button
                 type="button"
                 onClick={() => onClose(file.id)}
                 aria-label={`Close ${file.title}`}
-                title="Close this file (you can get it back)"
-                className={`rounded px-1 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 ${
+                title="Close tab"
+                className={`rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 ${
                   active ? 'text-cream/60 hover:text-cream' : 'text-muted hover:text-grape'
                 }`}
               >
-                ×
+                <X size={14} aria-hidden="true" />
               </button>
             ) : null}
           </div>
@@ -111,9 +126,9 @@ export function FileTabs({
         disabled={busy}
         aria-label="New file"
         title="New file"
-        className="rounded-t-lg bg-surface px-3 py-1.5 text-sm text-muted ring-1 ring-line hover:text-grape disabled:opacity-50"
+        className="rounded-t-lg bg-surface px-2.5 py-1.5 text-sm text-muted ring-1 ring-line hover:text-grape disabled:opacity-50"
       >
-        +
+        <Plus size={16} aria-hidden="true" />
       </button>
     </div>
   )

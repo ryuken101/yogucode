@@ -155,6 +155,11 @@ delete with a confirm, HTML5 drag-and-drop to move. `FileTabs` shows **only open
 (`editor/useOpenTabs.ts`); × closes the tab, never the file. Creating a file writes it
 into the cached list straight away so it can open as a tab before the refetch.
 
+**A file's type is its name, as in VS Code** (`lib/fileType.ts`): `.py` (any case) is
+Python — coloured and runnable; anything else is plain text, uncoloured, with Run disabled
+and a hint to rename. New files are `untitled.py` (server-side default); existing files got
+`.py` added by migration `258a4e916260`. Icons follow the type (`FileCode2` / `FileText`).
+
 While a teacher helps, `useLiveDoc().locked` is true and the child's editor is read-only
 with a calm `info` banner (Work, ProblemAttempt).
 

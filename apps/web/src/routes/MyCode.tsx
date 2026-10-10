@@ -24,6 +24,7 @@ import { CodeSurface } from '../editor/CodeSurface'
 import { useAutosave } from '../editor/useAutosave'
 import { useOpenTabs } from '../editor/useOpenTabs'
 import { messageFor } from '../lib/errors'
+import { isPythonFile, languageOf } from '../lib/fileType'
 import {
   useArchiveTeacherDocument,
   useCreateTeacherDocument,
@@ -119,6 +120,7 @@ export function MyCode() {
   const busy = state.status === 'running' || state.status === 'asking'
   const loading = state.status === 'loading'
   const code = active.data?.content ?? ''
+  const python = isPythonFile(active.data?.title)
 
   if (state.status === 'unsupported') {
     return <Notice tone="system-error">{state.reason}</Notice>
@@ -126,7 +128,12 @@ export function MyCode() {
 
   const runButtons = (
     <>
-      <Button variant="primary" onClick={() => run(code)} disabled={busy || loading}>
+      <Button
+        variant="primary"
+        onClick={() => run(code)}
+        disabled={busy || loading || !python}
+        title={python ? undefined : 'Only .py files can run'}
+      >
         {busy ? 'Running…' : 'Run'}
       </Button>
       <Button variant="secondary" onClick={stop} disabled={!busy}>
@@ -166,11 +173,13 @@ export function MyCode() {
       className={
         presenting
           ? 'fixed inset-0 z-50 flex flex-col gap-3 bg-night p-4'
-          : 'flex h-[calc(100dvh-9.5rem)] min-h-96 gap-3'
+          : 'flex h-full min-h-0 gap-3'
       }
     >
       {/* The explorer, hidden while presenting so the code fills the projector. */}
-      {!presenting ? <aside className="hidden w-56 shrink-0 sm:block">{explorer}</aside> : null}
+      {!presenting ? (
+        <aside className="hidden w-52 shrink-0 sm:block lg:w-60">{explorer}</aside>
+      ) : null}
       <div className={presenting ? 'contents' : 'flex min-w-0 flex-1 flex-col gap-2'}>
       {presenting ? (
         <div className="flex shrink-0 flex-wrap items-center gap-3">
@@ -209,6 +218,12 @@ export function MyCode() {
           {rename.error ? <Notice tone="not-yet">{messageFor(rename.error)}</Notice> : null}
 
           {folderError ? <Notice tone="not-yet">{messageFor(folderError)}</Notice> : null}
+          {active.data && !python ? (
+            <Notice tone="info">
+              This is a text file. Only files whose names end in <span className="font-mono">.py</span>{' '}
+              can run — rename it to add <span className="font-mono">.py</span>.
+            </Notice>
+          ) : null}
 
           <FileTabs
             files={tabs}
@@ -241,6 +256,7 @@ export function MyCode() {
             value={code}
             onChange={autosave.onChange}
             fontSize={presenting ? PRESENT_FONT_SIZE : 15}
+            language={languageOf(active.data?.title)}
           />
         )}
       </div>

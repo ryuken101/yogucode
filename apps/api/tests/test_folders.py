@@ -33,7 +33,7 @@ async def test_folders_nest_and_files_go_in_and_move(client, signed_in_student):
 
     doc = (await client.post("/me/documents", json={"folder_id": loops["id"]})).json()
     assert doc["folder_id"] == loops["id"]
-    assert doc["title"] == "Untitled"
+    assert doc["title"] == "untitled.py"
 
     moved = await client.patch(f"/me/documents/{doc['id']}", json={"folder_id": week1["id"]})
     assert moved.json()["folder_id"] == week1["id"]
@@ -60,13 +60,13 @@ async def test_names_are_unique_per_folder_not_per_child(client, signed_in_stude
     ).status_code == 201
     clash = await client.post("/me/documents", json={"title": "SQUARES", "folder_id": a["id"]})
     assert clash.status_code == 409
-    # "Untitled" numbering is per folder too.
+    # "untitled.py" numbering is per folder too.
     assert (await client.post("/me/documents", json={"folder_id": a["id"]})).json()[
         "title"
-    ] == "Untitled"
+    ] == "untitled.py"
     assert (await client.post("/me/documents", json={"folder_id": b["id"]})).json()[
         "title"
-    ] == "Untitled"
+    ] == "untitled.py"
     # Folders: same rule.
     assert (await client.post(ME, json={"name": "WEEK 1"})).status_code == 409
     assert (await client.post(ME, json={"name": "week 1", "parent_id": b["id"]})).status_code == 201

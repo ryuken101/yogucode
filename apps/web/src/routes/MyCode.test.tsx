@@ -18,14 +18,17 @@ vi.mock('../editor/CodeSurface', () => ({
     value,
     onChange,
     fontSize,
+    language,
   }: {
     value: string
     onChange: (next: string) => void
     fontSize?: number
+    language?: string
   }) => (
     <textarea
       aria-label="Your code"
       data-font-size={fontSize}
+      data-language={language ?? 'python'}
       defaultValue={value}
       onChange={(event) => onChange(event.target.value)}
     />
@@ -52,7 +55,7 @@ const { MyCode } = await import('./MyCode')
 
 const DOC: Schemas['DocumentOut'] = {
   id: 'd1',
-  title: 'Squares',
+  title: 'squares.py',
   folder_id: null,
   status: 'active',
   content: 'for i in range(5):\n    print(i * i)\n',
@@ -94,7 +97,7 @@ test('opens my last file, runs it, and saves through my own files', async () => 
 
   await editor()
   expect(authorization).toBe('Bearer teacher-token')
-  expect(screen.getByRole('tab', { name: /Squares/ })).toBeInTheDocument()
+  expect(screen.getByRole('tab', { name: /squares\.py/ })).toBeInTheDocument()
 
   await user.click(screen.getByRole('button', { name: 'Run' }))
   expect(python.run).toHaveBeenCalledWith(DOC.content)
@@ -125,13 +128,13 @@ test('Present makes the code big and hides the tabs; Exit brings them back', asy
 
   await user.click(screen.getByRole('button', { name: 'Present' }))
   expect(screen.getByLabelText('Your code')).toHaveAttribute('data-font-size', '24')
-  expect(screen.queryByRole('tab', { name: /Squares/ })).not.toBeInTheDocument()
-  expect(screen.getByText('Squares')).toBeInTheDocument() // the file name stays in the bar
+  expect(screen.queryByRole('tab', { name: /squares\.py/ })).not.toBeInTheDocument()
+  expect(screen.getByText('squares.py')).toBeInTheDocument() // the file name stays in the bar
   expect(screen.getByRole('button', { name: 'Run' })).toBeInTheDocument()
 
   await user.click(screen.getByRole('button', { name: 'Exit' }))
   expect(screen.getByLabelText('Your code')).toHaveAttribute('data-font-size', '15')
-  expect(screen.getByRole('tab', { name: /Squares/ })).toBeInTheDocument()
+  expect(screen.getByRole('tab', { name: /squares\.py/ })).toBeInTheDocument()
 })
 
 test('Escape leaves Present mode', async () => {
@@ -141,4 +144,27 @@ test('Escape leaves Present mode', async () => {
   expect(screen.getByRole('button', { name: 'Exit' })).toBeInTheDocument()
   await user.keyboard('{Escape}')
   expect(screen.queryByRole('button', { name: 'Exit' })).not.toBeInTheDocument()
+})
+
+test('a file whose name does not end in .py is plain text and cannot run', async () => {
+  server.use(
+    http.get('/api/teacher/documents', () => {
+      const { content: _content, ...summary } = DOC
+      return HttpResponse.json([{ ...summary, title: 'notes' }])
+    }),
+    http.get('/api/teacher/documents/d1', () => HttpResponse.json({ ...DOC, title: 'notes' })),
+  )
+  renderScreen(<MyCode />)
+  await editor()
+  expect(screen.getByLabelText('Your code')).toHaveAttribute('data-language', 'plaintext')
+  expect(screen.getByRole('button', { name: 'Run' })).toBeDisabled()
+  expect(screen.getByText(/This is a text file/)).toBeInTheDocument()
+})
+
+test('a .py file is Python: coloured and runnable', async () => {
+  renderScreen(<MyCode />)
+  await editor()
+  expect(screen.getByLabelText('Your code')).toHaveAttribute('data-language', 'python')
+  expect(screen.getByRole('button', { name: 'Run' })).toBeEnabled()
+  expect(screen.queryByText(/This is a text file/)).not.toBeInTheDocument()
 })

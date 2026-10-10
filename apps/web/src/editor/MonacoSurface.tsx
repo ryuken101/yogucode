@@ -57,6 +57,8 @@ export interface CodeSurfaceProps {
    * the projector (My code's Present mode) turns it up for the back row.
    */
   fontSize?: number
+  /** Python colours for a `.py` file; none for anything else (`lib/fileType.ts`). */
+  language?: 'python' | 'plaintext'
 }
 
 export interface EditChange {
@@ -76,6 +78,7 @@ export default function MonacoSurface({
   onModel,
   onCursor,
   fontSize,
+  language = 'python',
 }: CodeSurfaceProps) {
   const host = useRef<HTMLDivElement>(null)
   const editor = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
@@ -148,6 +151,11 @@ export default function MonacoSurface({
   useEffect(() => {
     editor.current?.updateOptions({ readOnly })
   }, [readOnly])
+
+  useEffect(() => {
+    const model = editor.current?.getModel()
+    if (model) monaco.editor.setModelLanguage(model, language)
+  }, [language])
 
   useEffect(() => {
     if (fontSize === undefined) return

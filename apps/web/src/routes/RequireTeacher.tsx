@@ -12,7 +12,7 @@
  */
 
 import { useQueryClient } from '@tanstack/react-query'
-import { Navigate, Outlet, useNavigate } from 'react-router'
+import { Navigate, Outlet, useLocation, useNavigate } from 'react-router'
 import { AppShell } from '../components/AppShell'
 import { Notice } from '../components/Notice'
 import { Spinner } from '../components/Spinner'
@@ -24,6 +24,8 @@ export function RequireTeacher() {
   const navigate = useNavigate()
   const client = useQueryClient()
   const { data, isPending, error } = useMe({ retry: false })
+  // My code is an editor, so it gets the whole window rather than the centred column.
+  const wide = useLocation().pathname.startsWith('/my-code')
 
   if (!supabaseConfigured) {
     return (
@@ -64,6 +66,7 @@ export function RequireTeacher() {
     <AppShell
       centreName={data.centre.name}
       isOwner={data.role === 'owner'}
+      wide={wide}
       onSignOut={() => {
         void signOut().then(() => {
           // Forget who was signed in, or the sign-in page reads the cached profile, thinks

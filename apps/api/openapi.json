@@ -9662,7 +9662,7 @@
         ]
       },
       "post": {
-        "description": "Start a new file.\n\nBoth fields are optional, because the common case is a child pressing \"new file\" with\nnothing in mind. An untitled file gets a number rather than a collision: the partial\nunique index would refuse a second \"Untitled\", and a 409 in response to pressing a\nplus button is not an error a ten-year-old can act on.",
+        "description": "Start a new file.\n\nBoth fields are optional, because the common case is a child pressing \"new file\" with\nnothing in mind. An untitled file gets a number rather than a collision: the partial\nunique index would refuse a second \"untitled.py\", and a 409 in response to pressing a\nplus button is not an error a ten-year-old can act on.",
         "operationId": "create_document_me_documents_post",
         "parameters": [
           {

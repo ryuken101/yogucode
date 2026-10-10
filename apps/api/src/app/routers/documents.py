@@ -47,7 +47,12 @@ MAX_TITLE_LENGTH = 80
 # unbounded `text`; the cap lives here, as it does for display_name and classes.name.
 MAX_CONTENT_BYTES = 64 * 1024
 
-DEFAULT_TITLE = "Untitled"
+# A file's type is its name, as in VS Code (Ken's decision, 11 Oct 2026): `.py` is Python,
+# anything else is plain text that cannot be run. New files are Python, so children see
+# — and get used to typing — the extension from their very first file.
+DEFAULT_STEM = "untitled"
+DEFAULT_EXTENSION = ".py"
+DEFAULT_TITLE = DEFAULT_STEM + DEFAULT_EXTENSION
 STARTER_CONTENT = '# Write your Python here, then press Run.\nprint("Hello!")\n'
 
 
@@ -102,14 +107,14 @@ class DocumentOut(DocumentSummaryOut):
 
 
 def default_title(existing: set[str]) -> str:
-    """ "Untitled", then "Untitled 2", and so on — never colliding with `existing`
+    """ "untitled.py", then "untitled2.py", and so on — never colliding with `existing`
     (the casefolded titles of the live files in the same folder)."""
     if DEFAULT_TITLE.casefold() not in existing:
         return DEFAULT_TITLE
     suffix = 2
-    while f"{DEFAULT_TITLE} {suffix}".casefold() in existing:
+    while f"{DEFAULT_STEM}{suffix}{DEFAULT_EXTENSION}".casefold() in existing:
         suffix += 1
-    return f"{DEFAULT_TITLE} {suffix}"
+    return f"{DEFAULT_STEM}{suffix}{DEFAULT_EXTENSION}"
 
 
 def _duplicate_title() -> HTTPException:
@@ -147,7 +152,7 @@ async def create_document(
 
     Both fields are optional, because the common case is a child pressing "new file" with
     nothing in mind. An untitled file gets a number rather than a collision: the partial
-    unique index would refuse a second "Untitled", and a 409 in response to pressing a
+    unique index would refuse a second "untitled.py", and a 409 in response to pressing a
     plus button is not an error a ten-year-old can act on.
     """
     folder_id = await live_folder(session, STUDENT, principal, body.folder_id)

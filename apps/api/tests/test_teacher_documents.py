@@ -2,7 +2,7 @@
 
 The files are private to the teacher: another teacher at the same centre gets a 404 and
 never sees them listed, another centre gets a 404, a student gets 403. Otherwise they
-behave like a child's files: starter content, "Untitled n", one live file per name.
+behave like a child's files: starter content, "untitled.py", one live file per name.
 """
 
 import uuid
@@ -20,8 +20,8 @@ async def test_a_new_file_has_starter_code_and_a_default_name(client, signed_in)
     ken = await signed_in("ken@example.com")
     first = (await client.post(URL, json={}, headers=ken)).json()
     second = (await client.post(URL, json={}, headers=ken)).json()
-    assert first["title"] == "Untitled"
-    assert second["title"] == "Untitled 2"
+    assert first["title"] == "untitled.py"
+    assert second["title"] == "untitled2.py"
     assert first["content"] == STARTER_CONTENT
 
 

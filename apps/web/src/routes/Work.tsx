@@ -23,6 +23,7 @@ import { CodeSurface } from '../editor/CodeSurface'
 import { useAutosave } from '../editor/useAutosave'
 import { useOpenTabs } from '../editor/useOpenTabs'
 import { messageFor } from '../lib/errors'
+import { isPythonFile, languageOf } from '../lib/fileType'
 import {
   useArchiveDocument,
   useCreateDocument,
@@ -132,6 +133,8 @@ export function Work() {
   const busy = state.status === 'running' || state.status === 'asking'
   const loading = state.status === 'loading'
   const code = active.data?.content ?? ''
+  // A file's type is its name, as in VS Code: only .py runs (lib/fileType.ts).
+  const python = isPythonFile(active.data?.title)
 
   if (state.status === 'unsupported') {
     return (
@@ -154,7 +157,8 @@ export function Work() {
             record('run')
             studentLive().status({ kind: 'run' })
           }}
-          disabled={busy || loading}
+          disabled={busy || loading || !python}
+          title={python ? undefined : 'Only .py files can run'}
         >
           {busy ? 'Running…' : 'Run'}
         </Button>
@@ -187,6 +191,12 @@ export function Work() {
       {rename.error ? <Notice tone="not-yet">{messageFor(rename.error)}</Notice> : null}
 
       {folderError ? <Notice tone="not-yet">{messageFor(folderError)}</Notice> : null}
+      {active.data && !python ? (
+        <Notice tone="info">
+          This is a text file. Only files whose names end in <span className="font-mono">.py</span>{' '}
+          can run — rename it to add <span className="font-mono">.py</span>.
+        </Notice>
+      ) : null}
 
       <FileTabs
         files={tabs}
@@ -228,6 +238,7 @@ export function Work() {
             value={code}
             // Locked while the teacher helps (Ken's decision, 11 Oct 2026).
             readOnly={live.locked}
+            language={languageOf(active.data?.title)}
             onChange={autosave.onChange}
             onModel={live.bind}
             onCursor={live.onCursor}

@@ -1,25 +1,50 @@
 /**
- * The file explorer — folders and files, VS Code style (Ken's decision, 11 Oct 2026).
+ * The file explorer — folders and files, VS Code style (Ken's decisions, 11 Oct 2026).
  *
- * Used by a child's My files and a teacher's My code. Folders nest; ▸/▾ opens and closes
- * them; clicking a file opens it in a tab. New file and New folder go into the selected
- * folder (the one last clicked, or the open file's). Rename by double-clicking or F2;
- * delete with the × that appears on hover or focus, after a confirmation. Drag a file or
- * folder onto a folder to move it, or onto "Files" at the top to bring it to the top level.
+ * Used by a child's My files and a teacher's My code. Folders nest; the chevron opens and
+ * closes them; clicking a file opens it in a tab. New file and New folder go into the
+ * selected folder (the one last clicked, or the open file's). Each row has rename, move and
+ * delete actions on hover or focus; double-click or F2 also renames.
+ *
+ * **Moving** works the way VS Code does:
+ * - drop on a folder → into that folder;
+ * - drop on a file → into the folder that file is in;
+ * - drop on empty space in the list → out to the top level.
+ * The whole list is a drop target for the top level, because "drag it out of the folder
+ * and let go" was what people tried first and the old heading-only target didn't catch it.
+ * **Move to…** does the same from a menu, for keyboards and fiddly trackpads.
  *
  * Deleting archives — a child's work is never destroyed by tidying up — but the words
- * here still say "delete", because that is what it is to the person doing it.
+ * here still say "delete", because that is what it is to the person doing it. No red: the
+ * bin icon is the same quiet colour as the others (the palette rule).
  */
 
+import {
+  ChevronDown,
+  ChevronRight,
+  FileCode2,
+  FilePlus2,
+  FileText,
+  Folder as FolderIcon,
+  FolderInput,
+  FolderOpen,
+  FolderPlus,
+  Pencil,
+  Trash2,
+} from 'lucide-react'
 import { useMemo, useState } from 'react'
 import type { Schemas } from '../lib/api'
+import { isPythonFile } from '../lib/fileType'
 import { Dialog } from './Dialog'
+import { Select } from './Field'
 
 type File = Schemas['DocumentSummaryOut']
 type Folder = Schemas['FolderOut']
 type Item = { kind: 'file' | 'folder'; id: string }
 
 const DRAG_TYPE = 'application/x-yogucode-item'
+const TOP = '__top__'
+const ICON = { size: 16, strokeWidth: 2, 'aria-hidden': true } as const
 
 interface Props {
   files: File[]
@@ -36,6 +61,35 @@ interface Props {
   busy?: boolean
   /** Said after "will be removed" in the delete confirmation. */
   restoreNote?: string
+}
+
+/** The folder and everything inside it — where a folder may not be moved to. */
+function subtree(folders: Folder[], root: string): Set<string> {
+  const found = new Set([root])
+  let grew = true
+  while (grew) {
+    grew = false
+    for (const f of folders) {
+      if (f.parent_id && found.has(f.parent_id) && !found.has(f.id)) {
+        found.add(f.id)
+        grew = true
+      }
+    }
+  }
+  return found
+}
+
+/** "week 1 / loops" — a folder's path, for the Move to… list. */
+function pathOf(folders: Folder[], id: string): string {
+  const parts: string[] = []
+  let at: string | null = id
+  for (let depth = 0; at && depth < 20; depth++) {
+    const folder = folders.find((f) => f.id === at)
+    if (!folder) break
+    parts.unshift(folder.name)
+    at = folder.parent_id ?? null
+  }
+  return parts.join(' / ')
 }
 
 export function FileExplorer({
@@ -60,7 +114,11 @@ export function FileExplorer({
   const [newFolderIn, setNewFolderIn] = useState<string | null | undefined>(undefined)
   const [folderName, setFolderName] = useState('')
   const [confirm, setConfirm] = useState<(Item & { name: string }) | null>(null)
+  const [moving, setMoving] = useState<(Item & { name: string }) | null>(null)
+  const [moveTarget, setMoveTarget] = useState(TOP)
+  // undefined: not dragging over anything; null: the top level; a string: that folder.
   const [dropTarget, setDropTarget] = useState<string | null | undefined>(undefined)
+  const [dragging, setDragging] = useState(false)
 
   const byParent = useMemo(() => {
     const map = new Map<string | null, Folder[]>()
@@ -133,33 +191,52 @@ export function FileExplorer({
     }
   }
 
+  /** Move, unless it would change nothing or put a folder inside itself. */
+  function moveTo(item: Item, folderId: string | null) {
+    if (item.kind === 'file') {
+      const file = files.find((f) => f.id === item.id)
+      if (!file || (file.folder_id ?? null) === folderId) return
+    } else {
+      const folder = folders.find((f) => f.id === item.id)
+      if (!folder || (folder.parent_id ?? null) === folderId) return
+      if (folderId && subtree(folders, item.id).has(folderId)) return
+    }
+    onMove(item, folderId)
+    if (folderId) setOpen((current) => new Set(current).add(folderId))
+  }
+
   function dragProps(item: Item) {
     return {
       draggable: true,
       onDragStart: (event: React.DragEvent) => {
         event.dataTransfer.setData(DRAG_TYPE, JSON.stringify(item))
         event.dataTransfer.effectAllowed = 'move'
+        setDragging(true)
+      },
+      onDragEnd: () => {
+        setDragging(false)
+        setDropTarget(undefined)
       },
     }
   }
 
+  /** Accept a drop meaning "into `folderId`" (null: the top level). */
   function dropProps(folderId: string | null) {
     return {
       onDragOver: (event: React.DragEvent) => {
         if (!event.dataTransfer.types.includes(DRAG_TYPE)) return
         event.preventDefault()
+        // The innermost target decides: a folder row inside the list wins over the list.
+        event.stopPropagation()
         setDropTarget(folderId)
       },
-      onDragLeave: () => setDropTarget(undefined),
       onDrop: (event: React.DragEvent) => {
         event.preventDefault()
+        event.stopPropagation()
         setDropTarget(undefined)
+        setDragging(false)
         const raw = event.dataTransfer.getData(DRAG_TYPE)
-        if (!raw) return
-        const item = JSON.parse(raw) as Item
-        if (item.kind === 'folder' && item.id === folderId) return
-        onMove(item, folderId)
-        if (folderId) setOpen((current) => new Set(current).add(folderId))
+        if (raw) moveTo(JSON.parse(raw) as Item, folderId)
       },
     }
   }
@@ -181,26 +258,61 @@ export function FileExplorer({
     )
   }
 
-  function deleteButton(item: Item, name: string) {
+  function actions(item: Item, name: string) {
+    const button =
+      'rounded p-0.5 text-muted hover:bg-grape-pale hover:text-grape focus-visible:outline-2 focus-visible:outline-grape'
     return (
-      <button
-        type="button"
-        aria-label={`Delete ${name}`}
-        title="Delete"
-        onClick={(event) => {
-          event.stopPropagation()
-          setConfirm({ ...item, name })
-        }}
-        className="rounded px-1 text-muted opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 hover:text-grape"
-      >
-        ×
-      </button>
+      <span className="flex shrink-0 items-center opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">
+        <button
+          type="button"
+          // Not "Rename …": that is the rename box's own label, here and on the tab.
+          aria-label={`Edit name of ${name}`}
+          title="Rename"
+          className={button}
+          onClick={(event) => {
+            event.stopPropagation()
+            startRename(item, name)
+          }}
+        >
+          <Pencil {...ICON} size={14} />
+        </button>
+        <button
+          type="button"
+          aria-label={`Move ${name}`}
+          title="Move to…"
+          className={button}
+          onClick={(event) => {
+            event.stopPropagation()
+            const current =
+              item.kind === 'file'
+                ? files.find((f) => f.id === item.id)?.folder_id
+                : folders.find((f) => f.id === item.id)?.parent_id
+            setMoveTarget(current ?? TOP)
+            setMoving({ ...item, name })
+          }}
+        >
+          <FolderInput {...ICON} size={14} />
+        </button>
+        <button
+          type="button"
+          aria-label={`Delete ${name}`}
+          title="Delete"
+          className={button}
+          onClick={(event) => {
+            event.stopPropagation()
+            setConfirm({ ...item, name })
+          }}
+        >
+          <Trash2 {...ICON} size={14} />
+        </button>
+      </span>
     )
   }
 
   function newFolderRow(depth: number) {
     return (
-      <li style={{ paddingLeft: depth * 14 }} className="py-0.5">
+      <li style={{ paddingLeft: depth * 14 + 4 }} className="flex items-center gap-1 py-0.5">
+        <FolderIcon {...ICON} className="shrink-0 text-not-yet-ink" />
         <input
           autoFocus
           value={folderName}
@@ -215,7 +327,7 @@ export function FileExplorer({
               setFolderName('')
             }
           }}
-          className="w-full rounded bg-surface px-1 text-sm text-grape ring-1 ring-grape outline-none"
+          className="min-w-0 flex-1 rounded bg-surface px-1 text-sm text-grape ring-1 ring-grape outline-none"
         />
       </li>
     )
@@ -227,6 +339,7 @@ export function FileExplorer({
         {(byParent.get(parentId) ?? []).map((folder) => {
           const isOpen = shownOpen.has(folder.id)
           const item: Item = { kind: 'folder', id: folder.id }
+          const editing = renaming?.kind === 'folder' && renaming.id === folder.id
           return (
             <li key={folder.id} role="treeitem" aria-expanded={isOpen} aria-selected={false}>
               <div
@@ -234,10 +347,14 @@ export function FileExplorer({
                 {...dropProps(folder.id)}
                 style={{ paddingLeft: depth * 14 }}
                 className={`group flex items-center gap-1 rounded-lg py-0.5 pr-1 ${
-                  dropTarget === folder.id ? 'bg-grape-pale ring-1 ring-grape' : ''
-                } ${selected === folder.id ? 'bg-cream' : ''}`}
+                  dropTarget === folder.id
+                    ? 'bg-grape-pale ring-1 ring-grape'
+                    : selected === folder.id
+                      ? 'bg-cream'
+                      : 'hover:bg-cream'
+                }`}
               >
-                {renaming?.kind === 'folder' && renaming.id === folder.id ? (
+                {editing ? (
                   renameBox(folder.name)
                 ) : (
                   <button
@@ -252,13 +369,20 @@ export function FileExplorer({
                     }}
                     className="flex min-w-0 flex-1 items-center gap-1 text-left text-sm text-grape"
                   >
-                    <span aria-hidden="true" className="w-3 text-muted">
-                      {isOpen ? '▾' : '▸'}
-                    </span>
+                    {isOpen ? (
+                      <ChevronDown {...ICON} size={14} className="shrink-0 text-muted" />
+                    ) : (
+                      <ChevronRight {...ICON} size={14} className="shrink-0 text-muted" />
+                    )}
+                    {isOpen ? (
+                      <FolderOpen {...ICON} className="shrink-0 text-not-yet-ink" />
+                    ) : (
+                      <FolderIcon {...ICON} className="shrink-0 text-not-yet-ink" />
+                    )}
                     <span className="truncate font-medium">{folder.name}</span>
                   </button>
                 )}
-                {deleteButton(item, folder.name)}
+                {editing ? null : actions(item, folder.name)}
               </div>
               {isOpen ? (
                 <ul role="group">
@@ -272,16 +396,24 @@ export function FileExplorer({
         {(filesIn.get(parentId) ?? []).map((file) => {
           const item: Item = { kind: 'file', id: file.id }
           const active = file.id === activeId
+          const editing = renaming?.kind === 'file' && renaming.id === file.id
           return (
             <li key={file.id} role="treeitem" aria-selected={active}>
               <div
                 {...dragProps(item)}
-                style={{ paddingLeft: depth * 14 + 16 }}
+                // Dropping on a file means "into the folder this file is in".
+                {...dropProps(file.folder_id ?? null)}
+                style={{ paddingLeft: depth * 14 + 15 }}
                 className={`group flex items-center gap-1 rounded-lg py-0.5 pr-1 ${
                   active ? 'bg-grape-pale' : 'hover:bg-cream'
                 }`}
               >
-                {renaming?.kind === 'file' && renaming.id === file.id ? (
+                {isPythonFile(file.title) ? (
+                  <FileCode2 {...ICON} className="shrink-0 text-muted" />
+                ) : (
+                  <FileText {...ICON} className="shrink-0 text-muted/70" />
+                )}
+                {editing ? (
                   renameBox(file.title)
                 ) : (
                   <button
@@ -294,14 +426,14 @@ export function FileExplorer({
                     onKeyDown={(event) => {
                       if (event.key === 'F2') startRename(item, file.title)
                     }}
-                    className={`min-w-0 flex-1 truncate text-left font-mono text-sm ${
-                      active ? 'font-medium text-grape' : 'text-grape'
+                    className={`min-w-0 flex-1 truncate text-left font-mono text-sm text-grape ${
+                      active ? 'font-medium' : ''
                     }`}
                   >
                     {file.title}
                   </button>
                 )}
-                {deleteButton(item, file.title)}
+                {editing ? null : actions(item, file.title)}
               </div>
             </li>
           )
@@ -310,14 +442,25 @@ export function FileExplorer({
     )
   }
 
+  const movingOptions =
+    moving === null
+      ? []
+      : folders
+          .filter((f) => moving.kind === 'file' || !subtree(folders, moving.id).has(f.id))
+          .map((f) => ({ id: f.id, label: pathOf(folders, f.id) }))
+          .sort((a, b) => a.label.localeCompare(b.label))
+
+  const iconButton =
+    'rounded-lg p-1 text-muted hover:bg-cream hover:text-grape focus-visible:outline-2 focus-visible:outline-grape disabled:opacity-50'
+
   return (
-    <nav aria-label="Files" className="flex h-full min-h-0 flex-col rounded-2xl bg-surface p-2 ring-1 ring-line">
-      <div
-        {...dropProps(null)}
-        className={`mb-1 flex items-center gap-1 rounded-lg px-1 ${
-          dropTarget === null ? 'bg-grape-pale ring-1 ring-grape' : ''
-        }`}
-      >
+    <nav
+      aria-label="Files"
+      className={`flex h-full min-h-0 flex-col rounded-2xl bg-surface p-2 ring-1 ${
+        dragging && dropTarget === null ? 'ring-2 ring-dashed ring-grape' : 'ring-line'
+      }`}
+    >
+      <div {...dropProps(null)} className="mb-1 flex items-center gap-1 px-1">
         <span className="flex-1 text-xs font-semibold tracking-wide text-muted uppercase">
           Files
         </span>
@@ -327,9 +470,9 @@ export function FileExplorer({
           disabled={busy}
           aria-label="New file"
           title="New file"
-          className="rounded px-1.5 text-sm text-muted hover:bg-cream hover:text-grape disabled:opacity-50"
+          className={iconButton}
         >
-          + File
+          <FilePlus2 {...ICON} />
         </button>
         <button
           type="button"
@@ -339,18 +482,30 @@ export function FileExplorer({
           }}
           aria-label="New folder"
           title="New folder"
-          className="rounded px-1.5 text-sm text-muted hover:bg-cream hover:text-grape"
+          className={iconButton}
         >
-          + Folder
+          <FolderPlus {...ICON} />
         </button>
       </div>
-      <ul role="tree" aria-label="Your files and folders" className="min-h-0 flex-1 overflow-y-auto">
+      {/* The whole list is a drop target for the top level: let go anywhere that is not a
+          folder or a file in a folder, and the item comes out to the top. */}
+      <ul
+        role="tree"
+        aria-label="Your files and folders"
+        {...dropProps(null)}
+        className="min-h-0 flex-1 overflow-y-auto pb-6"
+      >
         {newFolderIn === null ? newFolderRow(0) : null}
         {branch(null, 0)}
         {files.length === 0 && folders.length === 0 ? (
           <li className="px-2 py-1 text-sm text-muted">No files yet.</li>
         ) : null}
       </ul>
+      {dragging ? (
+        <p className="px-2 pt-1 text-xs text-muted" aria-live="polite">
+          Drop on a folder to move it there, or on empty space to move it out.
+        </p>
+      ) : null}
 
       <Dialog
         open={confirm !== null}
@@ -369,6 +524,33 @@ export function FileExplorer({
         {confirm?.kind === 'folder'
           ? `The folder, everything inside it, and the files in it will be removed. ${restoreNote}`
           : `The file will be removed. ${restoreNote}`}
+      </Dialog>
+
+      <Dialog
+        open={moving !== null}
+        title={moving ? `Move ${moving.name}` : ''}
+        onClose={() => setMoving(null)}
+        confirm={{
+          label: 'Move',
+          onConfirm: () => {
+            if (!moving) return
+            moveTo({ kind: moving.kind, id: moving.id }, moveTarget === TOP ? null : moveTarget)
+            setMoving(null)
+          },
+        }}
+      >
+        <Select
+          label="Move to"
+          value={moveTarget}
+          onChange={(event) => setMoveTarget(event.target.value)}
+        >
+          <option value={TOP}>Top level (no folder)</option>
+          {movingOptions.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.label}
+            </option>
+          ))}
+        </Select>
       </Dialog>
     </nav>
   )
