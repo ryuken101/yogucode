@@ -15,6 +15,10 @@ Two documents drive the work and both are worth reading before a substantial cha
 - `~/Documents/Ken Nguyen/Startup/phase-1-plan.md` — **outside the repo**, by the owner's
   preference. Specs and phase plans live in `~/Documents/Ken Nguyen/Startup/`, not in
   `docs/`. `docs/product-spec.md` is a copy kept versioned with the code.
+- **This repo is public.** The repo's spec copy deliberately omits the business sections
+  (risks, market, next actions); the full text is
+  `~/Documents/Ken Nguyen/Startup/product-spec-repo-full.md`. Strategy, pricing and
+  customer notes stay in that folder, never in a commit.
 
 The build is phased (spec §7). Each phase is usable on its own. The plan documents say
 *why* a decision was made far more often than the code can; when the two disagree, ask

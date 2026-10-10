@@ -1,5 +1,20 @@
 # Yogucode
 
+![Yogucode](docs/yogucode-cover.png)
+
+Yogucode is a classroom platform I'm building for after-school coding academies, live at
+<https://yogucode.com>. Its first customer is **Magikid Castle Hill**, where it runs the
+Year 4–6 Python class: children write Python in the browser (Pyodide, no server-side
+execution), the teacher watches the class live, sets problem sets and timed quizzes, and
+sees mastery per concept rather than per score.
+
+Built solo end to end: FastAPI + Postgres on Fly.io and Supabase, React + TypeScript on
+the front, with a tested multi-tenant authorisation model for children's data (opaque,
+revocable student sessions; row-level security on every table). Shown here as a portfolio
+piece — © Ken Nguyen, all rights reserved; no licence is granted to reuse the code.
+
+---
+
 Classroom platform for after-school coding academies with a browser-based Python editor
 and per-concept mastery tracking. Lives at <https://yogucode.com>; the brand (cup mark,
 `<yogucode>` wordmark, grape/strawberry/lemon/cream, Fredoka) is the "Yogucode Brand"
