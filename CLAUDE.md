@@ -54,7 +54,8 @@ the active `users` row is the per-request gate, so the owner's Remove revokes on
 request. Supabase's "Confirm email" must stay on: it is what proves an invitee owns the
 address. **Students** never touch Supabase. They get an
 app-issued opaque session token — `secrets.token_urlsafe(32)`, only its SHA-256 hash
-stored in `student_sessions`, delivered as an httpOnly/Secure/SameSite=Lax cookie.
+stored in `student_sessions`, delivered as an httpOnly/Secure/SameSite=Lax cookie
+(a browser-session cookie: no Max-Age).
 Opaque rather than JWT **because it must be revocable**: a teacher kicking a session
 (wrong child logged in, laptop left signed in) has to take effect on the next request.
 
@@ -95,6 +96,17 @@ Two structural choices that look like duplication and are not: `students` is a s
 table from `users` (no email, no Supabase identity, different PII posture), and students
 belong to a **centre**, not a class — enrolments are per-term, which is what lets mastery
 follow a child across terms in Phase 8.
+
+**`teacher_documents`** are a teacher's private "My code" files, scoped to the centre and
+`user_id` (`scoping.get_own_teacher_document`): another teacher at the same centre gets a
+404. A separate table from `student_documents` for the same reason `users` is separate from
+`students`.
+
+**Closing the app signs everyone out** (Ken's decision, 10 Oct 2026): teachers'
+supabase-js session lives in `sessionStorage`; a child's session is tied to the tab they
+signed in from by a `sessionStorage` marker (`apps/web/src/lib/tabSession.ts`), and
+`useStudentMe` ends a session found in an unmarked tab. A second tab means signing in
+again.
 
 **Removing a child from a class** withdraws the enrolment (never deletes it) and revokes
 their sessions — a session belongs to the student, not the class, so without that they

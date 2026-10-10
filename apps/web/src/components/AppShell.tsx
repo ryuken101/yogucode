@@ -39,6 +39,7 @@ export function AppShell({ centreName, isOwner = false, onSignOut, children }: P
                 ['/classes', 'Classes'],
                 ['/curriculum', 'Curriculum'],
                 ['/problems', 'Problems'],
+                ['/my-code', 'My code'],
                 ...(isOwner ? [['/teachers', 'Teachers']] : []),
               ].map(([to, label]) => (
                 <NavLink key={to} to={to} className={navPill}>

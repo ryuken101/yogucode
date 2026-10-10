@@ -285,6 +285,23 @@ export const api = {
       method: 'POST',
     }),
 
+  /* --- teacher: My code (their own private files) --------------------------------- */
+
+  listTeacherDocuments: () => request<Schemas['DocumentSummaryOut'][]>('/teacher/documents'),
+  readTeacherDocument: (documentId: string) =>
+    request<Schemas['DocumentOut']>(`/teacher/documents/${documentId}`),
+  createTeacherDocument: (body: Schemas['DocumentIn'] = { title: null, content: null }) =>
+    request<Schemas['DocumentOut']>('/teacher/documents', { method: 'POST', body }),
+  saveTeacherDocument: (documentId: string, body: Schemas['DocumentPatch']) =>
+    request<Schemas['DocumentOut']>(`/teacher/documents/${documentId}`, {
+      method: 'PATCH',
+      body,
+    }),
+  archiveTeacherDocument: (documentId: string) =>
+    request<Schemas['DocumentOut']>(`/teacher/documents/${documentId}/archive`, {
+      method: 'POST',
+    }),
+
   /* --- teacher: who teaches a class ------------------------------------------------ */
 
   classTeachers: (classId: string) =>

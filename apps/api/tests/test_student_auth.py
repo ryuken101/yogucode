@@ -469,3 +469,20 @@ async def test_the_student_principal_carries_the_centre(
     assert student.centre_id is not None
     assert student.status == StudentStatus.ACTIVE
     assert (await client.get("/auth/student/me")).status_code == 200
+
+
+async def test_the_session_cookie_ends_with_the_browser(client, student_on_roster) -> None:
+    """No Max-Age or Expires: quitting the browser drops it (closing the app = sign in again).
+
+    The server's own absolute and idle limits still apply on top.
+    """
+    roster = await student_on_roster()
+    response = await client.post(
+        "/auth/student/session",
+        json={"code": roster["code"], "student_id": roster["student_id"], "pin": roster["pin"]},
+    )
+    cookie = response.headers["set-cookie"].lower()
+    assert "student_session=" in cookie
+    assert "max-age" not in cookie
+    assert "expires" not in cookie
+    assert "httponly" in cookie

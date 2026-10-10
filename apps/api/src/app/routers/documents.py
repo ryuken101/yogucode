@@ -31,7 +31,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.auth.principal import CurrentStudent
 from app.db import get_session
-from app.models import DocumentStatus, StudentDocument
+from app.models import DocumentStatus, StudentDocument, TeacherDocument
 from app.models.base import utcnow
 from app.quiz import running_quiz_for
 from app.scoping import get_owned_document, list_student_documents
@@ -76,7 +76,7 @@ class DocumentSummaryOut(BaseModel):
     updated_at: datetime
 
     @classmethod
-    def build(cls, record: StudentDocument) -> "DocumentSummaryOut":
+    def build(cls, record: StudentDocument | TeacherDocument) -> "DocumentSummaryOut":
         return cls(
             id=record.id,
             title=record.title,
@@ -90,7 +90,7 @@ class DocumentOut(DocumentSummaryOut):
     content: str
 
     @classmethod
-    def build_full(cls, record: StudentDocument) -> "DocumentOut":
+    def build_full(cls, record: StudentDocument | TeacherDocument) -> "DocumentOut":
         return cls(**DocumentSummaryOut.build(record).model_dump(), content=record.content)
 
 

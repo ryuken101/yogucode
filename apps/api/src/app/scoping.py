@@ -53,6 +53,7 @@ from app.models import (
     Student,
     StudentDocument,
     StudentStatus,
+    TeacherDocument,
     Unit,
 )
 
@@ -252,6 +253,43 @@ async def get_owned_document(
     if found is None:
         raise _not_found("document")
     return found
+
+
+async def get_own_teacher_document(
+    session: AsyncSession, principal: Principal, document_id: uuid.UUID
+) -> TeacherDocument:
+    """One of the calling teacher's own files ("My code"), or 404.
+
+    The same three-part filter as a child's files: `centre_id` is the tenancy boundary and
+    **`user_id` is the "only me" boundary** — another teacher at the same centre gets a 404
+    for this file, never a 403 that would confirm it exists.
+    """
+    found = (
+        await session.exec(
+            select(TeacherDocument).where(
+                TeacherDocument.id == document_id,
+                TeacherDocument.centre_id == principal.centre_id,
+                TeacherDocument.user_id == principal.subject_id,
+            )
+        )
+    ).one_or_none()
+    if found is None:
+        raise _not_found("document")
+    return found
+
+
+async def list_own_teacher_documents(
+    session: AsyncSession, principal: Principal, include_archived: bool = False
+) -> Sequence[TeacherDocument]:
+    """The calling teacher's own files, most recently worked on first."""
+    statement = select(TeacherDocument).where(
+        TeacherDocument.centre_id == principal.centre_id,
+        TeacherDocument.user_id == principal.subject_id,
+    )
+    if not include_archived:
+        statement = statement.where(TeacherDocument.status == DocumentStatus.ACTIVE)
+    statement = statement.order_by(TeacherDocument.updated_at.desc())  # type: ignore[attr-defined]
+    return (await session.exec(statement)).all()
 
 
 async def list_student_documents(

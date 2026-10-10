@@ -19,6 +19,7 @@ from app.routers import (
     quiz,
     roster,
     student_work,
+    teacher_documents,
     teachers,
 )
 
@@ -42,6 +43,7 @@ app.include_router(progress.router)
 app.include_router(live.router)
 app.include_router(quiz.router)
 app.include_router(teachers.router)
+app.include_router(teacher_documents.router)
 
 
 @app.get("/health")

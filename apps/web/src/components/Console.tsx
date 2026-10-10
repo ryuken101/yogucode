@@ -41,6 +41,8 @@ interface Props {
   asking?: boolean
   onAnswer?: (text: string) => void
   placeholder?: string
+  /** Bigger text, for a teacher presenting on the projector. */
+  large?: boolean
 }
 
 export function Console({
@@ -48,7 +50,9 @@ export function Console({
   asking = false,
   onAnswer,
   placeholder = 'Press Run to see what your program does.',
+  large = false,
 }: Props) {
+  const size = large ? 'text-xl' : 'text-sm'
   const [typed, setTyped] = useState('')
   const caret = useRef<HTMLInputElement>(null)
   const end = useRef<HTMLDivElement>(null)
@@ -77,7 +81,7 @@ export function Console({
       aria-live="polite"
       aria-label="Program output"
       onClick={() => asking && caret.current?.focus()}
-      className="h-full min-h-0 overflow-y-auto rounded-lg bg-night p-3 font-mono text-sm ring-1 ring-grape/30"
+      className={`h-full min-h-0 overflow-y-auto rounded-lg bg-night p-3 font-mono ring-1 ring-grape/30 ${size}`}
     >
       {segments.length === 0 && !asking ? (
         <p className="text-cream/50">{placeholder}</p>
@@ -102,7 +106,7 @@ export function Console({
                 // Sized to the text so the caret sits where a terminal cursor would,
                 // rather than inside a visible field.
                 style={{ width: `${Math.max(typed.length, 1)}ch` }}
-                className="border-none bg-transparent p-0 font-mono text-sm text-lavender caret-lemon outline-none"
+                className={`border-none bg-transparent p-0 font-mono text-lavender caret-lemon outline-none ${size}`}
               />
               {/* A hairline block cursor, so it is obvious the terminal is waiting. */}
               <span aria-hidden="true" className="animate-pulse text-lavender">

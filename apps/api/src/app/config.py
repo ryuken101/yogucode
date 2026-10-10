@@ -15,8 +15,10 @@ class Settings(BaseSettings):
     # is not listed never provisions a centre.
     teacher_email_allowlist: str = ""
 
-    # Student sessions on shared centre laptops: survives a browser restart mid-lesson,
-    # does not outlive the day, and logs itself out if the laptop is abandoned.
+    # Student sessions on shared centre laptops: never outlive the day, and log themselves
+    # out if the laptop is abandoned. Since 10 Oct 2026 (Ken's decision) closing the tab or
+    # the browser also signs the child out — the cookie is a browser-session cookie and the
+    # web app ties the session to the tab (apps/web/src/lib/tabSession.ts).
     student_session_hours: int = 12
     student_session_idle_minutes: int = 90
 

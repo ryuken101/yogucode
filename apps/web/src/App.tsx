@@ -60,6 +60,7 @@ const StudentHistory = lazy(() =>
   import('./routes/StudentHistory').then((m) => ({ default: m.StudentHistory })),
 )
 
+const MyCode = lazy(() => import('./routes/MyCode').then((m) => ({ default: m.MyCode })))
 const Teachers = lazy(() => import('./routes/Teachers').then((m) => ({ default: m.Teachers })))
 const Live = lazy(() => import('./routes/Live').then((m) => ({ default: m.Live })))
 // My files streams to the live view, so it carries the collaboration library; lazy, so
@@ -121,6 +122,7 @@ export default function App() {
         <Route path="/students/:studentId" element={<Loading><StudentHistory /></Loading>} />
         <Route path="/curriculum" element={<Loading><Curriculum /></Loading>} />
         <Route path="/teachers" element={<Loading><Teachers /></Loading>} />
+        <Route path="/my-code" element={<Loading><MyCode /></Loading>} />
         <Route path="/problems" element={<Loading><ProblemBank /></Loading>} />
         {/* One key for both: saving a new problem navigates from /new to /:itemId, and a
             remount there would drop the solution check that was running. */}

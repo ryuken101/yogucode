@@ -49,6 +49,12 @@ not a way to make a failure go away.
 - `src/lib/queries.ts` owns the TanStack Query keys. Mutations invalidate the key they
   affect and no more.
 
+**Closing the tab signs you out** (Ken's decision, 10 Oct 2026). Teachers: supabase-js
+uses `sessionStorage`. Students: `markStudentTab()` on sign-in (`Join.tsx`), and
+`useStudentMe` revokes and reports 401 for a session found in an unmarked tab — every
+student page goes through it. Tests default to a marked tab (`test/setup.ts`);
+`TabSession.test.tsx` covers the closed-tab case.
+
 Students never talk to Supabase directly; `@supabase/supabase-js` is for teacher auth
 only, and the `service_role` key must never appear in this app.
 
@@ -138,6 +144,17 @@ after they press Run.
 **Monaco is uncontrolled after mount.** `value` is the initial document; the editor owns
 the text thereafter, which is what keeps typing off the network. Anything mocking
 `CodeSurface` must use `defaultValue`, or it is not testing the real contract.
+
+## My code (teachers' own files)
+
+`routes/MyCode.tsx` (`/my-code`, teacher nav) is a teacher's private scratch files for
+demonstrating on the projector — the same `FileTabs`, `CodeSurface`, `Console`,
+`usePython` and `useAutosave` as `Work.tsx`, but deliberately **no live-view stream and no
+event recording** (those are about children). It is a separate page rather than a shared
+component so the student page, which carries the live and recorder wiring, stays
+untouched. **Present** goes full screen (Fullscreen API, with a fixed-overlay fallback;
+Esc or Exit leaves), hides the tabs, and raises the editor to 24px (`CodeSurface`
+`fontSize`) and the console to `large`.
 
 ## Saving a student's work
 

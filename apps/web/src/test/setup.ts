@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest'
-import { afterAll, afterEach, beforeAll } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach } from 'vitest'
+import { markStudentTab } from '../lib/tabSession'
 import { server } from './server'
 
 // Every test runs against the mock API. `onUnhandledRequest: 'error'` means a screen
@@ -7,6 +8,16 @@ import { server } from './server'
 // promise, which is the failure mode that wastes an afternoon.
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => server.resetHandlers())
+
+// Most tests show a child already signed in, which means "signed in from this tab". The
+// tests for closing the tab (TabSession.test.tsx) clear the marker themselves.
+// Guarded: this setup is shared with `*.node.test.ts`, which has no DOM or storage.
+if (typeof window !== 'undefined') {
+  beforeEach(() => {
+    window.sessionStorage.clear()
+    markStudentTab()
+  })
+}
 afterAll(() => server.close())
 
 // jsdom implements <dialog> but not showModal()/close(). `Dialog` uses the native element

@@ -25,17 +25,36 @@ export const supabaseConfigured = Boolean(url && anonKey)
 
 let client: SupabaseClient | null = null
 
+/**
+ * Sessions saved before 10 Oct 2026 live in localStorage and would never expire on their
+ * own. Clear them once, so an old sign-in left on a shared laptop does not linger there.
+ */
+function forgetOldSessions(): void {
+  try {
+    for (const key of Object.keys(window.localStorage)) {
+      if (key.startsWith('sb-') && key.endsWith('-auth-token')) window.localStorage.removeItem(key)
+    }
+  } catch {
+    // Storage blocked (private mode, policy): nothing was saved there anyway.
+  }
+}
+
 export function getSupabase(): SupabaseClient {
   if (!supabaseConfigured) {
     throw new Error(
       'Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in apps/web/.env.local.',
     )
   }
+  forgetOldSessions()
   client ??= createClient(url, anonKey, {
     auth: {
-      // The teacher's session lives in this tab's storage and is restored on reload;
-      // detectSessionInUrl is what consumes the token in the URL when a verification
-      // link lands on /auth/callback, or a reset link on /reset-password.
+      // The teacher's session lives in *this tab's* storage (Ken's decision, 10 Oct
+      // 2026): it survives a reload, and closing the tab signs them out, so a centre
+      // laptop left open is never a signed-in teacher for the next person. A second tab
+      // asks them to sign in again. detectSessionInUrl is what consumes the token in the
+      // URL when a verification link lands on /auth/callback, or a reset link on
+      // /reset-password — in whichever tab the email link opened.
+      storage: window.sessionStorage,
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,

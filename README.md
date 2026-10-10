@@ -437,6 +437,9 @@ join by the owner's invite on the Teachers page (`/teachers`), sign up at `/sign
 cancel invites and remove teachers. No service key on the server: inviting sends no
 email — the owner copies the sign-up link to the teacher.
 
+**My code (10 Oct 2026).** Teachers have their own private files at `/my-code` to write
+and run Python, with a **Present** mode for the projector (full screen, big text).
+
 **Class people (10 Oct 2026).** A class page can remove a child from the class (history
 kept, the child signed out; "Show removed students" puts them back) and lists its
 teachers as Lead or Assistant. The Classes page shows "My classes" first. Assigning

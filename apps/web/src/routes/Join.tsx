@@ -23,6 +23,7 @@ import { Notice } from '../components/Notice'
 import type { Schemas } from '../lib/api'
 import { api } from '../lib/api'
 import { ApiError, messageFor } from '../lib/errors'
+import { markStudentTab } from '../lib/tabSession'
 
 type Step =
   | { name: 'code' }
@@ -80,6 +81,8 @@ export function Join() {
         student_id: step.student.id,
         pin,
       })
+      // This tab is now the child's; closing it signs them out (lib/tabSession.ts).
+      markStudentTab()
       setStep({ name: 'in', me })
     } catch (error) {
       setPin('')

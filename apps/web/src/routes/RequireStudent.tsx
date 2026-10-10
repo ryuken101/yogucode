@@ -24,6 +24,7 @@ import { Spinner } from '../components/Spinner'
 import { closeStudentLive, studentLive } from '../collab/socket'
 import { api } from '../lib/api'
 import { keys, useActiveQuiz, useStudentMe } from '../lib/queries'
+import { clearStudentTab } from '../lib/tabSession'
 
 export function RequireStudent() {
   const navigate = useNavigate()
@@ -66,6 +67,7 @@ export function RequireStudent() {
 
   async function signOut() {
     await api.studentSignOut().catch(() => undefined)
+    clearStudentTab()
     // The live connection belongs to this child; the next one on the laptop opens their own.
     closeStudentLive()
     // The cached identity has to go, or the guard would wave the next child through as

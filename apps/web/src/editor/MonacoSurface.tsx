@@ -52,6 +52,11 @@ export interface CodeSurfaceProps {
   onModel?: (model: monaco.editor.ITextModel) => (() => void) | undefined
   /** The cursor moved — its offset in the text. For showing it to the other person. */
   onCursor?: (offset: number) => void
+  /**
+   * Text size in pixels. The default is the editor's normal 15px; a teacher presenting on
+   * the projector (My code's Present mode) turns it up for the back row.
+   */
+  fontSize?: number
 }
 
 export interface EditChange {
@@ -70,6 +75,7 @@ export default function MonacoSurface({
   onPaste,
   onModel,
   onCursor,
+  fontSize,
 }: CodeSurfaceProps) {
   const host = useRef<HTMLDivElement>(null)
   const editor = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
@@ -142,6 +148,11 @@ export default function MonacoSurface({
   useEffect(() => {
     editor.current?.updateOptions({ readOnly })
   }, [readOnly])
+
+  useEffect(() => {
+    if (fontSize === undefined) return
+    editor.current?.updateOptions({ fontSize, lineHeight: Math.round(fontSize * 1.6) })
+  }, [fontSize])
 
   return <div ref={host} className="h-full w-full" />
 }

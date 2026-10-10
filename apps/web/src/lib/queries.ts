@@ -18,10 +18,13 @@ import {
 } from '@tanstack/react-query'
 import { api, type ProblemFilters, type Schemas } from './api'
 import { ApiError } from './errors'
+import { isStudentTab } from './tabSession'
 
 export const keys = {
   me: ['me'] as const,
   teachers: ['teachers'] as const,
+  teacherDocuments: ['teacher-documents'] as const,
+  teacherDocument: (documentId: string) => ['teacher-document', documentId] as const,
   classes: ['classes'] as const,
   /** Under `classes`, so invalidating the list refreshes this too. */
   classesWithArchived: ['classes', 'all'] as const,
@@ -245,9 +248,27 @@ export const useRemoveTeacher = () => useTeachersMutation(api.removeTeacher)
 
 /* --- student: identity and files ---------------------------------------------------- */
 
-/** Who the signed-in student is. Drives the guard and the shell. */
+/**
+ * Who the signed-in student is. Drives the guard and the shell.
+ *
+ * A session that this tab did not sign in (the child closed their tab, or opened a second
+ * one) is ended on the server and reported as "not signed in", so every student page sends
+ * them to sign in again — Ken's rule that closing the app means signing in next time. See
+ * `lib/tabSession.ts`.
+ */
 export function useStudentMe() {
-  return useQuery({ queryKey: keys.studentMe, queryFn: api.studentMe, retry: false })
+  return useQuery({
+    queryKey: keys.studentMe,
+    queryFn: async () => {
+      const me = await api.studentMe()
+      if (!isStudentTab()) {
+        await api.studentSignOut().catch(() => undefined)
+        throw new ApiError(401, 'Signed out because the tab was closed.')
+      }
+      return me
+    },
+    retry: false,
+  })
 }
 
 /** The tab strip: newest-edited first, which is what `list_student_documents` returns. */
@@ -315,6 +336,63 @@ export function useArchiveDocument() {
   return useMutation({
     mutationFn: (documentId: string) => api.archiveDocument(documentId),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.documents }),
+  })
+}
+
+/* --- teacher: My code ---------------------------------------------------------------- */
+// The same behaviour as a child's files above (no refetch under the editor, no tab
+// reshuffle on save), under their own keys so the two can never mix in the cache.
+
+export function useTeacherDocuments() {
+  return useQuery({ queryKey: keys.teacherDocuments, queryFn: api.listTeacherDocuments })
+}
+
+export function useTeacherDocument(documentId: string | null) {
+  return useQuery({
+    queryKey: keys.teacherDocument(documentId ?? 'none'),
+    queryFn: () => api.readTeacherDocument(documentId as string),
+    enabled: documentId !== null,
+    staleTime: Infinity,
+  })
+}
+
+export function useCreateTeacherDocument() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.createTeacherDocument(),
+    onSuccess: (created) => {
+      client.setQueryData(keys.teacherDocument(created.id), created)
+      return client.invalidateQueries({ queryKey: keys.teacherDocuments })
+    },
+  })
+}
+
+export function useSaveTeacherDocument() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ documentId, content }: { documentId: string; content: string }) =>
+      api.saveTeacherDocument(documentId, { title: null, content }),
+    onSuccess: (saved) => client.setQueryData(keys.teacherDocument(saved.id), saved),
+  })
+}
+
+export function useRenameTeacherDocument() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ documentId, title }: { documentId: string; title: string }) =>
+      api.saveTeacherDocument(documentId, { title, content: null }),
+    onSuccess: (saved) => {
+      client.setQueryData(keys.teacherDocument(saved.id), saved)
+      return client.invalidateQueries({ queryKey: keys.teacherDocuments })
+    },
+  })
+}
+
+export function useArchiveTeacherDocument() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (documentId: string) => api.archiveTeacherDocument(documentId),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.teacherDocuments }),
   })
 }
 

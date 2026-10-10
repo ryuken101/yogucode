@@ -235,13 +235,16 @@ async def student_sign_in(
     )
     await session.commit()
 
+    # No max_age: a browser-session cookie, gone when the browser quits (Ken's decision,
+    # 10 Oct 2026 — closing the app means signing in again). Closing just the tab is
+    # handled by the web app (lib/tabSession.ts). The server-side limits still apply on
+    # top: student_session_hours absolute, student_session_idle_minutes idle.
     response.set_cookie(
         STUDENT_SESSION_COOKIE,
         token,
         httponly=True,
         secure=settings.cookie_secure,
         samesite="lax",
-        max_age=settings.student_session_hours * 3600,
         path="/",
     )
     return StudentMeOut.build(student, klass)
