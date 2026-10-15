@@ -383,7 +383,10 @@ export const api = {
       method: 'POST',
       body: { pin: pin?.trim() || null } satisfies Schemas['PinIn'],
     }),
-  /** Create a child's account and put them in this class. Returns the slip once. */
+  /** Show PIN: a child's current PIN. Audited on the server; never cached here. */
+  revealPin: (studentId: string) =>
+    request<Schemas['PinSlipOut']>(`/students/${studentId}/pin/reveal`, { method: 'POST' }),
+  /** Create a child's account and put them in this class. Returns the slip. */
   addStudentToClass: (classId: string, body: Schemas['StudentIn']) =>
     request<Schemas['PinSlipOut']>(`/classes/${classId}/students`, { method: 'POST', body }),
   suggestUsername: (name: string) =>

@@ -41,6 +41,7 @@ import { Select } from '../components/Field'
 import { BulkPasteDialog } from './BulkPasteDialog'
 import { ClassTeachersCard } from './ClassTeachersCard'
 import { RemoveDialog } from '../components/RemoveDialog'
+import { ShowPin } from './ShowPin'
 import { AddStudentDialog, ChangePinDialog, UsernameDialog } from './StudentAccountDialogs'
 import type { SlipState } from './SlipSheet'
 
@@ -142,8 +143,8 @@ export function ClassDetail() {
           <div>
             <h2 className="font-display font-semibold text-lg text-grape">Logins</h2>
             <p className="text-sm text-muted">
-              Each student signs in with their username and PIN. PINs are shown once, when
-              they’re set — print the slips then.
+              Each student signs in with their username and PIN. Print the slips when you set
+              them; Show PIN looks one up later.
             </p>
           </div>
           <div className="flex gap-2">
@@ -202,6 +203,13 @@ export function ClassDetail() {
               <div className="flex flex-wrap items-center gap-2">
                 {entry.student_status === 'archived' ? <Badge variant="muted">Archived</Badge> : null}
                 {!entry.has_pin ? <Badge variant="not-yet">No PIN yet</Badge> : null}
+                {entry.has_pin ? (
+                  <ShowPin
+                    studentId={entry.student_id}
+                    name={entry.display_name}
+                    viewable={entry.pin_viewable}
+                  />
+                ) : null}
                 <Button
                   variant="quiet"
                   onClick={() =>

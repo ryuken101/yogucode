@@ -124,11 +124,14 @@ it, and a reconnecting child is told the current state.
 `students`.
 
 **Student accounts are username + PIN** (11 Oct 2026, `routers/join.py`): usernames are
-unique system-wide, case-insensitive (`app/usernames.py` suggests them from the name);
-PINs stay Argon2id-hashed — Ken chose that over teacher-readable PINs — so a PIN is shown
-once when set. No class code: the defences are identical refusals for every failure, the
-per-child lockout, and a per-device limit on wrong PINs (`app/auth/rate_limit.py`, in
-memory, failures only). A child in no active class gets a 403 after a correct PIN.
+unique system-wide, case-insensitive (`app/usernames.py` suggests them from the name).
+Sign-in checks an Argon2id hash; since 16 Oct 2026 (Ken, reversing 11 Oct's hash-only
+rule) a Fernet-encrypted copy sits beside it for **Show PIN** — any teacher at the centre,
+one child per POST, `no-store`, audited as `pin.viewed`, never in a roster response. The
+key is `PIN_ENCRYPTION_KEYS` (a Fly secret, comma-separated for rotation); unset turns
+Show PIN off, and a PIN set without it can only be changed. No class code: the defences
+are identical refusals for every failure, the per-child lockout, and a per-device limit
+on wrong PINs (`app/auth/rate_limit.py`, in memory, failures only). A child in no active class gets a 403 after a correct PIN.
 
 **Closing the app signs everyone out** (Ken's decision, 10 Oct 2026): teachers'
 supabase-js session lives in `sessionStorage`; a child's session is tied to the tab they
@@ -201,8 +204,8 @@ in-memory hubs — deploy with `--ha=false` and keep `fly scale count 1`. Every 
 `test_every_table_has_row_level_security`): Supabase serves the public schema to its
 `anon` role, and RLS is what keeps children's records unreadable with the public key.
 A new table's migration must enable it. Secrets (`DATABASE_URL`, `SUPABASE_URL`,
-`TEACHER_EMAIL_ALLOWLIST`) are Fly secrets that Ken sets himself; they never go in the repo
-or in a chat.
+`TEACHER_EMAIL_ALLOWLIST`, `PIN_ENCRYPTION_KEYS`) are Fly secrets that Ken sets himself;
+they never go in the repo or in a chat.
 
 **One public address: yogucode.com.** `CanonicalHost` in `app/server.py` 308s the hosts in
 `REDIRECT_HOSTS` (www, the old fly.dev name) to `CANONICAL_HOST`, because sessions are

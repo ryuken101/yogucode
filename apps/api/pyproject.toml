@@ -23,6 +23,9 @@ dependencies = [
     # The concept taxonomy loader (step 8). Present transitively via uvicorn[standard],
     # but relying on an unrelated package's extra is how an import breaks on an upgrade.
     "pyyaml>=6.0",
+    # Fernet for Show PIN's encrypted copy (app/auth/pin.py). Already present through
+    # pyjwt[crypto]; named because the app now imports it directly.
+    "cryptography>=44",
 ]
 
 [dependency-groups]

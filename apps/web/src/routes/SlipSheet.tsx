@@ -4,10 +4,10 @@
  * A route rather than a modal, because printing a modal is miserable and because the
  * browser's print dialog needs a page to point at.
  *
- * **The slips arrive in router state and are never refetched, because they cannot be.**
- * The API returns a PIN in plaintext exactly once and stores only an Argon2id hash, so
- * there is no endpoint that could answer "what were those again". A reload therefore
- * says so plainly instead of showing a spinner that will never resolve.
+ * **The slips arrive in router state and are never refetched.** A sheet of every PIN at
+ * once is not something to fetch back: Show PIN on the class page reveals one child's at a
+ * time, each look audited (Ken's decision, 16 Oct 2026). A reload therefore says where to
+ * look instead of showing a spinner that will never resolve.
  */
 
 import { Link, useLocation, useParams } from 'react-router'
@@ -33,8 +33,8 @@ export function SlipSheet() {
         <PageHeader title="PIN slips" />
         <Card>
           <Notice tone="not-yet">
-            These PINs can’t be shown again. They are stored as a one-way hash, so nobody
-            — not even us — can read them back. Issue new ones if you need them.
+            This sheet can’t be shown again. Use Show PIN on the class page to look up one
+            student’s PIN, or issue new ones.
           </Notice>
           <div className="mt-4">
             <Link to={`/classes/${classId}`} className="text-grape-deep underline">
@@ -63,8 +63,8 @@ export function SlipSheet() {
         </PageHeader>
         <div className="mb-6">
           <Notice tone="not-yet">
-            Print these now. Once you leave this page the PINs cannot be shown again —
-            only replaced.
+            Print these now. Once you leave this page, you can look up a PIN one student at
+            a time with Show PIN on the class page.
           </Notice>
         </div>
       </div>

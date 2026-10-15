@@ -621,7 +621,7 @@ export interface paths {
         put?: never;
         /**
          * Issue Class Pins
-         * @description Issue PINs across a class and return the slips, once.
+         * @description Issue PINs across a class and return the slips.
          *
          *     The bulk counterpart to bulk roster entry: having pasted twelve names, a teacher is
          *     not going to set twelve PINs one form at a time. By default this only touches
@@ -743,8 +743,7 @@ export interface paths {
          * Add New Student
          * @description Create a child's account and put them in this class — the class page's Add student.
          *
-         *     Returns the slip (name, username, PIN) once: the PIN is stored hashed and cannot be
-         *     read back later (Ken's decision, 11 Oct 2026).
+         *     Returns the slip (name, username, PIN) to print; Show PIN reveals it again later.
          */
         post: operations["add_new_student_classes__class_id__students_post"];
         delete?: never;
@@ -1373,7 +1372,7 @@ export interface paths {
          *
          *     Both fields are optional, because the common case is a child pressing "new file" with
          *     nothing in mind. An untitled file gets a number rather than a collision: the partial
-         *     unique index would refuse a second "Untitled", and a 409 in response to pressing a
+         *     unique index would refuse a second "untitled.py", and a 409 in response to pressing a
          *     plus button is not an error a ten-year-old can act on.
          */
         post: operations["create_document_me_documents_post"];
@@ -1883,10 +1882,34 @@ export interface paths {
          * Set Student Pin
          * @description Change a child's PIN — to one the teacher chose, or a random one.
          *
-         *     The PIN is stored hashed, so when a child forgets theirs this is the remedy: set a new
-         *     one and tell them. The slip comes back once, to print.
+         *     The remedy for a PIN that was set before Show PIN existed, or that a classmate has
+         *     seen. The slip comes back to print.
          */
         post: operations["set_student_pin_students__student_id__pin_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/students/{student_id}/pin/reveal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reveal Student Pin
+         * @description Show PIN: a child's current PIN, for a teacher without the slip (16 Oct 2026).
+         *
+         *     Any teacher at the centre may look — every teacher can open every class — and each look
+         *     is a `pin.viewed` row, so "who has seen this child's PIN" is answerable. A POST, not a
+         *     GET, so the PIN never lands in a URL, browser history or an HTTP cache.
+         */
+        post: operations["reveal_student_pin_students__student_id__pin_reveal_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3388,10 +3411,10 @@ export interface components {
         };
         /**
          * PinSlipOut
-         * @description A PIN in plaintext. Returned exactly once, to be printed and handed over.
+         * @description A PIN in plaintext: on setting it, to print and hand over, or from Show PIN.
          *
-         *     The stored form is an Argon2id hash, so this is the only moment the PIN is legible to
-         *     anyone. If the teacher loses it, the remedy is to issue a new one, not to look it up.
+         *     Stored as an Argon2id hash plus an encrypted copy (app/auth/pin.py). Every response
+         *     carrying one is a POST marked no-store, so it never sits in a URL or an HTTP cache.
          */
         PinSlipOut: {
             /** Display Name */
@@ -3676,6 +3699,8 @@ export interface components {
              * Format: date-time
              */
             joined_at: string;
+            /** Pin Viewable */
+            pin_viewable: boolean;
             status: components["schemas"]["EnrolmentStatus"];
             /**
              * Student Id
@@ -3835,7 +3860,7 @@ export interface components {
         };
         /**
          * StudentCreatedOut
-         * @description A new account, with its PIN — returned this once, to print or tell the child.
+         * @description A new account, with its PIN — to print or tell the child.
          */
         StudentCreatedOut: {
             /**
@@ -3903,7 +3928,8 @@ export interface components {
          * @description A new account (Ken's decision, 11 Oct 2026): a name, a username and a PIN.
          *
          *     Leave `username` out and one is suggested from the name; leave `pin` out and a random
-         *     one is drawn. Either way the PIN comes back once, in the response, to print or tell.
+         *     one is drawn. Either way the PIN comes back in the response, to print or tell; after
+         *     that, Show PIN reveals it again (16 Oct 2026).
          */
         StudentIn: {
             /** Display Name */
@@ -7782,6 +7808,39 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PinSlipOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reveal_student_pin_students__student_id__pin_reveal_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

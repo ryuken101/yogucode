@@ -2941,7 +2941,7 @@
         "type": "object"
       },
       "PinSlipOut": {
-        "description": "A PIN in plaintext. Returned exactly once, to be printed and handed over.\n\nThe stored form is an Argon2id hash, so this is the only moment the PIN is legible to\nanyone. If the teacher loses it, the remedy is to issue a new one, not to look it up.",
+        "description": "A PIN in plaintext: on setting it, to print and hand over, or from Show PIN.\n\nStored as an Argon2id hash plus an encrypted copy (app/auth/pin.py). Every response\ncarrying one is a POST marked no-store, so it never sits in a URL or an HTTP cache.",
         "properties": {
           "display_name": {
             "title": "Display Name",
@@ -3694,6 +3694,10 @@
             "title": "Joined At",
             "type": "string"
           },
+          "pin_viewable": {
+            "title": "Pin Viewable",
+            "type": "boolean"
+          },
           "status": {
             "$ref": "#/components/schemas/EnrolmentStatus"
           },
@@ -3727,6 +3731,7 @@
           "display_name",
           "username",
           "has_pin",
+          "pin_viewable",
           "student_status",
           "status",
           "joined_at",
@@ -4139,7 +4144,7 @@
         "type": "object"
       },
       "StudentCreatedOut": {
-        "description": "A new account, with its PIN \u2014 returned this once, to print or tell the child.",
+        "description": "A new account, with its PIN \u2014 to print or tell the child.",
         "properties": {
           "created_at": {
             "format": "date-time",
@@ -4260,7 +4265,7 @@
         "type": "object"
       },
       "StudentIn": {
-        "description": "A new account (Ken's decision, 11 Oct 2026): a name, a username and a PIN.\n\nLeave `username` out and one is suggested from the name; leave `pin` out and a random\none is drawn. Either way the PIN comes back once, in the response, to print or tell.",
+        "description": "A new account (Ken's decision, 11 Oct 2026): a name, a username and a PIN.\n\nLeave `username` out and one is suggested from the name; leave `pin` out and a random\none is drawn. Either way the PIN comes back in the response, to print or tell; after\nthat, Show PIN reveals it again (16 Oct 2026).",
         "properties": {
           "display_name": {
             "maxLength": 80,
@@ -6832,7 +6837,7 @@
     },
     "/classes/{class_id}/pins": {
       "post": {
-        "description": "Issue PINs across a class and return the slips, once.\n\nThe bulk counterpart to bulk roster entry: having pasted twelve names, a teacher is\nnot going to set twelve PINs one form at a time. By default this only touches\nchildren who have no PIN yet, so it is safe to run again after adding one student.",
+        "description": "Issue PINs across a class and return the slips.\n\nThe bulk counterpart to bulk roster entry: having pasted twelve names, a teacher is\nnot going to set twelve PINs one form at a time. By default this only touches\nchildren who have no PIN yet, so it is safe to run again after adding one student.",
         "operationId": "issue_class_pins_classes__class_id__pins_post",
         "parameters": [
           {
@@ -7254,7 +7259,7 @@
     },
     "/classes/{class_id}/students": {
       "post": {
-        "description": "Create a child's account and put them in this class \u2014 the class page's Add student.\n\nReturns the slip (name, username, PIN) once: the PIN is stored hashed and cannot be\nread back later (Ken's decision, 11 Oct 2026).",
+        "description": "Create a child's account and put them in this class \u2014 the class page's Add student.\n\nReturns the slip (name, username, PIN) to print; Show PIN reveals it again later.",
         "operationId": "add_new_student_classes__class_id__students_post",
         "parameters": [
           {
@@ -11546,7 +11551,7 @@
     },
     "/students/{student_id}/pin": {
       "post": {
-        "description": "Change a child's PIN \u2014 to one the teacher chose, or a random one.\n\nThe PIN is stored hashed, so when a child forgets theirs this is the remedy: set a new\none and tell them. The slip comes back once, to print.",
+        "description": "Change a child's PIN \u2014 to one the teacher chose, or a random one.\n\nThe remedy for a PIN that was set before Show PIN existed, or that a classmate has\nseen. The slip comes back to print.",
         "operationId": "set_student_pin_students__student_id__pin_post",
         "parameters": [
           {
@@ -11609,6 +11614,66 @@
           }
         },
         "summary": "Set Student Pin",
+        "tags": [
+          "roster"
+        ]
+      }
+    },
+    "/students/{student_id}/pin/reveal": {
+      "post": {
+        "description": "Show PIN: a child's current PIN, for a teacher without the slip (16 Oct 2026).\n\nAny teacher at the centre may look \u2014 every teacher can open every class \u2014 and each look\nis a `pin.viewed` row, so \"who has seen this child's PIN\" is answerable. A POST, not a\nGET, so the PIN never lands in a URL, browser history or an HTTP cache.",
+        "operationId": "reveal_student_pin_students__student_id__pin_reveal_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PinSlipOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reveal Student Pin",
         "tags": [
           "roster"
         ]

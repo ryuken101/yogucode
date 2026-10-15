@@ -33,7 +33,7 @@ from dataclasses import dataclass, field
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.auth.pin import generate_pin, hash_pin
+from app.auth.pin import encrypt_pin, generate_pin, hash_pin
 from app.config import get_settings
 from app.models import (
     Centre,
@@ -158,13 +158,16 @@ async def seed_demo(session: AsyncSession) -> DemoResult:
             pin = generate_pin()
             session.add(
                 StudentCredential(
-                    student_id=student.id, pin_hash=hash_pin(pin), pin_set_by=teacher.id
+                    student_id=student.id,
+                    pin_hash=hash_pin(pin),
+                    pin_ciphertext=encrypt_pin(settings, pin),
+                    pin_set_by=teacher.id,
                 )
             )
             result.created.append((name, pin))
         else:
-            # Argon2id is one-way, so an existing PIN cannot be reprinted. Reissue through
-            # the teacher UI, or archive the student and re-run.
+            # An existing PIN is not reprinted here; Show PIN in the teacher UI reveals it
+            # if it was set with a key configured, and Change PIN replaces it otherwise.
             result.existing.append(name)
 
     await session.flush()

@@ -1,10 +1,10 @@
 /**
- * The slips are shown once and cannot be fetched again.
+ * The sheet is shown once and is not fetched again.
  *
- * The API returns a PIN in plaintext exactly once and stores only an Argon2id hash, so a
- * reload has nothing to recover. The screen has to say that plainly — the failure mode
- * worth preventing is a spinner that never resolves, or worse, a teacher believing the
- * slips are safely stored somewhere.
+ * Show PIN reveals one child's PIN at a time (16 Oct 2026); a whole sheet is never fetched
+ * back, so a reload has nothing to recover. The screen has to say that plainly, and say
+ * where to look instead — the failure mode worth preventing is a spinner that never
+ * resolves.
  */
 
 import { render, screen } from '@testing-library/react'
@@ -39,14 +39,14 @@ test('a slip carries the name, the username and the PIN — the whole login', ()
   expect(screen.queryByText('WNPXYZ')).not.toBeInTheDocument()
 })
 
-test('the teacher is warned that this is the only time they will see them', () => {
+test('the teacher is told to print now, and where to look a PIN up later', () => {
   renderAt(state)
-  expect(screen.getByText(/cannot be shown again/i)).toBeInTheDocument()
+  expect(screen.getByText(/print these now/i)).toHaveTextContent(/show pin/i)
 })
 
 test('a reload says the PINs are gone rather than spinning forever', () => {
   renderAt(null)
-  expect(screen.getByText(/can’t be shown again/i)).toBeInTheDocument()
+  expect(screen.getByText(/can’t be shown again/i)).toHaveTextContent(/show pin/i)
   expect(screen.queryByRole('status', { name: /loading/i })).not.toBeInTheDocument()
 })
 

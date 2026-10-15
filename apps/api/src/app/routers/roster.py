@@ -18,16 +18,25 @@ import uuid
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlmodel import select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.audit import audit_entry
-from app.auth.pin import PIN_LENGTH, generate_pin, hash_pin, is_weak
-from app.auth.principal import CurrentOwner, CurrentTeacher, Principal
+from app.auth.pin import (
+    PIN_LENGTH,
+    decrypt_pin,
+    encrypt_pin,
+    generate_pin,
+    hash_pin,
+    is_weak,
+    show_pin_enabled,
+)
+from app.auth.principal import CurrentOwner, CurrentTeacher, Principal, SettingsDep
 from app.auth.student_session import revoke_live_sessions
+from app.config import Settings
 from app.db import get_session
 from app.erase import EraseIn, erase_student, names_match
 from app.models import (
@@ -81,7 +90,8 @@ class StudentIn(BaseModel):
     """A new account (Ken's decision, 11 Oct 2026): a name, a username and a PIN.
 
     Leave `username` out and one is suggested from the name; leave `pin` out and a random
-    one is drawn. Either way the PIN comes back once, in the response, to print or tell.
+    one is drawn. Either way the PIN comes back in the response, to print or tell; after
+    that, Show PIN reveals it again (16 Oct 2026).
     """
 
     display_name: str = Field(min_length=1, max_length=MAX_NAME_LENGTH)
@@ -167,8 +177,10 @@ class RosterEntryOut(BaseModel):
     student_id: uuid.UUID
     display_name: str
     username: str
-    # Whether a PIN is set. The PIN itself is never readable after it is set.
+    # Whether a PIN is set, and whether Show PIN can reveal it. The PIN itself is never in
+    # a roster response — only `POST /students/{id}/pin/reveal` returns it, audited.
     has_pin: bool
+    pin_viewable: bool
     student_status: StudentStatus
     status: EnrolmentStatus
     joined_at: datetime
@@ -176,13 +188,15 @@ class RosterEntryOut(BaseModel):
 
     @classmethod
     def build(
-        cls, enrolment: Enrolment, student: Student, has_pin: bool = False
+        cls, enrolment: Enrolment, student: Student, pin_viewable: bool | None = None
     ) -> "RosterEntryOut":
+        """`pin_viewable` is None when the child has no PIN at all."""
         return cls(
             student_id=student.id,
             display_name=student.display_name,
             username=student.username,
-            has_pin=has_pin,
+            has_pin=pin_viewable is not None,
+            pin_viewable=bool(pin_viewable),
             student_status=student.status,
             status=enrolment.status,
             joined_at=enrolment.joined_at,
@@ -276,10 +290,10 @@ class IssuePinsIn(BaseModel):
 
 
 class PinSlipOut(BaseModel):
-    """A PIN in plaintext. Returned exactly once, to be printed and handed over.
+    """A PIN in plaintext: on setting it, to print and hand over, or from Show PIN.
 
-    The stored form is an Argon2id hash, so this is the only moment the PIN is legible to
-    anyone. If the teacher loses it, the remedy is to issue a new one, not to look it up.
+    Stored as an Argon2id hash plus an encrypted copy (app/auth/pin.py). Every response
+    carrying one is a POST marked no-store, so it never sits in a URL or an HTTP cache.
     """
 
     student_id: uuid.UUID
@@ -289,7 +303,7 @@ class PinSlipOut(BaseModel):
 
 
 class StudentCreatedOut(StudentOut):
-    """A new account, with its PIN — returned this once, to print or tell the child."""
+    """A new account, with its PIN — to print or tell the child."""
 
     pin: str
 
@@ -340,16 +354,25 @@ async def _username_for(
     return username
 
 
-async def _pins_set(session: AsyncSession, student_ids: list[uuid.UUID]) -> set[uuid.UUID]:
-    """Which of these students have a PIN — the roster shows it, never the PIN."""
+async def _pins_set(session: AsyncSession, student_ids: list[uuid.UUID]) -> dict[uuid.UUID, bool]:
+    """Which of these students have a PIN, mapped to whether Show PIN can reveal it.
+
+    Never the PIN: the roster says only that one exists."""
     if not student_ids:
-        return set()
+        return {}
     rows = await session.exec(
-        select(StudentCredential.student_id).where(
+        select(StudentCredential.student_id, StudentCredential.pin_ciphertext).where(
             StudentCredential.student_id.in_(student_ids)  # type: ignore[attr-defined]
         )
     )
-    return set(rows.all())
+    return {student_id: token is not None for student_id, token in rows.all()}
+
+
+def _store_pin(settings: Settings, credential: StudentCredential, pin: str) -> None:
+    """Write both stored forms of a PIN. Every place that sets a PIN goes through here, so
+    the hash sign-in checks and the copy Show PIN reveals can never disagree."""
+    credential.pin_hash = hash_pin(pin)
+    credential.pin_ciphertext = encrypt_pin(settings, pin)
 
 
 def _conflict(detail: str) -> HTTPException:
@@ -452,8 +475,8 @@ async def _roster_entry(
         session, principal, class_id, include_withdrawn=True
     ):
         if student.id == student_id:
-            has_pin = student_id in await _pins_set(session, [student_id])
-            return RosterEntryOut.build(enrolment, student, has_pin)
+            pins = await _pins_set(session, [student_id])
+            return RosterEntryOut.build(enrolment, student, pins.get(student_id))
     raise HTTPException(  # pragma: no cover — the caller has just written this row
         status_code=status.HTTP_404_NOT_FOUND, detail="enrolment not found"
     )
@@ -463,7 +486,7 @@ async def _roster_entry(
 
 
 async def _new_account(
-    session: AsyncSession, principal: Principal, body: StudentIn
+    session: AsyncSession, principal: Principal, settings: Settings, body: StudentIn
 ) -> tuple[Student, str]:
     """A child's account: name, username and PIN. Never commits."""
     name = normalise_name(body.display_name)
@@ -472,11 +495,11 @@ async def _new_account(
     record = Student(centre_id=principal.centre_id, display_name=name, username=username)
     session.add(record)
     await session.flush()
-    session.add(
-        StudentCredential(
-            student_id=record.id, pin_hash=hash_pin(pin), pin_set_by=principal.subject_id
-        )
+    credential = StudentCredential(
+        student_id=record.id, pin_hash="", pin_set_by=principal.subject_id
     )
+    _store_pin(settings, credential, pin)
+    session.add(credential)
     session.add(
         _audit(principal, "student.created", record.id, display_name=name, username=username)
     )
@@ -485,10 +508,15 @@ async def _new_account(
 
 @students_router.post("", response_model=StudentCreatedOut, status_code=status.HTTP_201_CREATED)
 async def create_student(
-    body: StudentIn, principal: CurrentTeacher, session: SessionDep
+    body: StudentIn,
+    principal: CurrentTeacher,
+    session: SessionDep,
+    settings: SettingsDep,
+    response: Response,
 ) -> StudentCreatedOut:
     """Create a child's account at the centre, without enrolling them anywhere."""
-    record, pin = await _new_account(session, principal, body)
+    response.headers["Cache-Control"] = "no-store"
+    record, pin = await _new_account(session, principal, settings, body)
     await session.commit()
     await session.refresh(record)
     return StudentCreatedOut(**StudentOut.build(record).model_dump(), pin=pin)
@@ -660,7 +688,7 @@ async def read_roster(
     entries = await list_class_roster(session, principal, class_id, include_withdrawn)
     pins = await _pins_set(session, [student.id for _, student in entries])
     return [
-        RosterEntryOut.build(enrolment, student, student.id in pins)
+        RosterEntryOut.build(enrolment, student, pins.get(student.id))
         for enrolment, student in entries
     ]
 
@@ -669,13 +697,18 @@ async def read_roster(
     "/{class_id}/students", response_model=PinSlipOut, status_code=status.HTTP_201_CREATED
 )
 async def add_new_student(
-    class_id: uuid.UUID, body: StudentIn, principal: CurrentTeacher, session: SessionDep
+    class_id: uuid.UUID,
+    body: StudentIn,
+    principal: CurrentTeacher,
+    session: SessionDep,
+    settings: SettingsDep,
+    response: Response,
 ) -> PinSlipOut:
     """Create a child's account and put them in this class — the class page's Add student.
 
-    Returns the slip (name, username, PIN) once: the PIN is stored hashed and cannot be
-    read back later (Ken's decision, 11 Oct 2026).
+    Returns the slip (name, username, PIN) to print; Show PIN reveals it again later.
     """
+    response.headers["Cache-Control"] = "no-store"
     await get_owned_class(session, principal, class_id)
     probe = Student(
         centre_id=principal.centre_id,
@@ -683,7 +716,7 @@ async def add_new_student(
         username="probe",
     )
     await _refuse_name_clash(session, principal, class_id, probe)
-    record, pin = await _new_account(session, principal, body)
+    record, pin = await _new_account(session, principal, settings, body)
     await _enrol(session, principal, class_id, record)
     await session.commit()
     return PinSlipOut(
@@ -920,7 +953,7 @@ async def bulk_enrol(
     wanted = set(touched)
     pins = await _pins_set(session, touched)
     return [
-        RosterEntryOut.build(enrolment, student, student.id in pins)
+        RosterEntryOut.build(enrolment, student, pins.get(student.id))
         for enrolment, student in await list_class_roster(session, principal, class_id)
         if student.id in wanted
     ]
@@ -932,6 +965,7 @@ async def bulk_enrol(
 def _set_pin(
     session: AsyncSession,
     principal: Principal,
+    settings: Settings,
     student: Student,
     credential: StudentCredential | None,
     action: str,
@@ -941,16 +975,16 @@ def _set_pin(
     Never commits."""
     pin = pin or generate_pin()
     if credential is None:
-        credential = StudentCredential(student_id=student.id, pin_hash=hash_pin(pin))
+        credential = StudentCredential(student_id=student.id, pin_hash="")
     else:
-        credential.pin_hash = hash_pin(pin)
         credential.pin_set_at = utcnow()
+    _store_pin(settings, credential, pin)
     credential.pin_set_by = principal.subject_id
     # `must_change_pin` is deliberately never set. Forcing a child to choose a new PIN
     # after a reset protects a secret from an admin who should not know it — but here the
     # teacher is meant to know it, since they generate it and hand out the slip. It would
     # add a step for a nine-year-old at the moment they are already stuck, and leave the
-    # teacher unable to tell them their PIN next time, making the following reset harder.
+    # teacher unable to tell them their PIN next time — which Show PIN now exists to do.
     credential.must_change_pin = False
     credential.failed_attempts = 0
     credential.locked_until = None
@@ -966,14 +1000,20 @@ def _set_pin(
     "/{class_id}/pins", response_model=list[PinSlipOut], status_code=status.HTTP_201_CREATED
 )
 async def issue_class_pins(
-    class_id: uuid.UUID, body: IssuePinsIn, principal: CurrentTeacher, session: SessionDep
+    class_id: uuid.UUID,
+    body: IssuePinsIn,
+    principal: CurrentTeacher,
+    session: SessionDep,
+    settings: SettingsDep,
+    response: Response,
 ) -> list[PinSlipOut]:
-    """Issue PINs across a class and return the slips, once.
+    """Issue PINs across a class and return the slips.
 
     The bulk counterpart to bulk roster entry: having pasted twelve names, a teacher is
     not going to set twelve PINs one form at a time. By default this only touches
     children who have no PIN yet, so it is safe to run again after adding one student.
     """
+    response.headers["Cache-Control"] = "no-store"
     await get_owned_class(session, principal, class_id)
     roster = await list_class_roster(session, principal, class_id)
 
@@ -983,7 +1023,7 @@ async def issue_class_pins(
         if credential is not None and not body.reset_existing:
             continue
         action = "pin.reset" if credential is not None else "pin.issued"
-        slips.append(_set_pin(session, principal, student, credential, action))
+        slips.append(_set_pin(session, principal, settings, student, credential, action))
 
     if slips:
         await session.commit()
@@ -994,20 +1034,55 @@ async def issue_class_pins(
     "/{student_id}/pin", response_model=PinSlipOut, status_code=status.HTTP_201_CREATED
 )
 async def set_student_pin(
-    student_id: uuid.UUID, body: PinIn, principal: CurrentTeacher, session: SessionDep
+    student_id: uuid.UUID,
+    body: PinIn,
+    principal: CurrentTeacher,
+    session: SessionDep,
+    settings: SettingsDep,
+    response: Response,
 ) -> PinSlipOut:
     """Change a child's PIN — to one the teacher chose, or a random one.
 
-    The PIN is stored hashed, so when a child forgets theirs this is the remedy: set a new
-    one and tell them. The slip comes back once, to print.
+    The remedy for a PIN that was set before Show PIN existed, or that a classmate has
+    seen. The slip comes back to print.
     """
+    response.headers["Cache-Control"] = "no-store"
     student = await get_owned_student(session, principal, student_id)
     pin = _chosen_pin(body.pin)
     credential = await session.get(StudentCredential, student.id)
     action = "pin.reset" if credential is not None else "pin.issued"
-    slip = _set_pin(session, principal, student, credential, action, pin)
+    slip = _set_pin(session, principal, settings, student, credential, action, pin)
     await session.commit()
     return slip
+
+
+@students_router.post("/{student_id}/pin/reveal", response_model=PinSlipOut)
+async def reveal_student_pin(
+    student_id: uuid.UUID,
+    principal: CurrentTeacher,
+    session: SessionDep,
+    settings: SettingsDep,
+    response: Response,
+) -> PinSlipOut:
+    """Show PIN: a child's current PIN, for a teacher without the slip (16 Oct 2026).
+
+    Any teacher at the centre may look — every teacher can open every class — and each look
+    is a `pin.viewed` row, so "who has seen this child's PIN" is answerable. A POST, not a
+    GET, so the PIN never lands in a URL, browser history or an HTTP cache.
+    """
+    response.headers["Cache-Control"] = "no-store"
+    student = await get_owned_student(session, principal, student_id)
+    if not show_pin_enabled(settings):
+        raise _conflict("PIN viewing isn't set up")
+    credential = await session.get(StudentCredential, student.id)
+    pin = decrypt_pin(settings, credential.pin_ciphertext if credential else None)
+    if pin is None:
+        raise _conflict("This PIN can't be shown — change it to make it viewable")
+    session.add(_audit(principal, "pin.viewed", student.id))
+    await session.commit()
+    return PinSlipOut(
+        student_id=student.id, display_name=student.display_name, username=student.username, pin=pin
+    )
 
 
 @students_router.post("/{student_id}/sessions/revoke", response_model=SessionsRevokedOut)

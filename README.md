@@ -244,14 +244,15 @@ children on its roster and no way in is not a state worth being one click away. 
 alphabet excludes vowels as well as `0 O 1 I L`: no vowels means a generated code cannot
 spell a word, and the rest means it survives being read aloud to a room.
 
-**Teachers issue PINs; students never choose one.** The API generates a PIN, returns it in
-plaintext exactly once so it can be printed on a slip, and stores only an Argon2id hash.
-A child claiming an unclaimed name on first login would let whoever reaches a laptop first
-claim someone else's, and from Phase 8 that means another child's mastery record. One
-consequence is worth stating plainly: **a forgotten PIN can only be replaced, never
-recovered**, because nobody can read the hash back. That is why issuing PINs across a
-class and resetting one child's are both single requests — a Year 4 student forgets theirs
-roughly weekly, and a reset flow with friction in it is a reason the tool gets abandoned.
+**Teachers issue PINs; students never choose one.** The API generates a PIN and returns it
+in plaintext so it can be printed on a slip. Sign-in checks an Argon2id hash; beside it sits
+a Fernet-encrypted copy under `PIN_ENCRYPTION_KEYS`, a key the database never holds, so a
+teacher can **Show PIN** later — one child per request, audited as `pin.viewed`. A child
+claiming an unclaimed name on first login would let whoever reaches a laptop first claim
+someone else's, and from Phase 8 that means another child's mastery record. A Year 4
+student forgets theirs roughly weekly, which is why looking one up, issuing PINs across a
+class and resetting one child's are all single requests — a flow with friction in it is a
+reason the tool gets abandoned.
 
 `must_change_pin` exists in the schema and is deliberately never set. Forcing a child to
 pick a new PIN after a reset protects a secret from an admin who should not know it, but
@@ -456,6 +457,11 @@ email — the owner copies the sign-up link to the teacher.
 class page — a username (suggested from the name) and a PIN (typed or random) — and
 children sign in with just those two. PINs stay hashed: shown once on the slip, replaced
 with Change PIN if forgotten. Existing students were given usernames and kept their PINs.
+
+**Show PIN (16 Oct 2026).** A teacher can reveal a child's PIN from the roster without the
+slip. It is stored encrypted beside the hash under a Fly secret, revealed one child at a
+time, hidden again after 30 seconds, and every look is in the audit log. PINs set before
+this need one Change PIN to become viewable.
 
 **After the first class (11 Oct 2026).** Help now locks the child's editor until the
 teacher is done; the owner can **delete entirely** (a child with all their work, or a

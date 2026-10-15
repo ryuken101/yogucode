@@ -39,6 +39,7 @@ const entry = (
   display_name: name,
   username: name.toLowerCase().replace(' ', '.'),
   has_pin: true,
+  pin_viewable: true,
   student_status: 'active',
   status,
   joined_at: '2026-10-01T00:00:00Z',
@@ -455,7 +456,7 @@ test('a taken username is something to fix, with a one-click alternative', async
 test('the roster shows usernames, and who still needs a PIN', async () => {
   server.use(
     http.get(`/api/classes/${CLASS_ID}/roster`, () =>
-      HttpResponse.json([{ ...entry(ARIA_ID, 'Aria K'), has_pin: false }]),
+      HttpResponse.json([{ ...entry(ARIA_ID, 'Aria K'), has_pin: false, pin_viewable: false }]),
     ),
   )
   classPage()

@@ -10,9 +10,13 @@ Two consequences of that, both deliberate:
 
 - **Weak-PIN rejection is exclusion from the generator, not request validation.** No human
   ever types a PIN, so there is nothing to validate; there is only a draw to refuse.
-- **A forgotten PIN can only be replaced, never recovered.** The hash is one-way, so not
-  even the teacher can look one up. That is why `pin.reset` is a primary flow rather than
-  an edge case: a Year 4 student forgets theirs roughly weekly.
+- **Sign-in checks the hash; Show PIN reads an encrypted copy** (Ken's decision, 16 Oct
+  2026, reversing 11 Oct's hash-only rule). A Year 4 student forgets theirs roughly weekly,
+  and a teacher looking it up beats reprinting a slip. The copy is Fernet-encrypted under
+  `PIN_ENCRYPTION_KEYS`, a Fly secret held outside the database, so the database alone
+  still yields nothing legible. Revealing one is a teacher-only, per-child, audited
+  request (`pin.viewed`). With no key configured the copy is simply not written and a
+  forgotten PIN is replaced, as before.
 
 **On the honest value of hashing here.** Four digits is a 10,000-space. Against someone
 holding the database that is a trivial offline search, and no KDF parameters change that.
@@ -32,6 +36,9 @@ import secrets
 
 from argon2 import PasswordHasher
 from argon2.exceptions import Argon2Error, InvalidHashError, VerifyMismatchError
+from cryptography.fernet import Fernet, InvalidToken, MultiFernet
+
+from app.config import Settings
 
 PIN_LENGTH = 4
 
@@ -90,3 +97,36 @@ def verify_pin(pin_hash: str, pin: str) -> bool:
         # of a refusal. Nobody can sign in to that account either way, which is the safe
         # direction; the teacher's remedy is a reset.
         return False
+
+
+# --- Show PIN: the encrypted copy ---------------------------------------------------
+
+
+def _cipher(settings: Settings) -> MultiFernet | None:
+    """The configured keys, first one encrypting. None when Show PIN is off."""
+    keys = [k.strip() for k in settings.pin_encryption_keys.split(",") if k.strip()]
+    return MultiFernet([Fernet(k) for k in keys]) if keys else None
+
+
+def show_pin_enabled(settings: Settings) -> bool:
+    return _cipher(settings) is not None
+
+
+def encrypt_pin(settings: Settings, pin: str) -> str | None:
+    """The PIN under the current key, or None when no key is configured."""
+    cipher = _cipher(settings)
+    return cipher.encrypt(pin.encode()).decode() if cipher else None
+
+
+def decrypt_pin(settings: Settings, token: str | None) -> str | None:
+    """The PIN back, or None — no key, no copy, or a copy under a key no longer listed.
+
+    Like `verify_pin`, a bad stored value is a refusal, never a crash; the remedy is a reset.
+    """
+    cipher = _cipher(settings)
+    if cipher is None or not token:
+        return None
+    try:
+        return cipher.decrypt(token.encode()).decode()
+    except InvalidToken:
+        return None

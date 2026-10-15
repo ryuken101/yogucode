@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     # sign in with a username and PIN only, so this stands in for the old class-code step.
     pin_failures_per_device: int = 20
     pin_failure_window_minutes: int = 10
+    # Fernet keys for the encrypted copy of each PIN behind Show PIN (Ken's decision,
+    # 16 Oct 2026). Comma-separated: the first encrypts, every one decrypts, so a key can
+    # be rotated by prepending a new one. Empty turns Show PIN off; sign-in never needs it.
+    # A Fly secret Ken sets himself — never in the repo.
+    pin_encryption_keys: str = ""
 
     # The student session cookie's Secure flag. True everywhere real; false only for
     # local http development and tests, where a browser (and httpx) will silently refuse

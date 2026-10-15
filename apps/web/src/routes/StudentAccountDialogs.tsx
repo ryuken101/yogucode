@@ -3,8 +3,8 @@
  * 11 Oct 2026): a name, a username (suggested, editable) and a 4-digit PIN (typed, or left
  * blank for a random one).
  *
- * A PIN is shown once — on the slip, right after it is set — because it is stored hashed
- * and cannot be read back. If a child forgets it, Change PIN sets a new one.
+ * A PIN is on the slip right after it is set, and Show PIN on the roster reveals it again
+ * later (16 Oct 2026). Change PIN sets a new one.
  */
 
 import { useEffect, useState } from 'react'
@@ -193,8 +193,8 @@ export function ChangePinDialog({
     >
       <div className="flex flex-col gap-3">
         <p>
-          The old PIN stops working straight away. You’ll see the new one once, to print or
-          tell them.
+          The old PIN stops working straight away. You’ll get a slip with the new one to
+          print or tell them.
         </p>
         <TextInput
           label="New PIN (4 digits)"

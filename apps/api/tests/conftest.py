@@ -19,6 +19,7 @@ from pathlib import Path
 import httpx
 import jwt
 import pytest
+from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.asymmetric import ec
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
@@ -89,6 +90,7 @@ async def session(database_url: str) -> AsyncGenerator[AsyncSession, None]:
 # real; only the issuer is local.
 
 SUPABASE_URL = "https://testproject.supabase.co"
+TEST_PIN_KEY = Fernet.generate_key().decode()
 TEST_KID = "test-key-1"
 
 
@@ -210,6 +212,8 @@ def test_settings() -> Settings:
         # finalise-on-read path is what the tests exercise instead.
         quiz_timer=False,
         quiz_stop_grace_seconds=0,
+        # Show PIN on, under a key made fresh for the run. test_show_pin.py turns it off.
+        pin_encryption_keys=TEST_PIN_KEY,
     )
 
 

@@ -238,6 +238,12 @@ export function useSetPin(classId: string) {
   })
 }
 
+/** Show PIN. A mutation, not a query, so the PIN is never held in the query cache;
+ * nothing is invalidated because revealing changes nothing the screen shows. */
+export function useRevealPin() {
+  return useMutation({ mutationFn: (studentId: string) => api.revealPin(studentId) })
+}
+
 /** Add student: a new account straight into this class. */
 export function useAddStudent(classId: string) {
   const client = useQueryClient()

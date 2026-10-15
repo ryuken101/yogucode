@@ -48,19 +48,23 @@ class Student(TimestampMixin, table=True):
 
 
 class StudentCredential(TimestampMixin, table=True):
-    """A student's PIN, as an Argon2id hash. Never plaintext, anywhere, ever.
+    """A student's PIN: an Argon2id hash for sign-in, plus an encrypted copy. Never plaintext.
 
     The teacher sets the PIN — choosing one or pressing random — when creating the account
-    or changing it, and sees it at that moment only, to print or tell the child. It cannot
-    be read back afterwards (Ken's decision, 11 Oct 2026: kept hashed rather than made
-    readable); a forgotten PIN is replaced. Students never set their own: that would let
-    whoever reaches a laptop first take over another child's account.
+    or changing it, and gets the slip then. Since 16 Oct 2026 (Ken's decision, reversing
+    11 Oct's hash-only rule) a teacher can also reveal it later with Show PIN, which
+    decrypts `pin_ciphertext` under `PIN_ENCRYPTION_KEYS` — a key the database never
+    holds — and audits the view. `pin_ciphertext` is null for a PIN set before then, or
+    with no key configured; that PIN can only be replaced. Students never set their own:
+    that would let whoever reaches a laptop first take over another child's account.
     """
 
     __tablename__ = "student_credentials"
 
     student_id: uuid.UUID = Field(foreign_key="students.id", primary_key=True)
     pin_hash: str
+    # Fernet token for Show PIN (app/auth/pin.py). Display only; sign-in never reads it.
+    pin_ciphertext: str | None = Field(default=None)
     pin_set_at: datetime = Field(default_factory=utcnow, sa_type=DateTime(timezone=True))
     pin_set_by: uuid.UUID | None = Field(default=None, foreign_key="users.id")
     must_change_pin: bool = Field(default=False)
