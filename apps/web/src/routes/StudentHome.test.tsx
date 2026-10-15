@@ -9,6 +9,7 @@ import { expect, test } from 'vitest'
 import type { Schemas } from '../lib/api'
 import { renderScreen } from '../test/render'
 import { server } from '../test/server'
+import { MyWork } from './MyWork'
 import { StudentHome } from './StudentHome'
 
 const ASSIGNMENT = '018f0000-0000-7000-8000-0000000000d1'
@@ -70,7 +71,8 @@ test('home says so when nothing is set', async () => {
 
 test('a homework card says when it is due and how far they have got', async () => {
   serve({ today, homework: [card({})] })
-  renderScreen(<StudentHome />, { route: '/home' })
+  // Homework is the Work app's since the desktop (16 Oct 2026).
+  renderScreen(<MyWork />, { route: '/my-work' })
 
   const link = await screen.findByRole('link', { name: /Lists practice/ })
   expect(link).toHaveAttribute('href', '/homework/018f0000-0000-7000-8000-0000000000f1')
@@ -88,7 +90,7 @@ test('handed in, changed since, and given back each say so — never in system-e
       card({ assignment_id: 'd', title: 'Four', due_at: '2020-01-01T00:00:00Z' }),
     ],
   })
-  renderScreen(<StudentHome />, { route: '/home' })
+  renderScreen(<MyWork />, { route: '/my-work' })
 
   expect(await screen.findByText('Handed in')).toBeInTheDocument()
   expect(screen.getByText('Changed since you handed in')).toBeInTheDocument()

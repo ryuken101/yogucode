@@ -63,27 +63,53 @@ password?"), `/sign-up` (asks `signupAllowed` before creating a Supabase account
 `/reset-password`, and `/auth/callback`, where every sign-in finishes and the only place
 that provisions. `lib/supabase.ts` maps Supabase's error codes to `AuthProblem`s: a wrong
 password, an unverified email or an expired link is `not-yet`; only Supabase being
-unreachable is `system-error`. `/teachers` is the owner's page (nav link shown only to
-the owner; the API 403s everyone else).
+unreachable is `system-error`. `/teachers` is the owner's page (the Classes app's
+Teachers tab, shown only to the owner; the API 403s everyone else).
 
 ## Two audiences, one app
 
-Teacher routes sit behind `RequireTeacher`, which supplies `AppShell`. `/join` is outside
-it: a child gets `JoinShell` with no navigation, no sign-out and no centre name. The join
-flow must keep working when Supabase is unconfigured or unreachable, because it does not
-use Supabase at all.
+Teacher pages sit behind `RequireTeacher` and children's behind `RequireStudent`; each guard
+puts its pages on the desktop (below). `/join` is outside both: a child gets `JoinShell`
+with no navigation, no sign-out and no centre name. The join flow must keep working when
+Supabase is unconfigured or unreachable, because it does not use Supabase at all.
 
 **The bare address `/` is the children's front door** (Ken's decision, 8 Oct 2026).
 `Landing.tsx` sends a child who is still signed in to `/home` and a teacher with a session
-to `/classes`, and otherwise shows the sign-in with a "Teacher? Sign in here" link to
+to `/desk`, and otherwise shows the sign-in with a "Teacher? Sign in here" link to
 `/sign-in`. `/join` remains as an alias.
+
+## The desktop (`src/desktop/`)
+
+Ken's decisions, 16 Oct 2026; the clickable prototype is the artifact "Yogucode Desktop".
+
+- **Every page belongs to one app** (`apps.ts`: `owns` patterns, `home`, `tabs`). A link or
+  `navigate()` anywhere just goes to a URL; `Desktop.tsx` opens that app's window, or brings
+  it forward, showing the page. Windows render their page with `<Routes location={win.loc}>`
+  over `routes/pages.tsx`, so screens need no desktop code. A new page needs an owner here.
+- **The URL is the front window's page.** URL → window in an effect on the location;
+  window → URL only inside `act()`, which runs the reducer (`windows.ts`) synchronously and
+  navigates from its result. Never navigate from an effect watching the windows: it races
+  the location effect and bounces the browser.
+- **Teacher and student page lists share no path** — the router would send one audience to
+  the other's guard. Hence `/my-files` and `/my-desk` for children.
+- **Teachers** drag, resize and snap (local state in `Window.tsx` while dragging, so the page
+  inside never re-renders), and the layout saves to `/me/desktop` ~0.8 s after it settles.
+  The desktop starts in Live for the class in the top bar. **Children** cannot arrange
+  windows, nothing is saved, and only the front window (or its layout group) is mounted —
+  two mounted editors would both stream to the live view.
+- The front window is a tinted title bar, never a shadow. Windows grow from their dock icon
+  (`desktop.css`), with no animation under `prefers-reduced-motion`.
+- **Files** (`Finder.tsx`) is for finding and opening; organising stays in the editor's
+  explorer. A teacher opens a child's file read-only (`routes/ChildFile.tsx`); changing it
+  goes through Live's Help.
 
 **Children sign in with a username and a PIN** (Ken's decision, 11 Oct 2026) — permanent
 accounts the teacher creates on the class page (`StudentAccountDialogs.tsx`: Add a
-student, Change PIN, Username). No class code and no name picker any more. PINs stay
-hashed on the server, so a PIN is shown once, on the slip, when it is set; a forgotten PIN
-is replaced, never looked up. Sign-in errors are `not-yet` (lemon) — a wrong PIN, a
-lockout, a child in no class — and only an unreachable server is `system-error`.
+student, Change PIN, Username). No class code and no name picker any more. A PIN is on
+the slip when it is set, and since 16 Oct 2026 Show PIN on the roster reveals it again
+(`routes/ShowPin.tsx`: one child, hidden after 30 s, audited on the server). Sign-in
+errors are `not-yet` (lemon) — a wrong PIN, a lockout, a child in no class — and only an
+unreachable server is `system-error`.
 
 ## Local development and production
 
@@ -165,8 +191,8 @@ with a calm `info` banner (Work, ProblemAttempt).
 
 ## My code (teachers' own files)
 
-`routes/MyCode.tsx` (`/my-code`, teacher nav) is a teacher's private scratch files for
-demonstrating on the projector — the same `FileTabs`, `CodeSurface`, `Console`,
+`routes/MyCode.tsx` (`/my-code`, the teacher's Code app) is a teacher's private scratch
+files for demonstrating on the projector — the same `FileTabs`, `CodeSurface`, `Console`,
 `usePython` and `useAutosave` as `Work.tsx`, but deliberately **no live-view stream and no
 event recording** (those are about children). It is a separate page rather than a shared
 component so the student page, which carries the live and recorder wiring, stays

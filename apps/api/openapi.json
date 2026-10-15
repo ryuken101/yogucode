@@ -718,6 +718,65 @@
         "title": "CurriculumStatus",
         "type": "string"
       },
+      "DesktopIn": {
+        "properties": {
+          "class_id": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Id"
+          },
+          "windows": {
+            "items": {
+              "$ref": "#/components/schemas/WindowState"
+            },
+            "maxItems": 20,
+            "title": "Windows",
+            "type": "array"
+          }
+        },
+        "title": "DesktopIn",
+        "type": "object"
+      },
+      "DesktopOut": {
+        "properties": {
+          "class_id": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Id"
+          },
+          "saved": {
+            "title": "Saved",
+            "type": "boolean"
+          },
+          "windows": {
+            "items": {
+              "$ref": "#/components/schemas/WindowState"
+            },
+            "maxItems": 20,
+            "title": "Windows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "saved"
+        ],
+        "title": "DesktopOut",
+        "type": "object"
+      },
       "DocumentIn": {
         "properties": {
           "content": {
@@ -4891,6 +4950,76 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "WindowState": {
+        "description": "One window. Geometry is a fraction of the desktop area, so it survives a new screen.",
+        "properties": {
+          "app": {
+            "maxLength": 32,
+            "minLength": 1,
+            "pattern": "^[a-z][a-z0-9-]*$",
+            "title": "App",
+            "type": "string"
+          },
+          "h": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 1.0,
+            "title": "H",
+            "type": "number"
+          },
+          "max": {
+            "default": false,
+            "title": "Max",
+            "type": "boolean"
+          },
+          "min": {
+            "default": false,
+            "title": "Min",
+            "type": "boolean"
+          },
+          "path": {
+            "maxLength": 300,
+            "minLength": 1,
+            "pattern": "^/",
+            "title": "Path",
+            "type": "string"
+          },
+          "w": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 1.0,
+            "title": "W",
+            "type": "number"
+          },
+          "x": {
+            "maximum": 1.0,
+            "minimum": -1.0,
+            "title": "X",
+            "type": "number"
+          },
+          "y": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Y",
+            "type": "number"
+          },
+          "z": {
+            "default": 0,
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Z",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "app",
+          "path",
+          "x",
+          "y",
+          "w",
+          "h"
+        ],
+        "title": "WindowState",
         "type": "object"
       }
     }
@@ -9604,6 +9733,113 @@
         ]
       }
     },
+    "/me/desktop": {
+      "get": {
+        "description": "The saved layout, or `saved: false` for a teacher who has never arranged one.",
+        "operationId": "read_my_desktop_me_desktop_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesktopOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read My Desktop",
+        "tags": [
+          "desktop"
+        ]
+      },
+      "put": {
+        "operationId": "save_my_desktop_me_desktop_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesktopIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesktopOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save My Desktop",
+        "tags": [
+          "desktop"
+        ]
+      }
+    },
     "/me/documents": {
       "get": {
         "operationId": "list_documents_me_documents_get",
@@ -11486,6 +11722,201 @@
         "summary": "Delete Student",
         "tags": [
           "roster"
+        ]
+      }
+    },
+    "/students/{student_id}/documents": {
+      "get": {
+        "operationId": "list_a_childs_documents_students__student_id__documents_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DocumentSummaryOut"
+                  },
+                  "title": "Response List A Childs Documents Students  Student Id  Documents Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List A Childs Documents",
+        "tags": [
+          "student files"
+        ]
+      }
+    },
+    "/students/{student_id}/documents/{document_id}": {
+      "get": {
+        "operationId": "read_a_childs_document_students__student_id__documents__document_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read A Childs Document",
+        "tags": [
+          "student files"
+        ]
+      }
+    },
+    "/students/{student_id}/folders": {
+      "get": {
+        "operationId": "list_a_childs_folders_students__student_id__folders_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FolderOut"
+                  },
+                  "title": "Response List A Childs Folders Students  Student Id  Folders Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List A Childs Folders",
+        "tags": [
+          "student files"
         ]
       }
     },

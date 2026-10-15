@@ -189,6 +189,14 @@ export const handlers = [
   ),
 
   http.get('/api/auth/student/me', () => HttpResponse.json(signedIn)),
+
+  // A teacher's desktop: nothing saved, and saves accepted.
+  http.get('/api/me/desktop', () =>
+    HttpResponse.json({ windows: [], class_id: null, saved: false } satisfies Schemas['DesktopOut']),
+  ),
+  http.put('/api/me/desktop', async ({ request }) =>
+    HttpResponse.json({ ...((await request.json()) as Schemas['DesktopIn']), saved: true }),
+  ),
   http.post('/api/auth/student/logout', () => new HttpResponse(null, { status: 204 })),
 
   // The event recorder flushes on a timer from any editor screen; accept and forget.

@@ -463,6 +463,16 @@ slip. It is stored encrypted beside the hash under a Fly secret, revealed one ch
 time, hidden again after 30 seconds, and every look is in the audit log. PINs set before
 this need one Change PIN to become viewable.
 
+**The desktop (16 Oct 2026).** The page-and-nav-bar UI is replaced, for teachers and
+children alike, by a desktop: a top bar (class switcher, Layouts, search on Ctrl/⌘ K), app
+windows, and a dock. Teachers' apps are Live, Classes, Files, Code, Work, Marking, Progress
+and Library; a child's are Lessons, Code, Files and Work. Every existing page now opens in
+the window of the app that owns it (`apps/web/src/desktop/apps.ts`), and the URL is always
+the front window's page, so links and Back still work. A teacher's windows open full screen
+and can be dragged, resized and snapped; the layout is saved to their account
+(`/me/desktop`). A child's windows stay full screen. Files is Finder-style, and lets a
+teacher open any child's work read-only (`/students/{id}/folders|documents`).
+
 **After the first class (11 Oct 2026).** Help now locks the child's editor until the
 teacher is done; the owner can **delete entirely** (a child with all their work, or a
 class with its work) as well as archive; and My files / My code have **folders** with a

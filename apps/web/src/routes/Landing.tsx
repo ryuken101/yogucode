@@ -41,7 +41,7 @@ export function Landing() {
   }, [])
 
   if (student.data) return <Navigate to="/home" replace />
-  if (teacher) return <Navigate to="/classes" replace />
+  if (teacher) return <Navigate to="/desk" replace />
   if (student.isPending || teacher === null) {
     return (
       <JoinShell>

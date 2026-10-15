@@ -59,6 +59,11 @@ export const keys = {
   grid: (assignmentId: string) => ['grid', assignmentId] as const,
   todayGrid: (classId: string) => ['today-grid', classId] as const,
   history: (studentId: string) => ['history', studentId] as const,
+  childFolders: (studentId: string) => ['child-folders', studentId] as const,
+  childDocuments: (studentId: string) => ['child-documents', studentId] as const,
+  childDocument: (studentId: string, documentId: string) =>
+    ['child-document', studentId, documentId] as const,
+  desktop: ['desktop'] as const,
   studentProblem: (assignmentId: string, itemId: string) =>
     ['student-problem', assignmentId, itemId] as const,
 }
@@ -118,8 +123,13 @@ export function useClass(classId: string) {
   return useQuery({ queryKey: keys.class(classId), queryFn: () => api.readClass(classId) })
 }
 
-export function useRoster(classId: string) {
-  return useQuery({ queryKey: keys.roster(classId), queryFn: () => api.readRoster(classId) })
+/** `enabled` is for places that may have no class yet, like the Files sidebar. */
+export function useRoster(classId: string, enabled = true) {
+  return useQuery({
+    queryKey: keys.roster(classId),
+    queryFn: () => api.readRoster(classId),
+    enabled: enabled && classId !== '',
+  })
 }
 
 /** Everyone ever in the class, removed ones included — for "Show removed students". */
@@ -389,6 +399,46 @@ export function useArchiveDocument() {
   return useMutation({
     mutationFn: (documentId: string) => api.archiveDocument(documentId),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.documents }),
+  })
+}
+
+/* --- teacher: a child's files and the desktop ------------------------------------------ */
+
+/** A child's folders and files, for the teacher's Files app. Read-only; always fresh. */
+export function useChildFolders(studentId: string | null) {
+  return useQuery({
+    queryKey: keys.childFolders(studentId ?? ''),
+    queryFn: () => api.listChildFolders(studentId!),
+    enabled: studentId !== null,
+    staleTime: 0,
+  })
+}
+
+export function useChildDocuments(studentId: string | null) {
+  return useQuery({
+    queryKey: keys.childDocuments(studentId ?? ''),
+    queryFn: () => api.listChildDocuments(studentId!),
+    enabled: studentId !== null,
+    staleTime: 0,
+  })
+}
+
+export function useChildDocument(studentId: string, documentId: string) {
+  return useQuery({
+    queryKey: keys.childDocument(studentId, documentId),
+    queryFn: () => api.readChildDocument(studentId, documentId),
+    staleTime: 0,
+  })
+}
+
+/** The saved layout, read once when the desktop opens; saves go straight to the API. */
+export function useSavedDesktop(enabled: boolean) {
+  return useQuery({
+    queryKey: keys.desktop,
+    queryFn: api.readDesktop,
+    enabled,
+    retry: false,
+    staleTime: Infinity,
   })
 }
 

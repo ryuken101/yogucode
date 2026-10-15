@@ -29,6 +29,7 @@ from app.models.classes import (
 )
 from app.models.concepts import Concept, ConceptStatus
 from app.models.curriculum import Course, CurriculumStatus, Lesson, LessonConcept, Unit
+from app.models.desktop import DesktopLayout
 from app.models.documents import DocumentStatus, StudentDocument
 from app.models.events import Event, EventType
 from app.models.folders import StudentFolder, TeacherFolder
@@ -70,6 +71,7 @@ __all__ = [
     "ConceptStatus",
     "Course",
     "CurriculumStatus",
+    "DesktopLayout",
     "DocumentStatus",
     "Enrolment",
     "EnrolmentStatus",

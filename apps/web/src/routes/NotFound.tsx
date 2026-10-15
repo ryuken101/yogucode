@@ -13,8 +13,8 @@ export function NotFound() {
         <h1 className="text-2xl text-grape">Nothing in this cup</h1>
         <p className="mt-2 text-sm text-muted">
           That page doesn’t exist.{' '}
-          <Link to="/classes" className="text-grape-deep underline">
-            Go to your classes
+          <Link to="/desk" className="text-grape-deep underline">
+            Go to your desktop
           </Link>{' '}
           or{' '}
           <Link to="/" className="text-grape-deep underline">

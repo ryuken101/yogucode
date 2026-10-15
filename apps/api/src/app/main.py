@@ -8,6 +8,7 @@ from app.routers import (
     class_teachers,
     classes,
     curriculum,
+    desktop,
     documents,
     events,
     folders,
@@ -19,6 +20,7 @@ from app.routers import (
     progress,
     quiz,
     roster,
+    student_files,
     student_work,
     teacher_documents,
     teachers,
@@ -47,6 +49,8 @@ app.include_router(teachers.router)
 app.include_router(teacher_documents.router)
 app.include_router(folders.student_router)
 app.include_router(folders.teacher_router)
+app.include_router(student_files.router)
+app.include_router(desktop.router)
 
 
 @app.get("/health")

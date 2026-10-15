@@ -14,6 +14,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { Button } from '../components/Button'
 import { Console } from '../components/Console'
 import { FileExplorer } from '../components/FileExplorer'
@@ -74,6 +75,13 @@ export function MyCode() {
     if (files.data.length > 0) open(files.data[0]!.id)
     else create.mutate(null, { onSuccess: (created) => open(created.id) })
   }, [started, files.data, create, open])
+
+  // A file chosen in the Files app or in search arrives as `?open=<id>` (16 Oct 2026).
+  const [params] = useSearchParams()
+  const wanted = params.get('open')
+  useEffect(() => {
+    if (wanted && files.data?.some((f) => f.id === wanted)) open(wanted)
+  }, [wanted, files.data, open])
 
   useEffect(() => {
     if (active.data) autosave.adopt(active.data.id, active.data.content)
@@ -173,7 +181,7 @@ export function MyCode() {
       className={
         presenting
           ? 'fixed inset-0 z-50 flex flex-col gap-3 bg-night p-4'
-          : 'flex h-full min-h-0 gap-3'
+          : 'flex h-full min-h-0 gap-3 p-3'
       }
     >
       {/* The explorer, hidden while presenting so the code fills the projector. */}

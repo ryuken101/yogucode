@@ -1356,6 +1356,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/desktop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read My Desktop
+         * @description The saved layout, or `saved: false` for a teacher who has never arranged one.
+         */
+        get: operations["read_my_desktop_me_desktop_get"];
+        /** Save My Desktop */
+        put: operations["save_my_desktop_me_desktop_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/documents": {
         parameters: {
             query?: never;
@@ -1843,6 +1864,57 @@ export interface paths {
          *     decision, 11 Oct 2026). Owner only, and only with the name typed out. See `app.erase`.
          */
         post: operations["delete_student_students__student_id__delete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/students/{student_id}/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List A Childs Documents */
+        get: operations["list_a_childs_documents_students__student_id__documents_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/students/{student_id}/documents/{document_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read A Childs Document */
+        get: operations["read_a_childs_document_students__student_id__documents__document_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/students/{student_id}/folders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List A Childs Folders */
+        get: operations["list_a_childs_folders_students__student_id__folders_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2551,6 +2623,22 @@ export interface components {
          * @enum {string}
          */
         CurriculumStatus: "active" | "archived";
+        /** DesktopIn */
+        DesktopIn: {
+            /** Class Id */
+            class_id?: string | null;
+            /** Windows */
+            windows?: components["schemas"]["WindowState"][];
+        };
+        /** DesktopOut */
+        DesktopOut: {
+            /** Class Id */
+            class_id?: string | null;
+            /** Saved */
+            saved: boolean;
+            /** Windows */
+            windows?: components["schemas"]["WindowState"][];
+        };
         /** DocumentIn */
         DocumentIn: {
             /** Content */
@@ -4172,6 +4260,39 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /**
+         * WindowState
+         * @description One window. Geometry is a fraction of the desktop area, so it survives a new screen.
+         */
+        WindowState: {
+            /** App */
+            app: string;
+            /** H */
+            h: number;
+            /**
+             * Max
+             * @default false
+             */
+            max: boolean;
+            /**
+             * Min
+             * @default false
+             */
+            min: boolean;
+            /** Path */
+            path: string;
+            /** W */
+            w: number;
+            /** X */
+            x: number;
+            /** Y */
+            y: number;
+            /**
+             * Z
+             * @default 0
+             */
+            z: number;
         };
     };
     responses: never;
@@ -6705,6 +6826,72 @@ export interface operations {
             };
         };
     };
+    read_my_desktop_me_desktop_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DesktopOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_my_desktop_me_desktop_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DesktopIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DesktopOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_documents_me_documents_get: {
         parameters: {
             query?: {
@@ -7744,6 +7931,106 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_a_childs_documents_students__student_id__documents_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentSummaryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_a_childs_document_students__student_id__documents__document_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                student_id: string;
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_a_childs_folders_students__student_id__folders_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FolderOut"][];
+                };
             };
             /** @description Validation Error */
             422: {

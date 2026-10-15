@@ -398,6 +398,18 @@ export const api = {
       method: 'PATCH',
       body: { username } satisfies Schemas['StudentPatch'],
     }),
+  /** A child's folders and files, read-only, for a teacher's Files app. */
+  listChildFolders: (studentId: string) =>
+    request<Schemas['FolderOut'][]>(`/students/${studentId}/folders`),
+  listChildDocuments: (studentId: string) =>
+    request<Schemas['DocumentSummaryOut'][]>(`/students/${studentId}/documents`),
+  readChildDocument: (studentId: string, documentId: string) =>
+    request<Schemas['DocumentOut']>(`/students/${studentId}/documents/${documentId}`),
+
+  /** The teacher's saved desktop: which windows are open, and where. */
+  readDesktop: () => request<Schemas['DesktopOut']>('/me/desktop'),
+  saveDesktop: (body: Schemas['DesktopIn']) =>
+    request<Schemas['DesktopOut']>('/me/desktop', { method: 'PUT', body }),
   revokeSessions: (studentId: string) =>
     request<Schemas['SessionsRevokedOut']>(`/students/${studentId}/sessions/revoke`, {
       method: 'POST',

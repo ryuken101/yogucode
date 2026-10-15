@@ -13,6 +13,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { Button } from '../components/Button'
 import { Console } from '../components/Console'
 import { FileExplorer } from '../components/FileExplorer'
@@ -93,6 +94,13 @@ export function Work() {
       create.mutate(null, { onSuccess: (created) => open(created.id) })
     }
   }, [started, files.data, create, open])
+
+  // A file chosen in the Files app or in search arrives as `?open=<id>` (16 Oct 2026).
+  const [params] = useSearchParams()
+  const wanted = params.get('open')
+  useEffect(() => {
+    if (wanted && files.data?.some((f) => f.id === wanted)) open(wanted)
+  }, [wanted, files.data, open])
 
   // Tell the autosave what the server already has, so opening a file does not save it
   // straight back.

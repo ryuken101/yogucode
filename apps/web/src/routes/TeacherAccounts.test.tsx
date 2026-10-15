@@ -74,7 +74,7 @@ function screens(route: string) {
       <Route path="/sign-up" element={<SignUp />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
-      <Route path="/classes" element={<p>Classes page</p>} />
+      <Route path="/desk" element={<p>Desktop</p>} />
     </Routes>,
     { route },
   )
@@ -93,7 +93,7 @@ test('signing in with a password finishes through the callback', async () => {
   await user.type(screen.getByLabelText('Password'), 'correct horse')
   await user.click(screen.getByRole('button', { name: 'Sign in' }))
 
-  expect(await screen.findByText('Classes page')).toBeInTheDocument()
+  expect(await screen.findByText('Desktop')).toBeInTheDocument()
   expect(auth.signIn).toHaveBeenCalledWith('ken@example.com', 'correct horse')
 })
 
@@ -200,7 +200,7 @@ test('a new password must be typed the same twice, then signs in', async () => {
   await user.type(screen.getByLabelText('Type it again'), 'a brand new pw')
   await user.click(screen.getByRole('button', { name: 'Save and sign in' }))
 
-  expect(await screen.findByText('Classes page')).toBeInTheDocument()
+  expect(await screen.findByText('Desktop')).toBeInTheDocument()
   expect(auth.updatePassword).toHaveBeenCalledWith('a brand new pw')
 })
 

@@ -52,7 +52,7 @@ export function AuthCallback() {
         const profile = await api.startTeacherSession()
         if (cancelled) return
         client.setQueryData(keys.me, profile)
-        navigate('/classes', { replace: true })
+        navigate('/desk', { replace: true })
       } catch (error) {
         if (cancelled) return
         if (error instanceof ApiError && error.status === 403) {

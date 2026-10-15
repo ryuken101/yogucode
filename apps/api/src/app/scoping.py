@@ -52,6 +52,7 @@ from app.models import (
     LessonConcept,
     Student,
     StudentDocument,
+    StudentFolder,
     StudentStatus,
     TeacherDocument,
     Unit,
@@ -308,6 +309,65 @@ async def list_student_documents(
         statement = statement.where(StudentDocument.status == DocumentStatus.ACTIVE)
     statement = statement.order_by(StudentDocument.updated_at.desc())  # type: ignore[attr-defined]
     return (await session.exec(statement)).all()
+
+
+async def list_child_folders(
+    session: AsyncSession, principal: Principal, student_id: uuid.UUID
+) -> Sequence[StudentFolder]:
+    """A child's live folders, for a teacher's Files app. Call `get_owned_student` first.
+
+    Filtered on the centre **and** the child, like every read of children's work: the
+    student id comes from the URL here, so the centre filter is what keeps it in tenancy.
+    """
+    statement = (
+        select(StudentFolder)
+        .where(
+            StudentFolder.centre_id == principal.centre_id,
+            StudentFolder.student_id == student_id,
+            StudentFolder.status == DocumentStatus.ACTIVE,
+        )
+        .order_by(StudentFolder.name)
+    )
+    return (await session.exec(statement)).all()
+
+
+async def list_child_documents(
+    session: AsyncSession, principal: Principal, student_id: uuid.UUID
+) -> Sequence[StudentDocument]:
+    """A child's live files, newest work first, for a teacher. Call `get_owned_student` first."""
+    statement = (
+        select(StudentDocument)
+        .where(
+            StudentDocument.centre_id == principal.centre_id,
+            StudentDocument.student_id == student_id,
+            StudentDocument.status == DocumentStatus.ACTIVE,
+        )
+        .order_by(StudentDocument.updated_at.desc())  # type: ignore[attr-defined]
+    )
+    return (await session.exec(statement)).all()
+
+
+async def get_child_document(
+    session: AsyncSession, principal: Principal, student_id: uuid.UUID, document_id: uuid.UUID
+) -> StudentDocument:
+    """One of a child's files, for a teacher, or 404.
+
+    Three-part filter: the file, the centre, and **the child named in the URL** — a file id
+    belonging to a different child at the same centre is a 404 here, so the path a teacher
+    followed is the only one that reaches it.
+    """
+    found = (
+        await session.exec(
+            select(StudentDocument).where(
+                StudentDocument.id == document_id,
+                StudentDocument.centre_id == principal.centre_id,
+                StudentDocument.student_id == student_id,
+            )
+        )
+    ).one_or_none()
+    if found is None:
+        raise _not_found("document")
+    return found
 
 
 async def get_enrolment(

@@ -9,24 +9,26 @@
  * stored nothing in memory, and stops being harmless the moment it saves: every request
  * would 401 and a child would type into a page that silently discards their work.
  *
- * The bar answers "whose account is this" before a child starts typing, which on a
- * borrowed or shared laptop is the question that matters — and gives a teacher somewhere
- * obvious to press when handing the machine to the next student.
+ * Signed in, the child gets the desktop (`desktop/Desktop.tsx`). Its top bar answers "whose
+ * account is this" before a child starts typing, which on a borrowed or shared laptop is
+ * the question that matters — and gives a teacher somewhere obvious to press when handing
+ * the machine to the next student.
  */
 
 import { useEffect } from 'react'
-import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router'
+import type { ReactNode } from 'react'
+import { Navigate, useLocation, useNavigate } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
-import { CupMark } from '../components/Brand'
-import { Button } from '../components/Button'
-import { navPill } from '../components/navPill'
 import { Spinner } from '../components/Spinner'
 import { closeStudentLive, studentLive } from '../collab/socket'
+import { StudentDesktop } from '../desktop/Desktop'
 import { api } from '../lib/api'
 import { keys, useActiveQuiz, useStudentMe } from '../lib/queries'
 import { clearStudentTab } from '../lib/tabSession'
+import { studentPages } from './pages'
 
-export function RequireStudent() {
+/** `pages` is for tests, which give a guard stand-in pages; the app uses the real list. */
+export function RequireStudent({ pages = studentPages }: { pages?: ReactNode }) {
   const navigate = useNavigate()
   const client = useQueryClient()
   const { data: me, isPending, error } = useStudentMe()
@@ -77,36 +79,12 @@ export function RequireStudent() {
   }
 
   return (
-    <div className="flex h-dvh flex-col bg-cream">
-      <header className="flex shrink-0 items-center justify-between border-b border-line bg-surface px-4 py-2">
-        <div className="flex items-center gap-4">
-          <CupMark size={28} />
-          <p className="text-sm text-grape">
-            <span className="font-medium">{me.display_name}</span>
-            <span className="text-muted"> · {me.class_name}</span>
-          </p>
-          <nav className={`flex gap-1 text-sm ${quiz ? 'invisible' : ''}`}>
-            {[
-              ['/home', 'Today'],
-              ['/work', 'My files'],
-            ].map(([to, label]) => (
-              <NavLink
-                key={to}
-                to={to}
-                className={navPill}
-              >
-                {label}
-              </NavLink>
-            ))}
-          </nav>
-        </div>
-        <Button variant="quiet" onClick={() => void signOut()}>
-          Sign out
-        </Button>
-      </header>
-      <div className="min-h-0 flex-1">
-        <Outlet />
-      </div>
-    </div>
+    <StudentDesktop
+      pages={pages}
+      name={me.display_name}
+      subtitle={me.class_name}
+      locked={Boolean(quiz)}
+      onSignOut={() => void signOut()}
+    />
   )
 }

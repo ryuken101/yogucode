@@ -35,7 +35,7 @@ function renderAt(route: string) {
       <Route path="/" element={<Landing />} />
       <Route path="/join" element={<Join />} />
       <Route path="/home" element={<p>Today page</p>} />
-      <Route path="/classes" element={<p>Classes page</p>} />
+      <Route path="/desk" element={<p>Desktop</p>} />
     </Routes>,
     { route },
   )
@@ -54,11 +54,11 @@ test('a child still signed in goes straight to Today', async () => {
   expect(await screen.findByText('Today page')).toBeInTheDocument()
 })
 
-test('a teacher with a session goes to their classes', async () => {
+test('a teacher with a session goes to their desktop', async () => {
   signedOutStudent()
   supabase.token = 'teacher-token'
   renderAt('/')
-  expect(await screen.findByText('Classes page')).toBeInTheDocument()
+  expect(await screen.findByText('Desktop')).toBeInTheDocument()
 })
 
 test('/join still works for anyone with the old link', async () => {

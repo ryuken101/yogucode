@@ -1,9 +1,9 @@
 /**
- * Where a child lands after signing in: their homework, today's ladder, and their files.
- *
- * Homework first when there is any still to do — at home that is why they opened the
- * laptop. Each card answers the three questions a child (or a parent) has: when is it due,
- * how far have I got, have I handed it in. Work that has come back says so.
+ * Where a child lands after signing in — the Lessons app: today's ladder. Their homework
+ * and quizzes are the Work app's (`MyWork.tsx`, 16 Oct 2026), which shows each as a
+ * `HomeworkCard` from here. Each card answers the three questions a child (or a parent)
+ * has: when is it due, how far have I got, have I handed it in. Work that has come back
+ * says so.
  *
  * The ladder is spec §3.3's answer to idle time — 1-dot problems first, a 2-dot, a 3-dot
  * extension — so nobody finishes with nothing to do. Progress is `good` when every check
@@ -22,7 +22,7 @@ import { formatDue, isPast } from '../lib/dates'
 import { messageFor } from '../lib/errors'
 import { useHome } from '../lib/queries'
 
-function HomeworkCard({ card }: { card: Schemas['HomeworkCardOut'] }) {
+export function HomeworkCard({ card }: { card: Schemas['HomeworkCardOut'] }) {
   return (
     <Link
       to={card.mode === 'quiz' ? `/quiz/${card.assignment_id}` : `/homework/${card.assignment_id}`}
@@ -74,22 +74,9 @@ export function StudentHome() {
     )
   }
 
-  const { today, homework } = home.data
+  const { today } = home.data
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-8 px-6 py-8">
-      {homework.length > 0 ? (
-        <section>
-          <h2 className="mb-3 font-display font-semibold text-xl text-grape">Homework</h2>
-          <ul className="flex flex-col gap-2">
-            {homework.map((card) => (
-              <li key={card.assignment_id}>
-                <HomeworkCard card={card} />
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
       <section>
         <h1 className="mb-1 font-display font-semibold text-2xl text-grape">{today.lesson_title ?? 'Today'}</h1>
         <p className="mb-4 text-sm text-muted">{today.class_name}</p>
@@ -98,7 +85,7 @@ export function StudentHome() {
           <EmptyState title="Nothing set for today yet">
             Your teacher will put today’s problems here. Meanwhile, your files are in{' '}
             <Link to="/work" className="text-grape-deep underline">
-              My files
+              Code
             </Link>
             .
           </EmptyState>

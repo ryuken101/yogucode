@@ -24,6 +24,8 @@ vi.mock('../lib/supabase', () => ({
   sendPasswordReset: async () => undefined,
 }))
 
+const classes = <Route path="/classes" element={<p>Classes page</p>} />
+
 test('signing out lands on the sign-in page and stays there', async () => {
   server.use(
     http.get('/api/auth/me', () =>
@@ -37,15 +39,15 @@ test('signing out lands on the sign-in page and stays there', async () => {
   )
   const { user } = renderScreen(
     <Routes>
-      <Route element={<RequireTeacher />}>
-        <Route path="/classes" element={<p>Classes page</p>} />
-      </Route>
+      <Route element={<RequireTeacher pages={classes} />}>{classes}</Route>
       <Route path="/sign-in" element={<SignIn />} />
     </Routes>,
     { route: '/classes' },
   )
 
-  await user.click(await screen.findByRole('button', { name: 'Sign out' }))
+  // Sign out is in the account menu on the desktop's top bar.
+  await user.click(await screen.findByRole('button', { name: 'Account' }))
+  await user.click(await screen.findByRole('menuitem', { name: /Sign out/ }))
 
   expect(await screen.findByLabelText('Email')).toBeInTheDocument()
   expect(screen.queryByText('Classes page')).not.toBeInTheDocument()

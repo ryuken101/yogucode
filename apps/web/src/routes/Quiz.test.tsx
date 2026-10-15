@@ -53,14 +53,18 @@ function activeQuiz(endsAt = inTenMinutes()) {
 }
 
 function renderStudent(route: string) {
+  // The guard's desktop shows its pages in windows; these stand in for the real ones.
+  const pages = (
+    <>
+      <Route path="/home" element={<p>Home page</p>} />
+      <Route path="/work" element={<p>My files page</p>} />
+      <Route path="/quiz/:assignmentId" element={<QuizRunner />} />
+      <Route path="/lesson/:assignmentId/:itemId" element={<p>Question page</p>} />
+    </>
+  )
   return renderScreen(
     <Routes>
-      <Route element={<RequireStudent />}>
-        <Route path="/home" element={<p>Home page</p>} />
-        <Route path="/work" element={<p>My files page</p>} />
-        <Route path="/quiz/:assignmentId" element={<QuizRunner />} />
-        <Route path="/lesson/:assignmentId/:itemId" element={<p>Question page</p>} />
-      </Route>
+      <Route element={<RequireStudent pages={pages} />}>{pages}</Route>
     </Routes>,
     { route },
   )

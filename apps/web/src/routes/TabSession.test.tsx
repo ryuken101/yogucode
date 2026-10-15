@@ -50,13 +50,13 @@ const ME: Schemas['StudentMeOut'] = {
   term_label: '2026 T4',
 }
 
+const today = <Route path="/home" element={<p>Today page</p>} />
+
 function app(route: string) {
   return renderScreen(
     <Routes>
       <Route path="/" element={<Landing />} />
-      <Route element={<RequireStudent />}>
-        <Route path="/home" element={<p>Today page</p>} />
-      </Route>
+      <Route element={<RequireStudent pages={today} />}>{today}</Route>
     </Routes>,
     { route },
   )

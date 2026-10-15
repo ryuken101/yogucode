@@ -190,6 +190,13 @@ cream). **Never red for a student's incorrect answer** — `not-yet` (lemon) mea
 strawberry — the brand accent — is never a student's state. The rest of the frontend
 conventions live in `apps/web/CLAUDE.md`, which loads when working under that directory.
 
+**The UI is a desktop** (Ken's decision, 16 Oct 2026): top bar, app windows, dock, for
+teachers and children both. Pages are unchanged; each belongs to one app
+(`apps/web/src/desktop/apps.ts`) and opens in its window, and the URL is the front window's
+page. A teacher's layout is saved in `desktop_layouts` (`routers/desktop.py`); a child's
+windows are fixed full screen and never saved. A new page needs an owning app there, and
+the teacher and student page lists (`routes/pages.tsx`) must share no path.
+
 ### Production: one app
 
 `app.server:site` mounts the API (`app.main:app`) under `/api` and serves the built

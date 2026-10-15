@@ -9,23 +9,28 @@
  *
  * `profile_not_provisioned` sends the teacher back through /auth/callback, which is the
  * only route that provisions. This guard never writes.
+ *
+ * Signed in, the teacher gets the desktop (`desktop/Desktop.tsx`), which shows every
+ * teacher page in an app window.
  */
 
 import { useQueryClient } from '@tanstack/react-query'
-import { Navigate, Outlet, useLocation, useNavigate } from 'react-router'
+import type { ReactNode } from 'react'
+import { Navigate, useNavigate } from 'react-router'
 import { AppShell } from '../components/AppShell'
+import { TeacherDesktop } from '../desktop/Desktop'
 import { Notice } from '../components/Notice'
 import { Spinner } from '../components/Spinner'
 import { ApiError } from '../lib/errors'
 import { signOut, supabaseConfigured } from '../lib/supabase'
 import { useMe } from '../lib/queries'
+import { teacherPages } from './pages'
 
-export function RequireTeacher() {
+/** `pages` is for tests, which give a guard stand-in pages; the app uses the real list. */
+export function RequireTeacher({ pages = teacherPages }: { pages?: ReactNode }) {
   const navigate = useNavigate()
   const client = useQueryClient()
   const { data, isPending, error } = useMe({ retry: false })
-  // My code is an editor, so it gets the whole window rather than the centred column.
-  const wide = useLocation().pathname.startsWith('/my-code')
 
   if (!supabaseConfigured) {
     return (
@@ -63,20 +68,19 @@ export function RequireTeacher() {
   }
 
   return (
-    <AppShell
-      centreName={data.centre.name}
+    <TeacherDesktop
+      pages={pages}
+      name={data.display_name || data.email}
+      subtitle={data.centre.name}
       isOwner={data.role === 'owner'}
-      wide={wide}
       onSignOut={() => {
         void signOut().then(() => {
           // Forget who was signed in, or the sign-in page reads the cached profile, thinks
-          // the teacher is still here, and sends them straight back to their classes.
+          // the teacher is still here, and sends them straight back to their desktop.
           client.clear()
           navigate('/sign-in', { replace: true })
         })
       }}
-    >
-      <Outlet />
-    </AppShell>
+    />
   )
 }

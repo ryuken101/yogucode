@@ -39,7 +39,7 @@ export function SignIn() {
   const [resetSent, setResetSent] = useState(false)
   const { data: alreadySignedIn } = useMe({ retry: false })
 
-  if (alreadySignedIn) return <Navigate to="/classes" replace />
+  if (alreadySignedIn) return <Navigate to="/desk" replace />
 
   async function submitSignIn(event: React.FormEvent) {
     event.preventDefault()
