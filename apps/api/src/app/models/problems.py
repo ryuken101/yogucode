@@ -13,6 +13,16 @@ each part is independently attemptable, with its own tags, tests and marks — w
 exactly an item. The parent carries the shared prompt and has no tests of its own; an
 attempt is only ever against a leaf.
 
+**Parts can share one file** (`shared_file`, Ken's decision, 17 Oct 2026). The child then
+writes one program for the whole problem: the parent holds its starter and reference
+solution, and each part's tests run against the whole file. Parts still keep their own
+tests, hints, tags and marks, so each is still its own attempt; the child's code is kept
+identical across them (`routers/student_work.py`). Older problems keep code per part.
+
+**Examples** (`examples`) are sample runs a child can watch: the teacher gives the
+inputs, the teacher's browser runs the reference solution with them, and the terminal
+transcript is stored at publish. The solution itself never reaches a child.
+
 **A published item is never edited in place.** Editing makes a new draft row with
 `supersedes_id` pointing back and `version + 1`; publishing it marks the old row
 `superseded`. Attempts and marks point at the version the child actually saw, so a fix to
@@ -107,6 +117,15 @@ class Item(TimestampMixin, table=True):
         # Existing rows (every code problem) get an empty list rather than NULL.
         sa_column_kwargs={"server_default": text("'[]'::jsonb")},
     )
+    # [{"inputs": [str], "transcript": [{"kind": "out" | "in", "text"}] | None}]; the
+    # transcript is filled at publish (`app/problem_bank.py`).
+    examples: list[dict[str, Any]] = Field(
+        default_factory=list,
+        sa_type=JSONB,
+        sa_column_kwargs={"server_default": text("'[]'::jsonb")},
+    )
+    # Problems with parts only: one file for every part, held on this row.
+    shared_file: bool = Field(default=False, sa_column_kwargs={"server_default": text("false")})
     status: ItemStatus = Field(default=ItemStatus.DRAFT, sa_type=String)
     version: int = Field(default=1)
     supersedes_id: uuid.UUID | None = Field(default=None, foreign_key="items.id")

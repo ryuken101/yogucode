@@ -17,7 +17,13 @@ import {
   isolated,
   signalInterrupt,
 } from './channel'
-import { MAX_OUTPUT_CHARS, type FromWorker, type TestCheck, type TestRun } from './protocol'
+import {
+  MAX_OUTPUT_CHARS,
+  type ExampleRun,
+  type FromWorker,
+  type TestCheck,
+  type TestRun,
+} from './protocol'
 
 export interface OutputSegment {
   /** `stdin` is the terminal echo of what the child typed, not something Python wrote. */
@@ -95,6 +101,8 @@ export function usePython({ onRunFinished }: { onRunFinished?: (run: RunFinished
   const pendingRun = useRef(false)
   /** Checks in flight, by runId — a check answers by promise rather than into the console. */
   const pendingChecks = useRef(new Map<number, (run: TestRun | null) => void>())
+  /** Example runs in flight, the same way. */
+  const pendingExamples = useRef(new Map<number, (run: ExampleRun | null) => void>())
 
   const [state, setState] = useState<RunState>(() =>
     isolated()
@@ -122,6 +130,14 @@ export function usePython({ onRunFinished }: { onRunFinished?: (run: RunFinished
     [],
   )
 
+  /** Nothing is coming back for anything in flight; let every caller move on. */
+  const settleAll = useCallback(() => {
+    for (const resolve of pendingChecks.current.values()) resolve(null)
+    pendingChecks.current.clear()
+    for (const resolve of pendingExamples.current.values()) resolve(null)
+    pendingExamples.current.clear()
+  }, [])
+
   const ensureWorker = useCallback((): Worker => {
     if (worker.current) return worker.current
 
@@ -142,7 +158,12 @@ export function usePython({ onRunFinished }: { onRunFinished?: (run: RunFinished
           // state must not drop back to idle and re-enable the Run button underneath it.
           setState((current) =>
             current.status === 'loading' && pendingRun.current
-              ? { status: pendingChecks.current.size ? 'checking' : 'running' }
+              ? {
+                  status:
+                    pendingChecks.current.size || pendingExamples.current.size
+                      ? 'checking'
+                      : 'running',
+                }
               : { status: 'idle' },
           )
           pendingRun.current = false
@@ -177,18 +198,23 @@ export function usePython({ onRunFinished }: { onRunFinished?: (run: RunFinished
           setState({ status: 'idle' })
           break
         }
+        case 'exampled': {
+          const resolve = pendingExamples.current.get(message.runId)
+          pendingExamples.current.delete(message.runId)
+          resolve?.(message.run)
+          setState({ status: 'idle' })
+          break
+        }
         case 'fatal':
           setState({ status: 'unsupported', reason: message.message })
-          for (const resolve of pendingChecks.current.values()) resolve(null)
-          pendingChecks.current.clear()
+          settleAll()
           break
       }
     }
     created.onerror = () => {
       setState({ status: 'unsupported', reason: 'Python could not start.' })
       // Nothing is coming back for a check in flight; let its caller move on.
-      for (const resolve of pendingChecks.current.values()) resolve(null)
-      pendingChecks.current.clear()
+      settleAll()
     }
 
     created.postMessage({
@@ -199,7 +225,7 @@ export function usePython({ onRunFinished }: { onRunFinished?: (run: RunFinished
     })
     worker.current = created
     return created
-  }, [append])
+  }, [append, settleAll])
 
   const run = useCallback(
     (code: string) => {
@@ -249,6 +275,31 @@ export function usePython({ onRunFinished }: { onRunFinished?: (run: RunFinished
     [ensureWorker, state.status],
   )
 
+  /**
+   * Run `code` once, typing `inputs` in order, and resolve with the conversation it had —
+   * a problem's example (`grader.run_example`). Leaves the console and session alone, as
+   * a check does.
+   */
+  const example = useCallback(
+    (code: string, inputs: string[]): Promise<ExampleRun | null> => {
+      if (state.status === 'unsupported') return Promise.resolve(null)
+      runId.current += 1
+      const id = runId.current
+      const created = ensureWorker()
+      if (!ready.current) {
+        pendingRun.current = true
+        setState({ status: 'loading', detail: 'Starting Python' })
+      } else {
+        setState({ status: 'checking' })
+      }
+      return new Promise((resolve) => {
+        pendingExamples.current.set(id, resolve)
+        created.postMessage({ type: 'example', runId: id, code, inputs })
+      })
+    },
+    [ensureWorker, state.status],
+  )
+
   const answer = useCallback(
     (text: string) => {
       if (!stdin.current) return
@@ -277,5 +328,5 @@ export function usePython({ onRunFinished }: { onRunFinished?: (run: RunFinished
     if (interrupt.current) signalInterrupt(interrupt.current)
   }, [])
 
-  return { state, output, run, check, stop, answer }
+  return { state, output, run, check, example, stop, answer }
 }

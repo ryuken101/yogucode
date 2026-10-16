@@ -19,6 +19,7 @@
 import {
   FLUSH_INTERVAL_MS,
   MAX_FORWARDED_CHARS,
+  type ExampleRun,
   type FromWorker,
   type TestRun,
   type ToWorker,
@@ -33,7 +34,10 @@ interface Pyodide {
   FS: { writeFile(path: string, data: string): void }
   runPython(code: string): unknown
   runPythonAsync(code: string): Promise<unknown>
-  pyimport(name: string): { run_tests(code: string, tests: string): string }
+  pyimport(name: string): {
+    run_tests(code: string, tests: string): string
+    run_example(code: string, inputs: string): string
+  }
   setStdout(options: { write: (buffer: Uint8Array) => number }): void
   setStderr(options: { write: (buffer: Uint8Array) => number }): void
   setStdin(options: { stdin: () => string | null; autoEOF?: boolean }): void
@@ -120,7 +124,7 @@ function createSink(getRunId: () => number): Sink {
 let currentRunId = 0
 const sink = createSink(() => currentRunId)
 
-type Job = Extract<ToWorker, { type: 'run' | 'check' }>
+type Job = Extract<ToWorker, { type: 'run' | 'check' | 'example' }>
 
 /** A run or check that arrived while Pyodide was still loading; dispatched once ready. */
 let queuedJob: Job | null = null
@@ -194,7 +198,8 @@ async function init(message: Extract<ToWorker, { type: 'init' }>): Promise<void>
 
 async function dispatch(job: Job): Promise<void> {
   if (job.type === 'run') await run(job)
-  else await check(job)
+  else if (job.type === 'check') await check(job)
+  else await example(job)
 }
 
 /* --- run ---------------------------------------------------------------------------- */
@@ -259,11 +264,33 @@ async function check(message: Extract<ToWorker, { type: 'check' }>): Promise<voi
   }
 }
 
+/** A sample run for a problem's example (`grader.run_example`), synchronous like a check. */
+async function example(message: Extract<ToWorker, { type: 'example' }>): Promise<void> {
+  if (!pyodide || !interruptBuffer || !grader) {
+    queuedJob = message
+    return
+  }
+  clearInterrupt(interruptBuffer)
+  let result: ExampleRun | null = null
+  try {
+    result = JSON.parse(
+      grader.run_example(message.code, JSON.stringify(message.inputs)),
+    ) as ExampleRun
+  } catch {
+    result = null
+  } finally {
+    clearInterrupt(interruptBuffer)
+    post({ type: 'exampled', runId: message.runId, run: result })
+  }
+}
+
 self.onmessage = async (event: MessageEvent<ToWorker>) => {
   const message = event.data
   try {
     if (message.type === 'init') await init(message)
-    if (message.type === 'run' || message.type === 'check') await dispatch(message)
+    if (message.type === 'run' || message.type === 'check' || message.type === 'example') {
+      await dispatch(message)
+    }
   } catch (error) {
     post({
       type: 'fatal',

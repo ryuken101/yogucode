@@ -2,14 +2,18 @@
  * Everything a student attempts: difficulty, concepts, starter code, the reference
  * solution, the tests and the hints. Used once for a problem without parts, once per part
  * for a problem with them.
+ *
+ * On a shared file (`codeless`) a part has no code of its own — the problem's file holds
+ * it — so the code boxes are not shown.
  */
 
 import { CodeSurface } from '../editor/CodeSurface'
 import { DotsPicker } from '../components/Dots'
 import type { Schemas } from '../lib/api'
-import type { TestResult } from '../runtime/protocol'
+import type { ExampleRun, TestResult } from '../runtime/protocol'
 import { ConceptPicker } from './ConceptPicker'
 import type { LeafDoc } from './doc'
+import { ExamplesEditor } from './ExamplesEditor'
 import { HintsEditor } from './HintsEditor'
 import { TestsEditor } from './TestsEditor'
 
@@ -21,9 +25,15 @@ interface Props {
   concepts: Schemas['ConceptOut'][]
   results?: TestResult[] | null
   disabled?: boolean
+  /** A part of a shared file: no starter or solution of its own. */
+  codeless?: boolean
+  /** The last Check solution's runs of this leaf's examples. */
+  exampleRuns?: (ExampleRun | null)[]
+  /** Whether this leaf takes examples — not a part with its own code's parent. */
+  examples?: boolean
 }
 
-function CodeBox({
+export function CodeBox({
   label,
   hint,
   value,
@@ -48,7 +58,17 @@ function CodeBox({
   )
 }
 
-export function LeafEditor({ editorKey, leaf, onChange, concepts, results, disabled }: Props) {
+export function LeafEditor({
+  editorKey,
+  leaf,
+  onChange,
+  concepts,
+  results,
+  disabled,
+  codeless = false,
+  exampleRuns,
+  examples = true,
+}: Props) {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-start gap-6">
@@ -73,6 +93,7 @@ export function LeafEditor({ editorKey, leaf, onChange, concepts, results, disab
         </div>
       </div>
 
+      {codeless ? null : (
       <div className="grid gap-4 lg:grid-cols-2">
         <CodeBox
           key={`${editorKey}-starter`}
@@ -91,6 +112,7 @@ export function LeafEditor({ editorKey, leaf, onChange, concepts, results, disab
           onChange={(solution_code) => onChange({ ...leaf, solution_code })}
         />
       </div>
+      )}
 
       <section>
         <h3 className="mb-2 font-display font-semibold text-lg text-grape">Checks</h3>
@@ -101,6 +123,19 @@ export function LeafEditor({ editorKey, leaf, onChange, concepts, results, disab
           onChange={(tests) => onChange({ ...leaf, tests })}
         />
       </section>
+
+      {examples ? (
+        <section>
+          <h3 className="mb-2 font-display font-semibold text-lg text-grape">How it should run</h3>
+          <ExamplesEditor
+            examples={leaf.examples ?? []}
+            runs={exampleRuns}
+            disabled={disabled}
+            of={codeless ? 'the program, once this part is done,' : 'this program'}
+            onChange={(next) => onChange({ ...leaf, examples: next })}
+          />
+        </section>
+      ) : null}
 
       <section>
         <h3 className="mb-2 font-display font-semibold text-lg text-grape">Hints</h3>

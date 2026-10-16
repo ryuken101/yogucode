@@ -42,7 +42,7 @@ function mcqOut(overrides: Partial<Schemas['ProblemOut']> = {}): Schemas['Proble
     updated_at: '2026-10-08T10:00:00Z', parts: [], publish_problems: [],
     publish_warnings: ['1 wrong option without a misconception — naming it is what makes the answers diagnostic'],
     document: {
-      kind: 'mcq', title: 'range(5)', prompt_md: '', difficulty: 1, concept_ids: [RANGE],
+      kind: 'mcq', shared_file: false, title: 'range(5)', prompt_md: '', difficulty: 1, concept_ids: [RANGE],
       primary_concept_id: RANGE, starter_code: '', solution_code: '', tests: [], hints: [], parts: [],
       options: [{ text: '[0..4]', correct: true, misconception: null }, { text: '[1..5]', correct: false, misconception: null }],
     },
@@ -71,7 +71,7 @@ test('a multiple-choice question publishes with no solution check, and warns abo
   expect(screen.queryByRole('button', { name: 'Check solution' })).not.toBeInTheDocument()
   expect(screen.getByText(/without a misconception/)).toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: 'Publish' }))
-  await waitFor(() => expect(published).toEqual({ verified_updated_at: '2026-10-08T10:00:00Z' }))
+  await waitFor(() => expect(published).toEqual({ verified_updated_at: '2026-10-08T10:00:00Z', transcripts: {} }))
 })
 
 /* --- marking ----------------------------------------------------------------------------- */

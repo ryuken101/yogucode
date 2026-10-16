@@ -104,7 +104,8 @@ test('Check is hidden when the quiz turns it off; Run stays', async () => {
       HttpResponse.json({
         assignment_id: QUIZ, item_id: ITEM, kind: 'code', title: 'Add to the end', prompt_md: '', difficulty: 1,
         mode: 'quiz', completions: false, checks: false, options: [],
-        leaves: [{ item_id: ITEM, label: null, prompt_md: '', tests: [], hints: [], next_hint: null,
+        examples: [], shared_file: false, file_attempt_id: null,
+        leaves: [{ item_id: ITEM, label: null, prompt_md: '', tests: [], examples: [], hints: [], next_hint: null,
           attempt: { id: 'a1', code: '', status: 'in_progress', run_count: 0, last_passed: null, last_total: null, choice: null } }],
       } satisfies Schemas['StudentProblemOut']),
     ),

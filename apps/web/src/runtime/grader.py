@@ -193,3 +193,77 @@ def run_tests(code, tests_json):
             result = {"name": result["name"], "hidden": True, "passed": result["passed"]}
         results.append(result)
     return json.dumps({"compile_error": None, "results": results})
+
+
+# What a stored example may hold (`app/problem_bank.py` refuses more).
+MAX_EXAMPLE_PIECES = 400
+MAX_EXAMPLE_PIECE_CHARS = 10_000
+
+
+class NeedsMoreInput(Exception):
+    """An example's program asked for more input than the example gives it."""
+
+
+class _Transcript(io.TextIOBase):
+    """stdout for an example: what is printed, interleaved with what is typed in."""
+
+    def __init__(self):
+        self.pieces = []
+
+    def add(self, kind, text):
+        if not text:
+            return
+        if self.pieces and self.pieces[-1]["kind"] == kind == "out":
+            joined = self.pieces[-1]["text"] + text
+            self.pieces[-1]["text"] = joined[:MAX_EXAMPLE_PIECE_CHARS]
+        elif len(self.pieces) < MAX_EXAMPLE_PIECES:
+            self.pieces.append({"kind": kind, "text": text[:MAX_EXAMPLE_PIECE_CHARS]})
+
+    def write(self, text):
+        self.add("out", text)
+        return len(text)
+
+
+def run_example(code, inputs_json):
+    """Run the program once as a child would, typing `inputs` in order (17 Oct 2026).
+
+    Returns JSON: {"transcript": [{"kind": "out"|"in", "text"}], "error": str|null}. Unlike
+    a test, `input()`'s prompt is part of the output: the point is to show the
+    conversation — "Name? ", then "Ken", then "Hi Ken". Fresh globals and the same time
+    limit as a test. Running out of inputs stops the run, and says so.
+    """
+    inputs = list(json.loads(inputs_json))
+    transcript = _Transcript()
+    namespace = {"__name__": "__main__", "__builtins__": builtins}
+
+    def fake_input(prompt=""):
+        transcript.add("out", str(prompt))
+        if not inputs:
+            raise NeedsMoreInput
+        value = inputs.pop(0)
+        transcript.add("in", value)
+        return value
+
+    namespace["input"] = fake_input
+    error = None
+    try:
+        compiled = compile(code, FILENAME, "exec")
+    except SyntaxError as exc:
+        return json.dumps({"transcript": [], "error": _describe_error(exc)})
+    sys.settrace(_deadline_tracer(time.monotonic() + TIME_LIMIT_SECONDS))
+    try:
+        with contextlib.redirect_stdout(transcript):
+            exec(compiled, namespace)
+    except TookTooLong:
+        error = "took too long — is there a loop that never ends?"
+    except NeedsMoreInput:
+        error = "the program asked for more input than this example gives it"
+    except SystemExit:
+        pass
+    except KeyboardInterrupt:
+        raise
+    except Exception as exc:  # noqa: BLE001 — reported to the teacher
+        error = _describe_error(exc)
+    finally:
+        sys.settrace(None)
+    return json.dumps({"transcript": transcript.pieces, "error": error})

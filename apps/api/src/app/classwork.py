@@ -239,9 +239,15 @@ async def open_classwork_for_lesson(
 
 
 async def open_attempt(
-    session: AsyncSession, principal: Principal, assignment: Assignment, leaf: Item
+    session: AsyncSession,
+    principal: Principal,
+    assignment: Assignment,
+    leaf: Item,
+    *,
+    starter: str | None = None,
 ) -> Attempt:
-    """The child's attempt at a leaf, created with the starter code on first open.
+    """The child's attempt at a leaf, created with the starter code on first open — the
+    leaf's own, or `starter` (a shared-file problem's) when given.
 
     `ON CONFLICT DO NOTHING` rather than check-then-insert: a child with the problem open
     in two tabs opens it twice at once, and the second must find the first's row rather
@@ -255,7 +261,7 @@ async def open_attempt(
             student_id=principal.subject_id,
             assignment_id=assignment.id,
             item_id=leaf.id,
-            code=leaf.starter_code,
+            code=leaf.starter_code if starter is None else starter,
             status=AttemptStatus.IN_PROGRESS,
             run_count=0,
             hints_unlocked=0,

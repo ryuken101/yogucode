@@ -37,6 +37,21 @@ export interface TestResult {
   error?: string | null
 }
 
+/**
+ * One piece of a sample run (17 Oct 2026): what the program printed, or what was typed at
+ * an `input()`. The same shape the API stores as an example's transcript.
+ */
+export interface ExamplePiece {
+  kind: 'out' | 'in'
+  text: string
+}
+
+export interface ExampleRun {
+  transcript: ExamplePiece[]
+  /** Why the run ended early — an error, or more `input()`s than inputs. */
+  error: string | null
+}
+
 export interface TestRun {
   /** Set when the program does not parse — then nothing ran and every result fails. */
   compile_error: string | null
@@ -49,6 +64,8 @@ export type ToWorker =
   | { type: 'run'; runId: number; code: string }
   /** Grade `code` against `tests` in fresh globals; the child's session is untouched. */
   | { type: 'check'; runId: number; code: string; tests: TestCheck[] }
+  /** Run `code` once, typing `inputs` at its `input()`s, and record the conversation. */
+  | { type: 'example'; runId: number; code: string; inputs: string[] }
 
 /** Sent from the worker to the page. */
 export type FromWorker =
@@ -70,6 +87,8 @@ export type FromWorker =
   | { type: 'done'; runId: number; ok: boolean; interrupted: boolean }
   /** A `check` finished. `run` is null when it was stopped before finishing. */
   | { type: 'checked'; runId: number; run: TestRun | null }
+  /** An `example` finished. `run` is null when it was stopped before finishing. */
+  | { type: 'exampled'; runId: number; run: ExampleRun | null }
   /** The worker itself failed — Pyodide could not load. Ours to fix, not the student's. */
   | { type: 'fatal'; message: string }
 

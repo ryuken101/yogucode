@@ -114,6 +114,17 @@ class and its work (accounts and files stay), children-first in foreign-key orde
 table pointing at `students` or `classes` must be added there. Audit rows stay, with any
 `display_name` stripped from an erased child's.
 
+**A problem's parts share one file** (Ken, 17 Oct 2026; `items.shared_file`, set by
+"Split into parts"). The parent holds the starter and solution, and every part's checks run
+against the whole file. Parts are still separate attempts, but saving any of them writes
+the code to all of them (`routers/student_work.py`), so marking and hand-in are unchanged.
+Problems made before this keep code per part. **Examples** (`items.examples`) are inputs
+the teacher types. The teacher's browser runs the solution with them at Check solution,
+and Publish stores the transcripts (`problem_bank.apply_transcripts`). A save keeps the
+inputs only, since writing a run back would make it stale. A child is sent the transcript,
+never the solution. My work's Lessons tab (`GET /me/problems`) lists lesson problems
+already started, because Today shows only the current lesson.
+
 **Help locks the child's editor** (`app/live/hub.py`, `Room.helping`): a teacher's
 `{type: "help", on}` locks it; the last helper stopping — or their socket going — unlocks
 it, and a reconnecting child is told the current state.

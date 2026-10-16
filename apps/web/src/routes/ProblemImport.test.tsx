@@ -113,7 +113,7 @@ function problem(id: string, solution: string): Schemas['ProblemOut'] {
     id, status: 'draft', version: 1, supersedes_id: null, source_key: null,
     updated_at: `2026-10-04T00:00:00.${id.slice(-1)}Z`, parts: [], publish_problems: [], publish_warnings: [],
     document: {
-      kind: 'code', options: [], title: id, prompt_md: '', difficulty: 1, concept_ids: [], primary_concept_id: null,
+      kind: 'code', options: [], shared_file: false, title: id, prompt_md: '', difficulty: 1, concept_ids: [], primary_concept_id: null,
       starter_code: '', solution_code: solution, hints: [], parts: [],
       tests: [{ kind: 'io', name: 't', hidden: true, stdin: '', expected: '1', match: 'exact' }],
     },

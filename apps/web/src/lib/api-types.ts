@@ -1621,6 +1621,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/problems": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Started Problems
+         * @description Every lesson problem the child has started, last worked on first (17 Oct 2026).
+         *
+         *     So a child can carry on at home with a problem from an earlier lesson: Today only shows
+         *     the class's current one. Classwork only — homework and quizzes have their own tabs.
+         *     Reached through the child's active enrolments and open assignments, as everything is.
+         */
+        get: operations["started_problems_me_problems_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/quiz": {
         parameters: {
             query?: never;
@@ -2784,6 +2808,19 @@ export interface components {
          * @enum {string}
          */
         EventType: "edit" | "run" | "check" | "error" | "paste" | "hint" | "submit" | "teacher_edit";
+        /**
+         * ExampleDoc
+         * @description A sample run a child can watch. `inputs` are typed in order, one per `input()`.
+         *
+         *     `transcript` is what the reference solution's run looked like, filled at publish; on a
+         *     draft it is always None.
+         */
+        ExampleDoc: {
+            /** Inputs */
+            inputs?: string[];
+            /** Transcript */
+            transcript?: components["schemas"]["TranscriptLine"][] | null;
+        };
         /** FeedbackOut */
         FeedbackOut: {
             /** Answer */
@@ -3445,6 +3482,8 @@ export interface components {
              * @default 1
              */
             difficulty: number;
+            /** Examples */
+            examples?: components["schemas"]["ExampleDoc"][];
             /** Hints */
             hints?: components["schemas"]["HintDoc"][];
             /** Label */
@@ -3543,6 +3582,8 @@ export interface components {
              * @default 1
              */
             difficulty: number;
+            /** Examples */
+            examples?: components["schemas"]["ExampleDoc"][];
             /** Hints */
             hints?: components["schemas"]["HintDoc"][];
             /**
@@ -3562,6 +3603,11 @@ export interface components {
              * @default
              */
             prompt_md: string;
+            /**
+             * Shared File
+             * @default false
+             */
+            shared_file: boolean;
             /**
              * Solution Code
              * @default
@@ -3645,6 +3691,10 @@ export interface components {
          *     proved something about a version that no longer exists.
          */
         PublishIn: {
+            /** Transcripts */
+            transcripts?: {
+                [key: string]: components["schemas"]["TranscriptLine"][][];
+            };
             /**
              * Verified Updated At
              * Format: date-time
@@ -3924,6 +3974,38 @@ export interface components {
          */
         SnippetStatus: "active" | "archived";
         /**
+         * StartedProblemOut
+         * @description A lesson problem the child has opened, for My work's Lessons tab.
+         */
+        StartedProblemOut: {
+            /**
+             * Assignment Id
+             * Format: uuid
+             */
+            assignment_id: string;
+            /**
+             * Item Id
+             * Format: uuid
+             */
+            item_id: string;
+            /** Lesson Title */
+            lesson_title: string;
+            /** Part Labels */
+            part_labels: string[];
+            /**
+             * Progress
+             * @enum {string}
+             */
+            progress: "started" | "passing";
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
          * StudentClassOut
          * @description One class a student has been in, from the student's side.
          */
@@ -4030,6 +4112,8 @@ export interface components {
         /** StudentLeafOut */
         StudentLeafOut: {
             attempt: components["schemas"]["AttemptOut"];
+            /** Examples */
+            examples: components["schemas"]["TranscriptLine"][][];
             /** Hints */
             hints: components["schemas"]["UnlockedHintOut"][];
             /**
@@ -4110,6 +4194,10 @@ export interface components {
             completions: boolean;
             /** Difficulty */
             difficulty: number;
+            /** Examples */
+            examples: components["schemas"]["TranscriptLine"][][];
+            /** File Attempt Id */
+            file_attempt_id: string | null;
             /**
              * Item Id
              * Format: uuid
@@ -4123,6 +4211,8 @@ export interface components {
             options: string[];
             /** Prompt Md */
             prompt_md: string;
+            /** Shared File */
+            shared_file: boolean;
             /** Title */
             title: string;
         };
@@ -4192,6 +4282,19 @@ export interface components {
             lesson_title: string | null;
             /** Problems */
             problems: components["schemas"]["LadderProblemOut"][];
+        };
+        /**
+         * TranscriptLine
+         * @description One piece of a sample run: what the program printed, or what was typed in.
+         */
+        TranscriptLine: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "out" | "in";
+            /** Text */
+            text: string;
         };
         /** UnitOut */
         UnitOut: {
@@ -7386,6 +7489,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TodayOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    started_problems_me_problems_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StartedProblemOut"][];
                 };
             };
             /** @description Validation Error */

@@ -28,8 +28,14 @@ from app.auth.principal import CurrentTeacher, Principal
 from app.db import get_session
 from app.models import Item, ItemConcept, ItemKind, ItemStatus, TestCase
 from app.problem_bank import (
+    MAX_EXAMPLES,
+    MAX_PARTS,
+    MAX_TRANSCRIPT_LINES,
     ProblemDoc,
+    TranscriptLine,
+    TranscriptMismatch,
     UnavailableConcept,
+    apply_transcripts,
     check_concepts,
     publish_problems,
     publish_warnings,
@@ -94,6 +100,15 @@ class PublishIn(BaseModel):
     """
 
     verified_updated_at: datetime
+    # The same run's sample runs: for each leaf with examples ("" for the problem itself,
+    # else the part's label), one transcript per example, in order.
+    transcripts: dict[
+        str,
+        Annotated[
+            list[Annotated[list[TranscriptLine], Field(max_length=MAX_TRANSCRIPT_LINES)]],
+            Field(max_length=MAX_EXAMPLES),
+        ],
+    ] = Field(default_factory=dict, max_length=MAX_PARTS + 1)
 
 
 class ImportIn(BaseModel):
@@ -327,6 +342,10 @@ async def publish_problem(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Not ready to publish yet: " + "; ".join(problems),
         )
+    try:
+        await apply_transcripts(session, principal, item, doc, body.transcripts)
+    except TranscriptMismatch as exc:
+        raise _conflict("The examples changed since they were run. Run them again.") from exc
 
     if item.supersedes_id is not None:
         previous = await get_owned_item(session, principal, item.supersedes_id)

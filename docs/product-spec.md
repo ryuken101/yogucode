@@ -149,6 +149,12 @@ Two fixes:
 - Provide starter code handling earlier steps, so the problem tests the target
   concept rather than everything at once.
 
+*(17 Oct 2026, Ken.)* Parts are worked in **one file** for the whole problem, which a
+child can save and carry on with at home. Each part keeps its own tag, checks and mark,
+and its checks run against the whole file. A problem or part can also show **examples**:
+sample runs of the reference solution, played back in a terminal so a child sees what
+the program asks, what they type, and what it prints.
+
 ### 3.4 Test cases and hints — *makes self-serve possible*
 
 - Each problem carries test cases giving instant pass/fail feedback.

@@ -1120,6 +1120,37 @@
         "title": "EventType",
         "type": "string"
       },
+      "ExampleDoc": {
+        "description": "A sample run a child can watch. `inputs` are typed in order, one per `input()`.\n\n`transcript` is what the reference solution's run looked like, filled at publish; on a\ndraft it is always None.",
+        "properties": {
+          "inputs": {
+            "items": {
+              "maxLength": 500,
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Inputs",
+            "type": "array"
+          },
+          "transcript": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TranscriptLine"
+                },
+                "maxItems": 400,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transcript"
+          }
+        },
+        "title": "ExampleDoc",
+        "type": "object"
+      },
       "FeedbackOut": {
         "properties": {
           "answer": {
@@ -2864,6 +2895,14 @@
             "title": "Difficulty",
             "type": "integer"
           },
+          "examples": {
+            "items": {
+              "$ref": "#/components/schemas/ExampleDoc"
+            },
+            "maxItems": 3,
+            "title": "Examples",
+            "type": "array"
+          },
           "hints": {
             "items": {
               "$ref": "#/components/schemas/HintDoc"
@@ -3118,6 +3157,14 @@
             "title": "Difficulty",
             "type": "integer"
           },
+          "examples": {
+            "items": {
+              "$ref": "#/components/schemas/ExampleDoc"
+            },
+            "maxItems": 3,
+            "title": "Examples",
+            "type": "array"
+          },
           "hints": {
             "items": {
               "$ref": "#/components/schemas/HintDoc"
@@ -3168,6 +3215,11 @@
             "maxLength": 20000,
             "title": "Prompt Md",
             "type": "string"
+          },
+          "shared_file": {
+            "default": false,
+            "title": "Shared File",
+            "type": "boolean"
           },
           "solution_code": {
             "default": "",
@@ -3380,6 +3432,22 @@
       "PublishIn": {
         "description": "Proof the teacher's browser ran the solution against the tests of *this* version.\n\n`verified_updated_at` is the `updated_at` the editor had when its run passed. A save\nin another tab since then moves `updated_at`, and the publish is refused \u2014 the run\nproved something about a version that no longer exists.",
         "properties": {
+          "transcripts": {
+            "additionalProperties": {
+              "items": {
+                "items": {
+                  "$ref": "#/components/schemas/TranscriptLine"
+                },
+                "maxItems": 400,
+                "type": "array"
+              },
+              "maxItems": 3,
+              "type": "array"
+            },
+            "maxProperties": 7,
+            "title": "Transcripts",
+            "type": "object"
+          },
           "verified_updated_at": {
             "format": "date-time",
             "title": "Verified Updated At",
@@ -4147,6 +4215,60 @@
         "title": "SnippetStatus",
         "type": "string"
       },
+      "StartedProblemOut": {
+        "description": "A lesson problem the child has opened, for My work's Lessons tab.",
+        "properties": {
+          "assignment_id": {
+            "format": "uuid",
+            "title": "Assignment Id",
+            "type": "string"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "lesson_title": {
+            "title": "Lesson Title",
+            "type": "string"
+          },
+          "part_labels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Part Labels",
+            "type": "array"
+          },
+          "progress": {
+            "enum": [
+              "started",
+              "passing"
+            ],
+            "title": "Progress",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assignment_id",
+          "item_id",
+          "lesson_title",
+          "title",
+          "part_labels",
+          "progress",
+          "updated_at"
+        ],
+        "title": "StartedProblemOut",
+        "type": "object"
+      },
       "StudentClassOut": {
         "description": "One class a student has been in, from the student's side.",
         "properties": {
@@ -4368,6 +4490,16 @@
           "attempt": {
             "$ref": "#/components/schemas/AttemptOut"
           },
+          "examples": {
+            "items": {
+              "items": {
+                "$ref": "#/components/schemas/TranscriptLine"
+              },
+              "type": "array"
+            },
+            "title": "Examples",
+            "type": "array"
+          },
           "hints": {
             "items": {
               "$ref": "#/components/schemas/UnlockedHintOut"
@@ -4425,6 +4557,7 @@
           "label",
           "prompt_md",
           "tests",
+          "examples",
           "hints",
           "next_hint",
           "attempt"
@@ -4566,6 +4699,28 @@
             "title": "Difficulty",
             "type": "integer"
           },
+          "examples": {
+            "items": {
+              "items": {
+                "$ref": "#/components/schemas/TranscriptLine"
+              },
+              "type": "array"
+            },
+            "title": "Examples",
+            "type": "array"
+          },
+          "file_attempt_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Attempt Id"
+          },
           "item_id": {
             "format": "uuid",
             "title": "Item Id",
@@ -4595,6 +4750,10 @@
             "title": "Prompt Md",
             "type": "string"
           },
+          "shared_file": {
+            "title": "Shared File",
+            "type": "boolean"
+          },
           "title": {
             "title": "Title",
             "type": "string"
@@ -4611,6 +4770,9 @@
           "completions",
           "checks",
           "options",
+          "examples",
+          "shared_file",
+          "file_attempt_id",
           "leaves"
         ],
         "title": "StudentProblemOut",
@@ -4795,6 +4957,30 @@
           "problems"
         ],
         "title": "TodayOut",
+        "type": "object"
+      },
+      "TranscriptLine": {
+        "description": "One piece of a sample run: what the program printed, or what was typed in.",
+        "properties": {
+          "kind": {
+            "enum": [
+              "out",
+              "in"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "text": {
+            "maxLength": 10000,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "text"
+        ],
+        "title": "TranscriptLine",
         "type": "object"
       },
       "UnitOut": {
@@ -10729,6 +10915,60 @@
           }
         },
         "summary": "Todays Lesson",
+        "tags": [
+          "student work"
+        ]
+      }
+    },
+    "/me/problems": {
+      "get": {
+        "description": "Every lesson problem the child has started, last worked on first (17 Oct 2026).\n\nSo a child can carry on at home with a problem from an earlier lesson: Today only shows\nthe class's current one. Classwork only \u2014 homework and quizzes have their own tabs.\nReached through the child's active enrolments and open assignments, as everything is.",
+        "operationId": "started_problems_me_problems_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StartedProblemOut"
+                  },
+                  "title": "Response Started Problems Me Problems Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Started Problems",
         "tags": [
           "student work"
         ]

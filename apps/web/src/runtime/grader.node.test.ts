@@ -13,9 +13,12 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { loadPyodide, type PyodideInterface } from 'pyodide'
 import { beforeAll, expect, test } from 'vitest'
-import type { TestCheck, TestRun } from './protocol'
+import type { ExampleRun, TestCheck, TestRun } from './protocol'
 
-let grader: { run_tests(code: string, tests: string): string }
+let grader: {
+  run_tests(code: string, tests: string): string
+  run_example(code: string, inputs: string): string
+}
 
 beforeAll(async () => {
   const pyodide: PyodideInterface = await loadPyodide()
@@ -129,4 +132,39 @@ test('a teacher’s invalid expected value fails that test with a clear message'
 test('a hidden test says whether it passed and nothing else', () => {
   const run = check('print(4)', [io('5', { hidden: true })])
   expect(run.results[0]).toEqual({ name: 'it prints', hidden: true, passed: false })
+})
+
+/* --- examples: a sample run, as a child would see it ----------------------------------- */
+
+function example(code: string, inputs: string[]): ExampleRun {
+  return JSON.parse(grader.run_example(code, JSON.stringify(inputs))) as ExampleRun
+}
+
+test('an example interleaves the prompts, what was typed, and what was printed', () => {
+  const run = example('name = input("Name? ")\nage = input("Age? ")\nprint("Hi", name, age)\n', [
+    'Ken',
+    '9',
+  ])
+  expect(run).toEqual({
+    error: null,
+    transcript: [
+      { kind: 'out', text: 'Name? ' },
+      { kind: 'in', text: 'Ken' },
+      { kind: 'out', text: 'Age? ' },
+      { kind: 'in', text: '9' },
+      { kind: 'out', text: 'Hi Ken 9\n' },
+    ],
+  })
+})
+
+test('an example that runs out of inputs stops and says so', () => {
+  const run = example('a = input("A? ")\nb = input("B? ")\nprint(a + b)\n', ['1'])
+  expect(run.transcript.map((piece) => piece.text)).toEqual(['A? ', '1', 'B? '])
+  expect(run.error).toMatch(/more input/)
+})
+
+test('an example of a program that does not parse has nothing to show', () => {
+  const run = example('print(', [])
+  expect(run.transcript).toEqual([])
+  expect(run.error).toMatch(/^SyntaxError/)
 })

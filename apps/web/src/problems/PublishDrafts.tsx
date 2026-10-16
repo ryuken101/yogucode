@@ -19,7 +19,7 @@ import { api, type Schemas } from '../lib/api'
 import { messageFor } from '../lib/errors'
 import { keys } from '../lib/queries'
 import { usePython } from '../runtime/usePython'
-import { allLeavesPass, verifyProblem } from './verify'
+import { allLeavesPass, transcriptsOf, verifyProblem } from './verify'
 
 interface Outcome {
   id: string
@@ -48,9 +48,9 @@ export function PublishDrafts({ drafts }: { drafts: Schemas['ProblemSummaryOut']
           await api.publishProblem(problem.id, problem.updated_at)
           outcome = { id: draft.id, title: draft.title, published: true }
         } else {
-          const verification = await verifyProblem(python.check, problem)
+          const verification = await verifyProblem(python, problem)
           if (allLeavesPass(problem, verification)) {
-            await api.publishProblem(problem.id, verification.updatedAt)
+            await api.publishProblem(problem.id, verification.updatedAt, transcriptsOf(verification))
             outcome = { id: draft.id, title: draft.title, published: true }
           } else {
             outcome = {

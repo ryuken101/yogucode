@@ -55,8 +55,9 @@ function opened(problemId: string, attemptId: string, code: string): Schemas['St
   return {
     assignment_id: HW, item_id: problemId, title: '', prompt_md: '', difficulty: 1,
     mode: 'homework', completions: true, kind: 'code', checks: true, options: [],
+    examples: [], shared_file: false, file_attempt_id: null,
     leaves: [{
-      item_id: problemId, label: null, prompt_md: '', tests: [test1], hints: [], next_hint: null,
+      item_id: problemId, label: null, prompt_md: '', tests: [test1], examples: [], hints: [], next_hint: null,
       attempt: { id: attemptId, code, status: 'in_progress', run_count: 0, last_passed: null, last_total: null, choice: null },
     }],
   }

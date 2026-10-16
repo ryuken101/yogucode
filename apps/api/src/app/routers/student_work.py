@@ -8,7 +8,13 @@ reached only through a class the child is actively enrolled in (`app.scoping`).
 test cases — hidden ones included, because the tests run in their browser and a test
 cannot be run without its expected value. That is the accepted trade-off of running code
 client-side (spec §4: not an anti-cheat product). Never sent: the reference solution, and
-any hint rung they have not unlocked.
+any hint rung they have not unlocked. Examples go as their transcripts only — what the
+solution printed, never the solution.
+
+**A shared-file problem is one program across its parts** (17 Oct 2026). Each part keeps
+its own attempt — its checks, hints and marks are its own — but the code in them is one
+file: it starts from the problem's starter, and saving any of them writes all of them, so
+everything downstream that reads `attempt.code` (marking, hand-in, progress) is unchanged.
 
 **The server decides hint unlocks.** A rung opens after enough runs or enough minutes on
 the problem, whichever comes first (spec §3.4). `run_count` is counted here, from the
@@ -38,6 +44,8 @@ from app.models import (
     AssignmentStatus,
     Attempt,
     AttemptStatus,
+    Enrolment,
+    EnrolmentStatus,
     Item,
     ItemKind,
     Lesson,
@@ -46,7 +54,14 @@ from app.models import (
     SubmissionSource,
 )
 from app.models.base import utcnow
-from app.problem_bank import FunctionTest, IoTest, LeafDoc, read_document
+from app.problem_bank import (
+    ExampleDoc,
+    FunctionTest,
+    IoTest,
+    LeafDoc,
+    TranscriptLine,
+    read_document,
+)
 from app.quiz import is_running, running_quiz_for
 from app.routers.documents import MAX_CONTENT_BYTES
 from app.scoping import get_own_attempt, get_student_assignment, get_student_class
@@ -112,11 +127,17 @@ class NextHintOut(BaseModel):
     seconds_needed: int
 
 
+def transcripts(examples: list[ExampleDoc]) -> list[list[TranscriptLine]]:
+    """The examples a child can watch: those with a run on them, as the run alone."""
+    return [example.transcript for example in examples if example.transcript]
+
+
 class StudentLeafOut(BaseModel):
     item_id: uuid.UUID
     label: str | None
     prompt_md: str
     tests: list[IoTest | FunctionTest]
+    examples: list[list[TranscriptLine]]
     hints: list[UnlockedHintOut]
     next_hint: NextHintOut | None
     attempt: AttemptOut
@@ -136,6 +157,11 @@ class StudentProblemOut(BaseModel):
     # Multiple choice: the answers' texts, in order — never which is right, never the
     # misconceptions. Those are for the teacher.
     options: list[str]
+    # Examples of the whole program, shown above the parts.
+    examples: list[list[TranscriptLine]]
+    # One file for every part: `file_attempt_id` is the attempt the editor saves to.
+    shared_file: bool
+    file_attempt_id: uuid.UUID | None
     leaves: list[StudentLeafOut]
 
 
@@ -344,7 +370,12 @@ async def open_problem(
         if part_rows
         else [(doc, None, "")]
     )
-    attempts = [await open_attempt(session, principal, assignment, row) for row in leaf_rows]
+    # A shared file starts from the problem's starter; per-part code from each part's own.
+    starter = item.starter_code if doc.shared_file else None
+    attempts = [
+        await open_attempt(session, principal, assignment, row, starter=starter)
+        for row in leaf_rows
+    ]
     await session.commit()
 
     hints_on = bool(assignment.settings.get("hints", True))
@@ -357,6 +388,7 @@ async def open_problem(
                 label=label,
                 prompt_md=prompt,
                 tests=leaf.tests,
+                examples=transcripts(leaf.examples),
                 hints=hints,
                 next_hint=next_hint,
                 attempt=AttemptOut.build(attempt),
@@ -373,6 +405,9 @@ async def open_problem(
         difficulty=item.difficulty,
         mode=assignment.mode,
         completions=bool(assignment.settings.get("completions", True)),
+        examples=transcripts(doc.examples),
+        shared_file=doc.shared_file,
+        file_attempt_id=attempts[0].id if doc.shared_file else None,
         leaves=leaves,
     )
 
@@ -384,11 +419,36 @@ async def save_attempt(
     """Autosave. Like a file save, a save that changes nothing writes nothing."""
     attempt, _ = await _writable_attempt(session, principal, attempt_id)
     if body.code != attempt.code:
-        attempt.code = body.code
-        session.add(attempt)
+        for row in await _same_file(session, principal, attempt):
+            row.code = body.code
+            session.add(row)
         await session.commit()
         await session.refresh(attempt)
     return AttemptOut.build(attempt)
+
+
+async def _same_file(
+    session: AsyncSession, principal: CurrentStudent, attempt: Attempt
+) -> list[Attempt]:
+    """The attempts holding the same file as this one: itself, plus — for a part of a
+    shared-file problem — the child's attempts at the other parts in this assignment."""
+    item = await session.get(Item, attempt.item_id)
+    parent = await session.get(Item, item.parent_id) if item and item.parent_id else None
+    if parent is None or not parent.shared_file:
+        return [attempt]
+    siblings = (
+        await session.exec(
+            select(Attempt)
+            .join(Item, col(Item.id) == Attempt.item_id)
+            .where(
+                Item.parent_id == parent.id,
+                Attempt.assignment_id == attempt.assignment_id,
+                Attempt.student_id == principal.subject_id,
+                Attempt.centre_id == principal.centre_id,
+            )
+        )
+    ).all()
+    return list({row.id: row for row in [attempt, *siblings]}.values())
 
 
 @router.put("/attempts/{attempt_id}/choice", response_model=AttemptOut)
@@ -476,6 +536,7 @@ async def unlock_hint(
         label=label,
         prompt_md=prompt,
         tests=leaf_doc.tests,
+        examples=transcripts(leaf_doc.examples),
         hints=hints,
         next_hint=next_hint,
         attempt=AttemptOut.build(attempt),
@@ -731,3 +792,82 @@ async def home(principal: CurrentStudent, session: SessionDep) -> HomeOut:
     far = datetime.max.replace(tzinfo=UTC)
     cards.sort(key=lambda c: (c.returned, c.due_at or far))
     return HomeOut(today=today, homework=cards)
+
+
+class StartedProblemOut(BaseModel):
+    """A lesson problem the child has opened, for My work's Lessons tab."""
+
+    assignment_id: uuid.UUID
+    item_id: uuid.UUID
+    lesson_title: str
+    title: str
+    part_labels: list[str]
+    progress: Literal["started", "passing"]
+    updated_at: datetime
+
+
+@router.get("/problems", response_model=list[StartedProblemOut])
+async def started_problems(
+    principal: CurrentStudent, session: SessionDep
+) -> list[StartedProblemOut]:
+    """Every lesson problem the child has started, last worked on first (17 Oct 2026).
+
+    So a child can carry on at home with a problem from an earlier lesson: Today only shows
+    the class's current one. Classwork only — homework and quizzes have their own tabs.
+    Reached through the child's active enrolments and open assignments, as everything is.
+    """
+    rows = (
+        await session.exec(
+            select(Attempt, Item, Assignment)
+            .join(Item, col(Item.id) == Attempt.item_id)
+            .join(Assignment, col(Assignment.id) == Attempt.assignment_id)
+            .join(Enrolment, col(Enrolment.class_id) == Assignment.class_id)
+            .where(
+                Attempt.student_id == principal.subject_id,
+                Attempt.centre_id == principal.centre_id,
+                Assignment.centre_id == principal.centre_id,
+                Assignment.mode == AssignmentMode.CLASSWORK,
+                Assignment.status == AssignmentStatus.OPEN,
+                Enrolment.student_id == principal.subject_id,
+                Enrolment.status == EnrolmentStatus.ACTIVE,
+            )
+        )
+    ).all()
+    if not rows:
+        return []
+    parent_ids = {item.parent_id for _, item, _ in rows if item.parent_id is not None}
+    parents = {
+        p.id: p
+        for p in (
+            await session.exec(
+                select(Item).where(
+                    col(Item.id).in_(parent_ids), Item.centre_id == principal.centre_id
+                )
+            )
+        ).all()
+    }
+    grouped: dict[tuple[uuid.UUID, uuid.UUID], dict] = {}
+    for attempt, item, assignment in rows:
+        problem = parents.get(item.parent_id, item) if item.parent_id else item
+        entry = grouped.setdefault(
+            (assignment.id, problem.id),
+            {"assignment": assignment, "problem": problem, "attempts": [], "labels": []},
+        )
+        entry["attempts"].append(attempt)
+        if item.part_label:
+            entry["labels"].append(item.part_label)
+    out = [
+        StartedProblemOut(
+            assignment_id=entry["assignment"].id,
+            item_id=entry["problem"].id,
+            lesson_title=entry["assignment"].title,
+            title=entry["problem"].title,
+            part_labels=sorted(entry["labels"]),
+            progress="passing"
+            if all(a.last_total and a.last_passed == a.last_total for a in entry["attempts"])
+            else "started",
+            updated_at=max(a.updated_at for a in entry["attempts"]),
+        )
+        for entry in grouped.values()
+    ]
+    return sorted(out, key=lambda p: p.updated_at, reverse=True)

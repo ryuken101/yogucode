@@ -12,8 +12,12 @@
  * Check result is what the teacher's progress view shows. The code autosaves through the
  * same hook as a file, so leaving mid-sentence costs nothing.
  *
- * A problem with parts shows them as tabs. Each part is its own attempt with its own code,
- * so part (b) can be done before part (a) — the point of parts (spec §3.3).
+ * A problem with parts shows them as tabs. Each part is its own attempt — its checks,
+ * hints and marks are its own, so part (b) can be done before part (a) (spec §3.3). On a
+ * **shared file** (17 Oct 2026) the code is one program for every part: the editor, its
+ * autosave and the live stream stay on the file's attempt while the tabs change, and a
+ * Check runs the active part's checks against the whole file. Older problems keep code
+ * per part.
  */
 
 import { useEffect, useRef, useState } from 'react'
@@ -31,7 +35,8 @@ import { api, type Schemas } from '../lib/api'
 import { messageFor } from '../lib/errors'
 import { useStudentProblem } from '../lib/queries'
 import { toChecks } from '../problems/doc'
-import { PassingSummary, TestResultLine } from '../problems/TestResults'
+import { ChecksPanel } from '../problems/ChecksPanel'
+import { ProblemBrief } from '../problems/ProblemBrief'
 import type { TestRun } from '../runtime/protocol'
 import { studentLive } from '../collab/socket'
 import { useLiveDoc } from '../collab/useLiveDoc'
@@ -95,9 +100,16 @@ export function ProblemAttempt() {
 
   const navigate = useNavigate()
   const leaf = leaves[active]
-  const autosave = useAutosave(leaf?.attempt.id ?? null, (id, code) => api.saveAttempt(id, code))
-  // The process trace for this part (step 7): every edit, run, check, error and hint.
-  const record = useEventRecorder(leaf ? { attemptId: leaf.attempt.id } : null)
+  const shared = Boolean(problem.data?.shared_file)
+  // The attempt the editor is: the file's on a shared file, else the active part's.
+  const fileAttemptId = shared ? (problem.data?.file_attempt_id ?? null) : (leaf?.attempt.id ?? null)
+  // Where this visit's latest text is kept: one slot for a shared file, one per part else.
+  const codeKey = shared ? 'file' : (leaf?.item_id ?? '')
+  const startingCode = shared ? (leaves[0]?.attempt.code ?? '') : (leaf?.attempt.code ?? '')
+  const autosave = useAutosave(fileAttemptId, (id, code) => api.saveAttempt(id, code))
+  // The process trace (step 7): every edit, run, check, error and hint — on the file's
+  // attempt for a shared file, so its edit history is one history.
+  const record = useEventRecorder(fileAttemptId ? { attemptId: fileAttemptId } : null)
   const python = usePython({
     onRunFinished: ({ ok, interrupted, stderr }) => {
       if (!ok && !interrupted) {
@@ -119,11 +131,8 @@ export function ProblemAttempt() {
     [quizMode, assignmentId],
   )
   // The live classroom: this part's code streams to the teacher, who can type into it.
-  const liveTarget = leaf ? `attempt:${leaf.attempt.id}` : null
-  const live = useLiveDoc(
-    liveTarget,
-    leaf ? (latest.current[leaf.item_id] ?? leaf.attempt.code) : null,
-  )
+  const liveTarget = fileAttemptId ? `attempt:${fileAttemptId}` : null
+  const live = useLiveDoc(liveTarget, leaf ? (latest.current[codeKey] ?? startingCode) : null)
   const title = problem.data
     ? `${problem.data.title}${leaf?.label ? ` (${leaf.label})` : ''}`
     : null
@@ -143,10 +152,10 @@ export function ProblemAttempt() {
   }, [problem.data])
 
   useEffect(() => {
-    if (leaf) autosave.adopt(leaf.attempt.id, latest.current[leaf.item_id] ?? leaf.attempt.code)
-    // `adopt` is stable; re-adopt only when the part changes.
+    if (fileAttemptId) autosave.adopt(fileAttemptId, latest.current[codeKey] ?? startingCode)
+    // `adopt` is stable; re-adopt only when the file changes — on a shared file, never.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leaf?.attempt.id])
+  }, [fileAttemptId])
 
   if (problem.isPending) return <Spinner label="Opening the problem" />
   if (problem.error) {
@@ -190,7 +199,7 @@ export function ProblemAttempt() {
   if (!leaf) return null
 
   const data = problem.data
-  const code = latest.current[leaf.item_id] ?? leaf.attempt.code
+  const code = latest.current[codeKey] ?? startingCode
   const busy = ['running', 'asking', 'checking'].includes(python.state.status)
   const loading = python.state.status === 'loading'
   const run = results[leaf.item_id]
@@ -223,6 +232,7 @@ export function ProblemAttempt() {
         compile_error: outcome.compile_error,
       })
       record('check', {
+        ...(shared ? { part: leaf.label } : {}),
         passed,
         total: outcome.results.length,
         compile_error: outcome.compile_error,
@@ -257,62 +267,27 @@ export function ProblemAttempt() {
     <div className="grid h-full gap-3 p-3 lg:grid-cols-[2fr_3fr]">
       {/* Left: what to do, how it is going, and help. Scrolls on its own. */}
       <div className="flex min-h-0 flex-col gap-4 overflow-y-auto rounded-lg bg-surface p-4 ring-1 ring-line">
-        <div>
-          <BackLink mode={data.mode} assignmentId={assignmentId} />
-          <div className="mt-2 flex items-center gap-3">
-            <Dots value={data.difficulty} />
-            <h1 className="font-display font-semibold text-xl text-grape">{data.title}</h1>
-          </div>
-          <Markdown>{data.prompt_md}</Markdown>
-        </div>
+        <ProblemBrief
+          top={<BackLink mode={data.mode} assignmentId={assignmentId} />}
+          title={data.title}
+          difficulty={data.difficulty}
+          prompt_md={data.prompt_md}
+          examples={data.examples}
+          parts={leaves.map((part) => ({
+            key: part.item_id,
+            label: part.label,
+            prompt_md: part.prompt_md,
+            examples: part.examples,
+          }))}
+          active={active}
+          onSelect={(index) => {
+            autosave.flush()
+            setActive(index)
+            setHintMessage(null)
+          }}
+        />
 
-        {leaves.length > 1 ? (
-          <div role="tablist" aria-label="Parts" className="flex gap-1">
-            {leaves.map((part, index) => (
-              <button
-                key={part.item_id}
-                role="tab"
-                aria-selected={index === active}
-                onClick={() => {
-                  autosave.flush()
-                  setActive(index)
-                  setHintMessage(null)
-                }}
-                className={`rounded-lg px-3 py-1.5 text-sm ring-1 ${
-                  index === active ? 'bg-grape-pale ring-grape' : 'bg-surface ring-grape/20'
-                }`}
-              >
-                Part ({part.label})
-              </button>
-            ))}
-          </div>
-        ) : null}
-        {leaf.prompt_md ? <Markdown>{leaf.prompt_md}</Markdown> : null}
-
-        <section aria-label="Checks" className="flex flex-col gap-2">
-          <h2 className="font-display font-semibold text-lg text-grape">Checks</h2>
-          {!data.checks ? (
-            <p className="text-sm text-muted">
-              Checks are off for this quiz — use Run to try your code yourself.
-            </p>
-          ) : run === undefined ? (
-            <p className="text-sm text-muted">
-              Press <strong>Check</strong> to see how your code does on {leaf.tests.length}{' '}
-              check{leaf.tests.length === 1 ? '' : 's'}.
-            </p>
-          ) : run === null ? (
-            <Notice tone="not-yet">The check was stopped before it finished.</Notice>
-          ) : (
-            <>
-              <PassingSummary results={run.results} />
-              {run.compile_error ? (
-                <Notice tone="not-yet">Python could not read your code: {run.compile_error}</Notice>
-              ) : (
-                run.results.map((result, index) => <TestResultLine key={index} result={result} />)
-              )}
-            </>
-          )}
-        </section>
+        <ChecksPanel enabled={data.checks} count={leaf.tests.length} run={run} sharedFile={shared} />
 
         {leaf.hints.length > 0 || leaf.next_hint ? (
           <section aria-label="Hints" className="flex flex-col gap-2">
@@ -374,13 +349,13 @@ export function ProblemAttempt() {
           <CodeSurface
             // One editor per part: Monaco's undo stack must not carry one part's history
             // into another.
-            key={leaf.item_id}
+            key={codeKey}
             value={code}
             completions={data.completions}
             // Locked while the teacher helps (Ken's decision, 11 Oct 2026).
             readOnly={live.locked}
             onChange={(next) => {
-              latest.current[leaf.item_id] = next
+              latest.current[codeKey] = next
               autosave.onChange(next)
             }}
             onModel={live.bind}

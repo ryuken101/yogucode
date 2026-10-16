@@ -204,7 +204,7 @@ const STUDENT: AppDef[] = [
   {
     id: 'work',
     label: 'Work',
-    hint: 'Homework and quizzes',
+    hint: 'Homework, quizzes, and lessons to finish',
     icon: ClipboardList,
     tile: 'bg-grape-pale text-grape',
     owns: [/^\/my-work$/, /^\/homework\//, /^\/quiz\//],
@@ -213,12 +213,19 @@ const STUDENT: AppDef[] = [
       {
         label: 'Homework',
         to: '/my-work',
-        active: (p, s) => p.startsWith('/homework/') || (p === '/my-work' && tabParam(s) !== 'quizzes'),
+        active: (p, s) => p.startsWith('/homework/') || (p === '/my-work' && tabParam(s) === null),
       },
       {
         label: 'Quizzes',
         to: '/my-work?tab=quizzes',
         active: (p, s) => p.startsWith('/quiz/') || (p === '/my-work' && tabParam(s) === 'quizzes'),
+      },
+      {
+        // Lesson problems already started, to finish at home (17 Oct 2026). They open in
+        // the Lessons app, where every lesson problem is worked.
+        label: 'Lessons',
+        to: '/my-work?tab=lessons',
+        active: (p, s) => p === '/my-work' && tabParam(s) === 'lessons',
       },
     ],
   },

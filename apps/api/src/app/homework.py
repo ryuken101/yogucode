@@ -152,7 +152,9 @@ async def hand_in(
     late = assignment.due_at is not None and now > assignment.due_at
     submissions = []
     for leaf in await set_leaves(session, principal, assignment.set_id):
-        attempt = await open_attempt(session, principal, assignment, leaf.leaf)
+        # A part of a shared-file problem starts, like its siblings, from the problem's file.
+        starter = leaf.problem.starter_code if leaf.problem.shared_file else None
+        attempt = await open_attempt(session, principal, assignment, leaf.leaf, starter=starter)
         passed, total = results.get(attempt.id, (None, None))
         submission = Submission(
             centre_id=principal.centre_id,

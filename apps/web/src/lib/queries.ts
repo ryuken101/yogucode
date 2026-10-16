@@ -46,6 +46,7 @@ export const keys = {
   ladder: (lessonId: string) => ['ladder', lessonId] as const,
   today: ['today'] as const,
   home: ['home'] as const,
+  startedProblems: ['started-problems'] as const,
   activeQuiz: ['active-quiz'] as const,
   quizzes: (classId: string) => ['quizzes', classId] as const,
   quiz: (quizId: string) => ['quiz', quizId] as const,
@@ -661,6 +662,11 @@ export function useStudentProblem(assignmentId: string, itemId: string) {
 
 export function useHome() {
   return useQuery({ queryKey: keys.home, queryFn: api.home })
+}
+
+/** Lesson problems the child has started, last worked on first — My work's Lessons tab. */
+export function useStartedProblems(enabled = true) {
+  return useQuery({ queryKey: keys.startedProblems, queryFn: api.startedProblems, enabled })
 }
 
 export function useSheet(assignmentId: string) {

@@ -41,6 +41,7 @@ function leaf(overrides: Partial<Schemas['StudentLeafOut']> = {}): Schemas['Stud
       { kind: 'io', name: 'prints it', hidden: false, stdin: '', expected: '[1, 2, 3, 5]', match: 'exact' },
       { kind: 'io', name: 'secret', hidden: true, stdin: '', expected: '5', match: 'contains' },
     ],
+    examples: [],
     hints: [],
     next_hint: { level: 1, available: false, runs_needed: 1, seconds_needed: 120 },
     attempt: { id: ATTEMPT, code: 'numbers = [1, 2, 3]\n', status: 'in_progress', run_count: 0, last_passed: null, last_total: null, choice: null },
@@ -56,6 +57,7 @@ const problem = (): Schemas['StudentProblemOut'] => ({
   difficulty: 1,
   mode: 'classwork',
   completions: true, kind: 'code', checks: true, options: [],
+  examples: [], shared_file: false, file_attempt_id: null,
   leaves: [leaf()],
 })
 
@@ -162,4 +164,42 @@ test('typing saves the attempt', async () => {
   await user.type(editor, 'numbers.append(5)')
 
   await waitFor(() => expect(saves.at(-1)).toContain('numbers.append(5)'), { timeout: 4000 })
+})
+
+test('on a shared file, the parts are one program: switching keeps the code, checks stay per part', async () => {
+  const PART_B = '018f0000-0000-7000-8000-0000000000d4'
+  const ATTEMPT_B = '018f0000-0000-7000-8000-0000000000d5'
+  const partB = leaf({
+    item_id: PART_B,
+    label: 'b',
+    prompt_md: 'Now triple it.',
+    attempt: { ...leaf().attempt, id: ATTEMPT_B },
+  })
+  const bRuns: Schemas['RunIn'][] = []
+  server.use(
+    http.post(`/api/me/assignments/${ASSIGNMENT}/items/${ITEM}/open`, () =>
+      HttpResponse.json({
+        ...problem(),
+        shared_file: true,
+        file_attempt_id: ATTEMPT,
+        leaves: [leaf({ label: 'a', prompt_md: 'Double it.' }), partB],
+      }),
+    ),
+    http.post(`/api/me/attempts/${ATTEMPT_B}/runs`, async ({ request }) => {
+      bRuns.push((await request.json()) as Schemas['RunIn'])
+      return HttpResponse.json(partB.attempt)
+    }),
+  )
+  check.mockResolvedValue({ compile_error: null, results: [{ name: 'prints it', hidden: false, passed: true }] })
+  const { user } = renderAttempt()
+  await user.type(await screen.findByLabelText('Your program'), 'x = 1')
+  await user.click(screen.getByRole('tab', { name: 'Part (b)' }))
+
+  expect(screen.getByText('Now triple it.')).toBeInTheDocument()
+  expect(screen.getByLabelText('Your program')).toHaveValue('numbers = [1, 2, 3]\nx = 1')
+  await user.click(screen.getByRole('button', { name: 'Check' }))
+  await waitFor(() => expect(bRuns).toEqual([{ passed: 1, total: 1 }]))
+  expect(check.mock.calls[0]![0]).toBe('numbers = [1, 2, 3]\nx = 1')
+  // Everything typed went to the one file's attempt.
+  await waitFor(() => expect(saves.at(-1)).toBe('numbers = [1, 2, 3]\nx = 1'))
 })

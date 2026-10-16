@@ -14,6 +14,12 @@
  *   timestamp, so a second tab cannot slip a stale run through either.
  * - **Nothing a teacher's solution fails is shown as an error.** It is "not yet", like a
  *   child's.
+ *
+ * Since 17 Oct 2026 (Ken): splitting into parts makes **one file** for them all — the
+ * starter and solution stay on the problem, every part's checks run against the whole
+ * file — and a problem or part can have **examples**, sample runs of the solution that a
+ * child watches. Check solution runs those too, and Publish sends what they printed.
+ * "Preview as student" opens the problem as a child would see it, from what is on screen.
  */
 
 import { useEffect, useMemo, useState } from 'react'
@@ -23,26 +29,28 @@ import { Button } from '../components/Button'
 import { Card, PageHeader } from '../components/Card'
 import { Dialog } from '../components/Dialog'
 import { DotsPicker } from '../components/Dots'
-import { TextInput, Textarea } from '../components/Field'
-import { Markdown } from '../components/Markdown'
+import { TextInput } from '../components/Field'
 import { Notice } from '../components/Notice'
 import { Spinner } from '../components/Spinner'
 import { api, type Schemas } from '../lib/api'
 import { messageFor } from '../lib/errors'
 import { useConcepts, useProblem, useProblemMutation } from '../lib/queries'
 import {
-  emptyLeaf,
   emptyPart,
   emptyProblem,
+  isSharedFile,
   leavesOf,
   nextPartLabel,
   type LeafDoc,
   type ProblemDoc,
 } from '../problems/doc'
 import { ConceptPicker } from '../problems/ConceptPicker'
-import { LeafEditor } from '../problems/LeafEditor'
+import { ExamplesEditor } from '../problems/ExamplesEditor'
+import { CodeBox, LeafEditor } from '../problems/LeafEditor'
 import { McqEditor } from '../problems/McqEditor'
-import { runPassed, verifyProblem, type Verification } from '../problems/verify'
+import { PromptField } from '../problems/PromptField'
+import { StudentPreview } from '../problems/StudentPreview'
+import { runPassed, transcriptsOf, verifyProblem, type Verification } from '../problems/verify'
 import { usePython } from '../runtime/usePython'
 
 const STATUS_BADGE: Record<Schemas['ItemStatus'], { label: string; variant: 'active' | 'good' | 'muted' }> = {
@@ -63,13 +71,13 @@ export function ProblemEditor() {
   const [savedJson, setSavedJson] = useState<string | null>(null)
   const [verification, setVerification] = useState<Verification | null>(null)
   const [checking, setChecking] = useState(false)
-  const [preview, setPreview] = useState(false)
+  const [studentPreview, setStudentPreview] = useState(false)
   const [confirmArchive, setConfirmArchive] = useState(false)
 
   const create = useProblemMutation((body: ProblemDoc) => api.createProblem(body))
   const save = useProblemMutation((body: ProblemDoc) => api.saveProblem(itemId ?? '', body))
-  const publish = useProblemMutation((updatedAt: string) =>
-    api.publishProblem(itemId ?? '', updatedAt),
+  const publish = useProblemMutation((run: Verification | { updatedAt: string }) =>
+    api.publishProblem(itemId ?? '', run.updatedAt, 'examples' in run ? transcriptsOf(run) : {}),
   )
   const newVersion = useProblemMutation(() => api.newProblemVersion(itemId ?? ''))
   const archive = useProblemMutation(() => api.archiveProblem(itemId ?? ''))
@@ -91,7 +99,12 @@ export function ProblemEditor() {
   const leaves = useMemo(() => (doc ? leavesOf(doc) : []), [doc])
   const verified =
     verification !== null && !dirty && loaded !== undefined && verification.updatedAt === loaded.updated_at
-  const allPass = verified && leaves.every((leaf) => runPassed(verification.runs[leaf.key]))
+  const allPass =
+    verified &&
+    leaves.every((leaf) => runPassed(verification.runs[leaf.key])) &&
+    Object.values(verification.examples).every((runs) => runs.every((run) => run !== null))
+  const shared = doc ? isSharedFile(doc) : false
+  const exampleRuns = (key: string) => (verified ? verification.examples[key] : undefined)
   const gaps = loaded && !dirty ? loaded.publish_problems : []
   const warnings = loaded && !dirty ? loaded.publish_warnings : []
   // A multiple-choice question has nothing to run: publishing needs only a clean save.
@@ -120,7 +133,7 @@ export function ProblemEditor() {
     try {
       const saved = await persist()
       if (!saved) return
-      setVerification(await verifyProblem(python.check, saved))
+      setVerification(await verifyProblem(python, saved))
     } catch {
       // The mutation's own error state carries the message.
     } finally {
@@ -142,31 +155,40 @@ export function ProblemEditor() {
   }
 
   /**
-   * Splitting a problem moves what it already has into part (a), rather than starting
-   * the parts empty and leaving the problem's own tests stranded on the parent — which
-   * publishing would then refuse.
+   * Splitting a problem makes its parts one file (Ken, 17 Oct 2026): the starter, the
+   * solution and the examples stay on the problem, and what is checked moves into part
+   * (a) — tests left on the parent would be refused at publish.
    */
   function splitIntoParts() {
     setDoc((current) => {
       if (!current) return current
-      const { difficulty, concept_ids, primary_concept_id, starter_code, solution_code, tests, hints } =
-        current
+      const { difficulty, concept_ids, primary_concept_id, tests, hints } = current
       return {
         ...current,
-        ...emptyLeaf(),
-        difficulty,
-        parts: [
-          {
-            ...emptyPart('a'),
-            difficulty,
-            concept_ids,
-            primary_concept_id,
-            starter_code,
-            solution_code,
-            tests,
-            hints,
-          },
-        ],
+        shared_file: true,
+        concept_ids: [],
+        primary_concept_id: null,
+        tests: [],
+        hints: [],
+        parts: [{ ...emptyPart('a'), difficulty, concept_ids, primary_concept_id, tests, hints }],
+      }
+    })
+  }
+
+  /**
+   * An older problem with code per part, made one file: part (a)'s starter, the last
+   * part's solution (later parts build on earlier ones), and the parts' examples kept.
+   */
+  function shareOneFile() {
+    setDoc((current) => {
+      if (!current) return current
+      const parts = current.parts ?? []
+      return {
+        ...current,
+        shared_file: true,
+        starter_code: parts[0]?.starter_code ?? '',
+        solution_code: parts.at(-1)?.solution_code ?? '',
+        parts: parts.map((part) => ({ ...part, starter_code: '', solution_code: '' })),
       }
     })
   }
@@ -267,26 +289,13 @@ export function ProblemEditor() {
             disabled={!editable}
             onChange={(event) => setDoc({ ...doc, title: event.target.value })}
           />
-          <div>
-            <div className="mb-1.5 flex items-center justify-between">
-              <span className="text-sm font-medium text-grape">Prompt</span>
-              <Button variant="quiet" onClick={() => setPreview(!preview)}>
-                {preview ? 'Edit' : 'Preview'}
-              </Button>
-            </div>
-            {preview || !editable ? (
-              <div className="rounded-lg bg-cream/60 px-4 py-2 ring-1 ring-line">
-                <Markdown>{doc.prompt_md || '*No prompt yet.*'}</Markdown>
-              </div>
-            ) : (
-              <Textarea
-                label="What the student reads (markdown: `code`, **bold**, lists)"
-                rows={6}
-                value={doc.prompt_md}
-                onChange={(event) => setDoc({ ...doc, prompt_md: event.target.value })}
-              />
-            )}
-          </div>
+          <PromptField
+            name="Prompt"
+            label="What the student reads (markdown: `code`, **bold**, lists)"
+            value={doc.prompt_md ?? ''}
+            editable={editable}
+            onChange={(prompt_md) => setDoc({ ...doc, prompt_md })}
+          />
           {(doc.parts ?? []).length > 0 ? (
             <div>
               <p className="mb-1.5 text-sm font-medium text-grape">Overall difficulty</p>
@@ -332,7 +341,54 @@ export function ProblemEditor() {
           </div>
         </Card>
       ) : concepts.data ? (
-        leaves.map((leaf) => (
+        <>
+        {shared ? (
+          <Card className="mb-6">
+            <h2 className="mb-1 font-display font-semibold text-xl text-grape">The file</h2>
+            <p className="mb-4 text-sm text-muted">
+              One program for every part. Students write all the parts in it, and each
+              part&rsquo;s checks run against the whole file.
+            </p>
+            {verified && verification.runs[leaves[0]?.key ?? '']?.compile_error ? (
+              <div className="mb-4">
+                <Notice tone="not-yet">
+                  The solution does not run: {verification.runs[leaves[0]?.key ?? '']?.compile_error}
+                </Notice>
+              </div>
+            ) : null}
+            <div className="grid gap-4 lg:grid-cols-2">
+              <CodeBox
+                key={`${loaded?.id ?? 'new'}-${loaded?.version ?? 0}-file-starter`}
+                label="Starter code"
+                hint="what the student begins with"
+                value={doc.starter_code ?? ''}
+                readOnly={!editable}
+                onChange={(starter_code) => setDoc({ ...doc, starter_code })}
+              />
+              <CodeBox
+                key={`${loaded?.id ?? 'new'}-${loaded?.version ?? 0}-file-solution`}
+                label="Reference solution"
+                hint="all the parts done — never shown to students"
+                value={doc.solution_code ?? ''}
+                readOnly={!editable}
+                onChange={(solution_code) => setDoc({ ...doc, solution_code })}
+              />
+            </div>
+            <section className="mt-5">
+              <h3 className="mb-2 font-display font-semibold text-lg text-grape">
+                How the finished program should run
+              </h3>
+              <ExamplesEditor
+                examples={doc.examples ?? []}
+                runs={exampleRuns('')}
+                disabled={!editable}
+                of="the finished program"
+                onChange={(examples) => setDoc({ ...doc, examples })}
+              />
+            </section>
+          </Card>
+        ) : null}
+        {leaves.map((leaf) => (
           <Card key={leaf.key || 'whole'} className="mb-6">
             {leaf.key ? (
               <div className="mb-4 flex items-center justify-between">
@@ -354,23 +410,24 @@ export function ProblemEditor() {
             ) : null}
             {leaf.key ? (
               <div className="mb-4">
-                <Textarea
-                  label="This part's prompt"
+                <PromptField
+                  name="This part's prompt"
+                  label="What the student reads for this part (markdown)"
                   rows={3}
-                  disabled={!editable}
+                  editable={editable}
                   value={(doc.parts ?? []).find((part) => part.label === leaf.key)?.prompt_md ?? ''}
-                  onChange={(event) =>
+                  onChange={(prompt_md) =>
                     setDoc({
                       ...doc,
                       parts: (doc.parts ?? []).map((part) =>
-                        part.label === leaf.key ? { ...part, prompt_md: event.target.value } : part,
+                        part.label === leaf.key ? { ...part, prompt_md } : part,
                       ),
                     })
                   }
                 />
               </div>
             ) : null}
-            {verified && verification.runs[leaf.key]?.compile_error ? (
+            {verified && !shared && verification.runs[leaf.key]?.compile_error ? (
               <div className="mb-4">
                 <Notice tone="not-yet">
                   The solution does not run: {verification.runs[leaf.key]?.compile_error}
@@ -383,16 +440,24 @@ export function ProblemEditor() {
               concepts={concepts.data}
               disabled={!editable}
               results={verified ? (verification.runs[leaf.key]?.results ?? null) : null}
+              codeless={shared}
+              exampleRuns={exampleRuns(leaf.key)}
               onChange={(next) => setLeaf(leaf.key, next)}
             />
           </Card>
-        ))
+        ))}
+        </>
       ) : (
         <Spinner label="Loading concepts" />
       )}
 
       {editable && !isMcq ? (
         <div className="mb-6 flex flex-wrap gap-2">
+          {(doc.parts ?? []).length > 0 && !shared ? (
+            <Button variant="secondary" onClick={shareOneFile}>
+              Use one file for all parts
+            </Button>
+          ) : null}
           {(doc.parts ?? []).length === 0 ? (
             <Button variant="secondary" onClick={splitIntoParts}>
               Split into parts (a, b, c)
@@ -432,10 +497,17 @@ export function ProblemEditor() {
               disabled={
                 (!isMcq && !allPass) || dirty || gaps.length > 0 || publish.isPending || !loaded
               }
-              onClick={() => loaded && publish.mutate(loaded.updated_at)}
+              onClick={() =>
+                loaded && publish.mutate(isMcq || !verification ? { updatedAt: loaded.updated_at } : verification)
+              }
             >
               Publish
             </Button>
+            {isMcq ? null : (
+              <Button variant="secondary" onClick={() => setStudentPreview(true)}>
+                Preview as student
+              </Button>
+            )}
             {loaded ? (
               <Button variant="quiet" onClick={() => setConfirmArchive(true)}>
                 Archive draft
@@ -466,6 +538,24 @@ export function ProblemEditor() {
             </ul>
           ) : null}
         </Card>
+      ) : null}
+
+      {!isMcq ? (
+        <StudentPreview
+          open={studentPreview}
+          onClose={() => setStudentPreview(false)}
+          doc={doc}
+          runs={verified ? verification.examples : null}
+          python={python}
+        />
+      ) : null}
+
+      {!editable && !isMcq ? (
+        <div className="mb-6">
+          <Button variant="secondary" onClick={() => setStudentPreview(true)}>
+            Preview as student
+          </Button>
+        </div>
       ) : null}
 
       <Dialog

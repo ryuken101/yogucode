@@ -272,10 +272,14 @@ export const api = {
     request<Schemas['ProblemOut']>('/items', { method: 'POST', body }),
   saveProblem: (itemId: string, body: Schemas['ProblemDoc']) =>
     request<Schemas['ProblemOut']>(`/items/${itemId}`, { method: 'PUT', body }),
-  publishProblem: (itemId: string, verifiedUpdatedAt: string) =>
+  publishProblem: (
+    itemId: string,
+    verifiedUpdatedAt: string,
+    transcripts: Schemas['PublishIn']['transcripts'] = {},
+  ) =>
     request<Schemas['ProblemOut']>(`/items/${itemId}/publish`, {
       method: 'POST',
-      body: { verified_updated_at: verifiedUpdatedAt } satisfies Schemas['PublishIn'],
+      body: { verified_updated_at: verifiedUpdatedAt, transcripts } satisfies Schemas['PublishIn'],
     }),
   newProblemVersion: (itemId: string) =>
     request<Schemas['ProblemOut']>(`/items/${itemId}/new-version`, { method: 'POST' }),
@@ -454,6 +458,8 @@ export const api = {
 
   today: () => request<Schemas['TodayOut']>('/me/lesson', { anonymous: true }),
   home: () => request<Schemas['HomeOut']>('/me/home', { anonymous: true }),
+  startedProblems: () =>
+    request<Schemas['StartedProblemOut'][]>('/me/problems', { anonymous: true }),
   activeQuiz: () => request<Schemas['ActiveQuizOut'] | null>('/me/quiz', { anonymous: true }),
   sheet: (assignmentId: string) =>
     request<Schemas['SheetOut']>(`/me/homework/${assignmentId}`, { anonymous: true }),

@@ -233,6 +233,9 @@ def _comparable(doc: ProblemDoc) -> dict:
     dumped = doc.model_dump(mode="json")
     for leaf in [dumped, *dumped["parts"]]:
         leaf["concept_ids"] = sorted(leaf["concept_ids"])
+        # A published version carries its examples' runs; a file only ever has inputs.
+        for example in leaf["examples"]:
+            example["transcript"] = None
     return dumped
 
 

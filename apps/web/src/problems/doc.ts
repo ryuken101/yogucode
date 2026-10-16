@@ -5,6 +5,10 @@
  * keeps exactly that shape in state and sends it back whole. These helpers are the few
  * things the screen needs to do *to* a document: make an empty one, walk its attemptable
  * leaves, and turn a leaf's tests into what the grader takes.
+ *
+ * **A shared file** (`shared_file`, 17 Oct 2026): a problem's parts are one program, whose
+ * starter and solution live on the problem, and every part's checks run against all of
+ * it. `codeOf` is the one place that decides which code a leaf runs.
  */
 
 import type { Schemas } from '../lib/api'
@@ -14,6 +18,8 @@ export type ProblemDoc = Schemas['ProblemDoc']
 export type PartDoc = Schemas['PartDoc']
 export type TestDoc = Schemas['IoTest'] | Schemas['FunctionTest']
 export type HintDoc = Schemas['HintDoc']
+export type ExampleDoc = Schemas['ExampleDoc']
+export type ExamplePiece = Schemas['TranscriptLine']
 
 /** The fields every attemptable thing has — a problem without parts, or one part. */
 export type LeafDoc = Pick<
@@ -25,6 +31,7 @@ export type LeafDoc = Pick<
   | 'solution_code'
   | 'tests'
   | 'hints'
+  | 'examples'
 >
 
 export const PART_LABELS = ['a', 'b', 'c', 'd', 'e', 'f'] as const
@@ -38,11 +45,44 @@ export function emptyLeaf(): Required<LeafDoc> {
     solution_code: '',
     tests: [],
     hints: [],
+    examples: [],
   }
 }
 
 export function emptyProblem(): ProblemDoc {
-  return { kind: 'code', title: '', prompt_md: '', parts: [], options: [], ...emptyLeaf() }
+  return {
+    kind: 'code',
+    title: '',
+    prompt_md: '',
+    parts: [],
+    options: [],
+    shared_file: false,
+    ...emptyLeaf(),
+  }
+}
+
+/** Whether the problem's parts are one file. */
+export function isSharedFile(doc: ProblemDoc): boolean {
+  return Boolean(doc.shared_file) && (doc.parts ?? []).length > 0
+}
+
+/** The reference solution a leaf's checks and examples run: the file's, when shared. */
+export function solutionOf(doc: ProblemDoc, leaf: LeafDoc): string {
+  return isSharedFile(doc) ? doc.solution_code ?? '' : leaf.solution_code ?? ''
+}
+
+/**
+ * Everything with examples on it, and the solution they are runs of. The problem's own
+ * examples sit at key `''` — on a problem without parts, that is the problem itself; on a
+ * shared file, they are examples of the whole program.
+ */
+export function exampleLeaves(doc: ProblemDoc): { key: string; examples: ExampleDoc[]; solution: string }[] {
+  const parts = doc.parts ?? []
+  const own = parts.length === 0 || isSharedFile(doc)
+  return [
+    ...(own ? [{ key: '', examples: doc.examples ?? [], solution: doc.solution_code ?? '' }] : []),
+    ...parts.map((part) => ({ key: part.label, examples: part.examples ?? [], solution: solutionOf(doc, part) })),
+  ].filter((leaf) => leaf.examples.length > 0)
 }
 
 export function emptyPart(label: string): PartDoc {

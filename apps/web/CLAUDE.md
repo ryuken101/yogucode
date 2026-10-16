@@ -151,6 +151,14 @@ both write without a newline, and a line-oriented handler puts the prompt above 
 instead of in front of it. The console keeps the newest 200k characters and drops the
 oldest, like terminal scrollback.
 
+Besides Run and Check there is **`example`** (`grader.run_example`, 17 Oct 2026). It runs a
+program once, typing a list of inputs, and records the conversation as `out`/`in` pieces.
+Unlike a check, the `input()` prompt is part of the output. The editor's Check solution
+uses it for a problem's examples (`problems/verify.ts`). `components/ExampleRun.tsx` plays
+the result back to a child, line by line and key by key, and shows it all at once when
+reduced motion is asked for. Its colours are the console's: cream for output, lavender for
+what was typed.
+
 ## The editor
 
 Monaco, behind `React.lazy` in `src/editor/CodeSurface.tsx`. `/join`, the class list and

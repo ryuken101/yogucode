@@ -16,6 +16,12 @@ test, a primary concept, on every leaf. Whether the solution actually *passes* i
 can only be known by running Python, which this server does not do (spec §5.1) — the
 teacher's browser runs them, and the publish route requires proof that it did so against
 the version being published.
+
+**Example transcripts are written at publish, never at save.** The teacher gives the
+inputs; what the solution printed with them is only known after the browser runs it, and
+writing it back with a save would move `updated_at` and make that very run stale. So a
+save keeps the inputs and drops any transcript, and the publish route stores the
+transcripts its browser run produced (`apply_transcripts`).
 """
 
 import re
@@ -38,6 +44,9 @@ MAX_CODE_CHARS = 64 * 1024
 MAX_TEST_TEXT = 10_000
 MAX_TESTS = 30
 MAX_PARTS = 6
+MAX_EXAMPLES = 3
+MAX_EXAMPLE_INPUTS = 20
+MAX_TRANSCRIPT_LINES = 400
 PART_LABEL = re.compile(r"^[a-f]$")
 
 
@@ -84,6 +93,26 @@ class HintDoc(BaseModel):
     unlock_after_seconds: int = Field(default=120, ge=0, le=3600)
 
 
+class TranscriptLine(BaseModel):
+    """One piece of a sample run: what the program printed, or what was typed in."""
+
+    kind: Literal["out", "in"]
+    text: str = Field(max_length=MAX_TEST_TEXT)
+
+
+class ExampleDoc(BaseModel):
+    """A sample run a child can watch. `inputs` are typed in order, one per `input()`.
+
+    `transcript` is what the reference solution's run looked like, filled at publish; on a
+    draft it is always None.
+    """
+
+    inputs: list[Annotated[str, Field(max_length=500)]] = Field(
+        default_factory=list, max_length=MAX_EXAMPLE_INPUTS
+    )
+    transcript: list[TranscriptLine] | None = Field(default=None, max_length=MAX_TRANSCRIPT_LINES)
+
+
 class LeafDoc(BaseModel):
     """What every attemptable thing carries — a problem without parts, or one part."""
 
@@ -94,6 +123,7 @@ class LeafDoc(BaseModel):
     solution_code: str = Field(default="", max_length=MAX_CODE_CHARS)
     tests: list[TestDoc] = Field(default_factory=list, max_length=MAX_TESTS)
     hints: list[HintDoc] = Field(default_factory=list, max_length=3)
+    examples: list[ExampleDoc] = Field(default_factory=list, max_length=MAX_EXAMPLES)
 
     @model_validator(mode="after")
     def _primary_is_one_of_the_tags(self) -> "LeafDoc":
@@ -138,6 +168,9 @@ class ProblemDoc(LeafDoc):
     title: str = Field(min_length=1, max_length=MAX_TITLE_LENGTH)
     prompt_md: str = Field(default="", max_length=MAX_PROMPT_CHARS)
     parts: list[PartDoc] = Field(default_factory=list, max_length=MAX_PARTS)
+    # One file for every part: the starter and solution here, each part's checks run
+    # against all of it. Meaningless without parts.
+    shared_file: bool = False
     # Multiple choice only.
     options: list[OptionDoc] = Field(default_factory=list, max_length=MAX_OPTIONS)
 
@@ -211,6 +244,7 @@ def _leaf_fields(item: Item, tests: list, hints: list, tags: list) -> dict:
             )
             for h in hints
         ],
+        "examples": [ExampleDoc(**example) for example in item.examples],
     }
 
 
@@ -224,6 +258,7 @@ async def read_document(
         kind=item.kind,
         title=item.title,
         prompt_md=item.prompt_md,
+        shared_file=item.shared_file and bool(parts),
         options=[OptionDoc(**option) for option in item.options],
         parts=[
             PartDoc(
@@ -258,6 +293,8 @@ async def _replace_leaf(
     item.difficulty = leaf.difficulty
     item.starter_code = leaf.starter_code
     item.solution_code = leaf.solution_code
+    # Inputs only: a transcript is proof of a run, and a save is not one.
+    item.examples = [{"inputs": example.inputs, "transcript": None} for example in leaf.examples]
     await _delete_children(session, [item.id])
     for order, test in enumerate(leaf.tests):
         session.add(
@@ -308,6 +345,7 @@ async def write_document(
     item.title = doc.title.strip()
     item.prompt_md = doc.prompt_md
     item.kind = ItemKind(doc.kind)
+    item.shared_file = doc.shared_file and bool(doc.parts)
     item.options = [option.model_dump() for option in doc.options] if doc.kind == "mcq" else []
     # Set by hand, not left to `onupdate`: a save that only changes a test case does not
     # touch this row, and `updated_at` is what the publish route checks a test run against.
@@ -371,9 +409,24 @@ def publish_problems(doc: ProblemDoc) -> list[str]:
         if leaf.primary_concept_id is None:
             problems.append(f"{where} needs a main concept")
 
-    if doc.parts:
+    if doc.parts and doc.shared_file:
+        if not doc.solution_code.strip():
+            problems.append("The file needs a reference solution")
+        if doc.tests:
+            problems.append("A problem with parts keeps its tests on the parts")
+        for part in doc.parts:
+            where = f"Part ({part.label})"
+            if part.starter_code.strip() or part.solution_code.strip():
+                problems.append(f"{where} shares the problem's file, so has no code of its own")
+            if not part.tests:
+                problems.append(f"{where} needs at least one test")
+            if part.primary_concept_id is None:
+                problems.append(f"{where} needs a main concept")
+    elif doc.parts:
         if doc.tests or doc.solution_code.strip():
             problems.append("A problem with parts keeps its tests and solution on the parts")
+        if doc.examples:
+            problems.append("Examples go on the parts, since each part has its own code")
         for part in doc.parts:
             check_leaf(part, f"Part ({part.label})")
     else:
@@ -384,6 +437,11 @@ def publish_problems(doc: ProblemDoc) -> list[str]:
 def publish_warnings(doc: ProblemDoc) -> list[str]:
     """What is worth fixing but does not block publishing."""
     if doc.kind != "mcq":
+        if doc.shared_file and any(t.kind == "io" for part in doc.parts for t in part.tests):
+            return [
+                "An output check on a part sees everything the whole file prints, other "
+                "parts included — function checks suit a shared file better"
+            ]
         return []
     unexplained = [
         option.text for option in doc.options if not option.correct and not option.misconception
@@ -394,6 +452,53 @@ def publish_warnings(doc: ProblemDoc) -> list[str]:
             "without a misconception — naming it is what makes the answers diagnostic"
         ]
     return []
+
+
+class TranscriptMismatch(ValueError):
+    """Transcripts that do not fit the examples they claim to be runs of."""
+
+
+def leaf_key(part: PartDoc | None) -> str:
+    """How the editor and the publish route name a leaf: its label, or "" for the problem."""
+    return part.label if part is not None else ""
+
+
+async def apply_transcripts(
+    session: AsyncSession,
+    principal: Principal,
+    item: Item,
+    doc: ProblemDoc,
+    transcripts: dict[str, list[list[TranscriptLine]]],
+) -> None:
+    """Store the browser's runs of each example on the rows being published.
+
+    Every leaf with examples needs one transcript per example, and what was typed in a
+    transcript must be the example's inputs, in order (a run may stop before using them
+    all). Anything else is refused: it is a run of some other version of the examples.
+    """
+    rows = {"": item} | {
+        part.part_label or "": part for part in await list_item_parts(session, principal, item.id)
+    }
+    leaves: list[tuple[str, LeafDoc]] = [("", doc)] + [(p.label, p) for p in doc.parts]
+    expected = {key for key, leaf in leaves if leaf.examples}
+    if set(transcripts) - expected or expected - set(transcripts):
+        raise TranscriptMismatch
+    for key, leaf in leaves:
+        if not leaf.examples:
+            continue
+        runs = transcripts[key]
+        if len(runs) != len(leaf.examples):
+            raise TranscriptMismatch
+        for example, run in zip(leaf.examples, runs, strict=True):
+            typed = [line.text for line in run if line.kind == "in"]
+            if typed != example.inputs[: len(typed)]:
+                raise TranscriptMismatch
+        row = rows[key]
+        row.examples = [
+            {"inputs": example.inputs, "transcript": [line.model_dump() for line in run]}
+            for example, run in zip(leaf.examples, runs, strict=True)
+        ]
+        session.add(row)
 
 
 async def set_status(
