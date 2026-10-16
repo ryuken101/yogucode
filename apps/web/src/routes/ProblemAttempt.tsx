@@ -30,6 +30,7 @@ import { Markdown } from '../components/Markdown'
 import { Notice } from '../components/Notice'
 import { Spinner } from '../components/Spinner'
 import { CodeSurface } from '../editor/CodeSurface'
+import { SaveControl } from '../editor/SaveControl'
 import { useAutosave } from '../editor/useAutosave'
 import { api, type Schemas } from '../lib/api'
 import { messageFor } from '../lib/errors'
@@ -330,10 +331,7 @@ export function ProblemAttempt() {
           {python.state.status === 'asking' ? (
             <span className="text-sm text-not-yet-ink">Your program is waiting for you to type.</span>
           ) : null}
-          <span className="ml-auto text-xs text-muted" aria-live="polite">
-            {autosave.state === 'saving' ? 'Saving…' : null}
-            {autosave.state === 'saved' ? 'Saved' : null}
-          </span>
+          <SaveControl className="ml-auto" state={autosave.state} onSave={autosave.save} />
         </div>
         {autosave.state === 'failed' ? (
           <Notice tone="system-error">
@@ -347,6 +345,7 @@ export function ProblemAttempt() {
         ) : null}
         <div className="min-h-64 flex-[2] overflow-hidden rounded-lg ring-1 ring-grape/25">
           <CodeSurface
+            onSave={autosave.save}
             // One editor per part: Monaco's undo stack must not carry one part's history
             // into another.
             key={codeKey}

@@ -197,6 +197,35 @@ test('a failed save is said out loud rather than hidden', async () => {
   expect(warning.className).toContain('system-error')
 })
 
+test('the label says when there is unsaved typing, and Save sends it straight away', async () => {
+  const { calls, handler } = countSaves()
+  server.use(handler)
+  const user = userEvent.setup()
+  renderScreen(<Work />, { route: '/work' })
+
+  const box = await editorWithValue('print("spiral")\n')
+  expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+  await user.type(box, 'x')
+  expect(screen.getByText('Unsaved changes')).toBeInTheDocument()
+
+  await user.click(screen.getByRole('button', { name: 'Save' }))
+  // Long before the two-second autosave.
+  await waitFor(() => expect(calls).toHaveLength(1), { timeout: 1_000 })
+  expect(await screen.findByText('Saved')).toBeInTheDocument()
+})
+
+test('⌘/Ctrl+S saves too', async () => {
+  const { calls, handler } = countSaves()
+  server.use(handler)
+  const user = userEvent.setup()
+  renderScreen(<Work />, { route: '/work' })
+
+  const box = await editorWithValue('print("spiral")\n')
+  await user.type(box, 'y')
+  await user.keyboard('{Control>}s{/Control}')
+  await waitFor(() => expect(calls).toHaveLength(1), { timeout: 1_000 })
+})
+
 // --- renaming ------------------------------------------------------------------------
 
 test('renaming onto a name already in use says so', async () => {

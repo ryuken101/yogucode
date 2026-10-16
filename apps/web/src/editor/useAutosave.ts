@@ -1,9 +1,13 @@
 /**
  * Saving a child's work without them ever thinking about it.
  *
- * There is no Save button, because a nine-year-old will not press one and product-spec
- * §3.1's promise is "no lost files between weeks" rather than "no lost files if you
- * remember". So the editor holds the text and this writes it behind them.
+ * Saving never depends on a button, because a nine-year-old will not press one and
+ * product-spec §3.1's promise is "no lost files between weeks" rather than "no lost files
+ * if you remember". So the editor holds the text and this writes it behind them. Since 17
+ * Oct 2026 there is a Save button and ⌘/Ctrl+S anyway (Ken): for reassurance, and for the
+ * moment before closing the laptop. They call `save`, which is the same flush. The state
+ * says honestly when there is typing not yet sent (`pending`), where it used to say
+ * "Saved" through the two-second wait.
  *
  * Three properties, in the order they matter:
  *
@@ -21,7 +25,7 @@ import { useSaveDocument } from '../lib/queries'
 /** Long enough to coalesce a sentence of typing, short enough to lose almost nothing. */
 export const AUTOSAVE_DELAY_MS = 2_000
 
-export type SaveState = 'saved' | 'saving' | 'failed'
+export type SaveState = 'saved' | 'pending' | 'saving' | 'failed'
 
 /**
  * What actually writes. Defaults to saving a file; a problem attempt passes its own, so
@@ -65,8 +69,12 @@ export function useAutosave(documentId: string | null, saver?: Saver) {
       },
       // Deliberately not retried: the usual cause is a revoked or expired session, and
       // retrying would hide that behind a spinner while the child keeps typing into
-      // something that cannot be saved. The editor says so instead.
-      () => setState('failed'),
+      // something that cannot be saved. The editor says so instead — and keeps the text
+      // as unsent, so pressing Save tries again.
+      () => {
+        if (pending.current === null) pending.current = content
+        setState('failed')
+      },
     )
   }, [])
 
@@ -81,7 +89,13 @@ export function useAutosave(documentId: string | null, saver?: Saver) {
   const onChange = useCallback(
     (content: string) => {
       pending.current = content
-      if (content === persisted.current) return
+      if (content === persisted.current) {
+        if (timer.current !== null) clearTimeout(timer.current)
+        timer.current = null
+        setState((now) => (now === 'pending' ? 'saved' : now))
+        return
+      }
+      setState((now) => (now === 'saving' ? now : 'pending'))
       if (timer.current !== null) clearTimeout(timer.current)
       timer.current = setTimeout(flush, AUTOSAVE_DELAY_MS)
     },
@@ -99,5 +113,18 @@ export function useAutosave(documentId: string | null, saver?: Saver) {
     }
   }, [flush])
 
-  return { state, onChange, adopt, flush }
+  // ⌘/Ctrl+S saves wherever the focus is — the console, a button — and never opens the
+  // browser's "Save page". Inside the editor Monaco takes the key first (`onSave`).
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault()
+        flush()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [flush])
+
+  return { state, onChange, adopt, flush, save: flush }
 }

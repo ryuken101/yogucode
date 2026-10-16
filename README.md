@@ -470,8 +470,9 @@ and Library; a child's are Lessons, Code, Files and Work. Every existing page no
 the window of the app that owns it (`apps/web/src/desktop/apps.ts`), and the URL is always
 the front window's page, so links and Back still work. A teacher's windows open full screen
 and can be dragged, resized and snapped; the layout is saved to their account
-(`/me/desktop`). A child's windows stay full screen. Files is Finder-style, and lets a
-teacher open any child's work read-only (`/students/{id}/folders|documents`).
+(`/me/desktop`). A child's windows stay full screen. Files is Finder-style, with a right-click
+menu, drag to move, and copy and paste. It lets a teacher open any child's work read-only,
+and organise their files: those writes are audited (`/students/{id}/folders|documents`).
 
 **After the first class (11 Oct 2026).** Help now locks the child's editor until the
 teacher is done; the owner can **delete entirely** (a child with all their work, or a

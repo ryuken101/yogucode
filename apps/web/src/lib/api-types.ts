@@ -1904,7 +1904,11 @@ export interface paths {
         /** List A Childs Documents */
         get: operations["list_a_childs_documents_students__student_id__documents_get"];
         put?: never;
-        post?: never;
+        /**
+         * Make A Childs Document
+         * @description A new file in a child's files — empty, or a copy of one the teacher pastes in.
+         */
+        post: operations["make_a_childs_document_students__student_id__documents_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1925,6 +1929,24 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
+        /** Change A Childs Document */
+        patch: operations["change_a_childs_document_students__student_id__documents__document_id__patch"];
+        trace?: never;
+    };
+    "/students/{student_id}/documents/{document_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive A Childs Document */
+        post: operations["archive_a_childs_document_students__student_id__documents__document_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
         patch?: never;
         trace?: never;
     };
@@ -1938,7 +1960,42 @@ export interface paths {
         /** List A Childs Folders */
         get: operations["list_a_childs_folders_students__student_id__folders_get"];
         put?: never;
+        /** Make A Childs Folder */
+        post: operations["make_a_childs_folder_students__student_id__folders_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/students/{student_id}/folders/{folder_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change A Childs Folder */
+        patch: operations["change_a_childs_folder_students__student_id__folders__folder_id__patch"];
+        trace?: never;
+    };
+    "/students/{student_id}/folders/{folder_id}/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Delete A Childs Folder */
+        post: operations["delete_a_childs_folder_students__student_id__folders__folder_id__delete_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2434,6 +2491,16 @@ export interface components {
             name: string;
             /** Slug */
             slug: string;
+        };
+        /**
+         * ChildDocumentPatch
+         * @description Rename and/or move a child's file. Never its content — see the module docstring.
+         */
+        ChildDocumentPatch: {
+            /** Folder Id */
+            folder_id?: string | null;
+            /** Title */
+            title?: string | null;
         };
         /** ChoiceIn */
         ChoiceIn: {
@@ -8110,7 +8177,116 @@ export interface operations {
             };
         };
     };
+    make_a_childs_document_students__student_id__documents_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     read_a_childs_document_students__student_id__documents__document_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                student_id: string;
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_a_childs_document_students__student_id__documents__document_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                student_id: string;
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChildDocumentPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_a_childs_document_students__student_id__documents__document_id__archive_post: {
         parameters: {
             query?: never;
             header?: {
@@ -8164,6 +8340,115 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FolderOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    make_a_childs_folder_students__student_id__folders_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FolderIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FolderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_a_childs_folder_students__student_id__folders__folder_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                student_id: string;
+                folder_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FolderPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FolderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_a_childs_folder_students__student_id__folders__folder_id__delete_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                student_id: string;
+                folder_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FolderDeletedOut"];
                 };
             };
             /** @description Validation Error */

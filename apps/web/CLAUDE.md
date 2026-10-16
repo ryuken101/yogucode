@@ -99,9 +99,14 @@ Ken's decisions, 16 Oct 2026; the clickable prototype is the artifact "Yogucode 
   two mounted editors would both stream to the live view.
 - The front window is a tinted title bar, never a shadow. Windows grow from their dock icon
   (`desktop.css`), with no animation under `prefers-reduced-motion`.
-- **Files** (`Finder.tsx`) is for finding and opening; organising stays in the editor's
-  explorer. A teacher opens a child's file read-only (`routes/ChildFile.tsx`); changing it
-  goes through Live's Help.
+- **Files** (`Finder.tsx`) finds, opens and, since 17 Oct 2026, **organises**, as Finder
+  or File Explorer does. It has a right-click menu (`ContextMenu.tsx`), naming in place,
+  drag onto a folder or path crumb to move, Duplicate, and Cut/Copy/Paste (the clipboard
+  is `clipboard.ts`, and Paste can cross places). The keys are F2, Delete, ⌘C/⌘X/⌘V, ⌘D
+  and ⌘⇧N. Every place goes through `fileStore.ts`. A teacher may organise a child's files
+  (`/students/{id}/...` writes, audited), but opens a file read-only
+  (`routes/ChildFile.tsx`); changing what it says goes through Live's Help. Move rules
+  (no folder into itself) live in `lib/folderTree.ts`, shared with the editor's explorer.
 
 **Children sign in with a username and a PIN** (Ken's decision, 11 Oct 2026) — permanent
 accounts the teacher creates on the class page (`StudentAccountDialogs.tsx`: Add a
@@ -211,8 +216,12 @@ Esc or Exit leaves), hides the tabs, and raises the editor to 24px (`CodeSurface
 ## Saving a student's work
 
 `src/editor/useAutosave.ts`: debounced ~2 s, skipped when nothing changed, flushed on file
-switch and on `pagehide`. There is no Save button, because a nine-year-old will not press
-one and §3.1's promise is "no lost files between weeks", not "if you remember".
+switch and on `pagehide`. Saving never depends on a button, because a nine-year-old will
+not press one and §3.1's promise is "no lost files between weeks", not "if you remember".
+There is a Save button anyway (Ken, 17 Oct 2026; `editor/SaveControl.tsx`), plus ⌘/Ctrl+S,
+which Monaco hands to `onSave` instead of the browser's Save page. Both are the same
+flush. The label is honest: "Unsaved changes" during the wait (the `pending` state), then
+"Saving…", then "Saved".
 
 A failed save is the one thing on that screen allowed to be **`system-error`** — it is
 genuinely our fault, and a child typing into a page that silently discards their work is

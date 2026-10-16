@@ -22,6 +22,7 @@ import { FileTabs } from '../components/FileTabs'
 import { Notice } from '../components/Notice'
 import { Spinner } from '../components/Spinner'
 import { CodeSurface } from '../editor/CodeSurface'
+import { SaveControl } from '../editor/SaveControl'
 import { useAutosave } from '../editor/useAutosave'
 import { useOpenTabs } from '../editor/useOpenTabs'
 import { messageFor } from '../lib/errors'
@@ -209,10 +210,7 @@ export function MyCode() {
                 Your program is waiting for you to type.
               </span>
             ) : null}
-            <span className="ml-auto text-xs text-muted" aria-live="polite">
-              {autosave.state === 'saving' ? 'Saving…' : null}
-              {autosave.state === 'saved' ? 'Saved' : null}
-            </span>
+            <SaveControl className="ml-auto" state={autosave.state} onSave={autosave.save} />
             <Button variant="secondary" onClick={startPresenting} disabled={!activeId}>
               Present
             </Button>
@@ -260,6 +258,7 @@ export function MyCode() {
           </div>
         ) : (
           <CodeSurface
+            onSave={autosave.save}
             key={activeId ?? 'none'}
             value={code}
             onChange={autosave.onChange}

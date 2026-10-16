@@ -311,6 +311,19 @@ async def list_student_documents(
     return (await session.exec(statement)).all()
 
 
+def as_child(principal: Principal, student: Student) -> Principal:
+    """The child's own scope, for a teacher organising that child's files (17 Oct 2026).
+
+    The file and folder rules filter on the centre and `subject_id` (`app/folders.py`,
+    `routers/documents.py`), so a teacher acting on a child's files goes through them as
+    the child. Only ever built from a `student` that `get_owned_student` returned — that is
+    what keeps it inside the teacher's centre — and only passed to those rules.
+    """
+    if not principal.is_teacher or student.centre_id != principal.centre_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="student not found")
+    return Principal(kind="student", subject_id=student.id, centre_id=principal.centre_id)
+
+
 async def list_child_folders(
     session: AsyncSession, principal: Principal, student_id: uuid.UUID
 ) -> Sequence[StudentFolder]:

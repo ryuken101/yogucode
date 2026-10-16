@@ -59,6 +59,8 @@ export interface CodeSurfaceProps {
   fontSize?: number
   /** Python colours for a `.py` file; none for anything else (`lib/fileType.ts`). */
   language?: 'python' | 'plaintext'
+  /** ⌘/Ctrl+S in the editor — Save, rather than the browser's "Save page". */
+  onSave?: () => void
 }
 
 export interface EditChange {
@@ -79,6 +81,7 @@ export default function MonacoSurface({
   onCursor,
   fontSize,
   language = 'python',
+  onSave,
 }: CodeSurfaceProps) {
   const host = useRef<HTMLDivElement>(null)
   const editor = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
@@ -92,6 +95,8 @@ export default function MonacoSurface({
   notifyPaste.current = onPaste
   const notifyCursor = useRef(onCursor)
   notifyCursor.current = onCursor
+  const notifySave = useRef(onSave)
+  notifySave.current = onSave
   /** True while the page, not the person, is replacing the text. */
   const applying = useRef(false)
 
@@ -112,6 +117,14 @@ export default function MonacoSurface({
     created.onDidPaste((event) => {
       const chars = created.getModel()?.getValueLengthInRange(event.range) ?? 0
       notifyPaste.current?.(chars)
+    })
+    // An action, not `addCommand`: commands are shared by every editor on the page, so the
+    // last one mounted would answer for all of them.
+    created.addAction({
+      id: 'yogucode.save',
+      label: 'Save',
+      keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS],
+      run: () => notifySave.current?.(),
     })
     editor.current = created
     if (autoFocus) created.focus()

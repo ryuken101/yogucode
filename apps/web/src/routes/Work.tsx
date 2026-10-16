@@ -21,6 +21,7 @@ import { FileTabs } from '../components/FileTabs'
 import { Notice } from '../components/Notice'
 import { Spinner } from '../components/Spinner'
 import { CodeSurface } from '../editor/CodeSurface'
+import { SaveControl } from '../editor/SaveControl'
 import { useAutosave } from '../editor/useAutosave'
 import { useOpenTabs } from '../editor/useOpenTabs'
 import { messageFor } from '../lib/errors'
@@ -178,10 +179,7 @@ export function Work() {
         {state.status === 'asking' ? (
           <span className="text-sm text-not-yet-ink">Your program is waiting for you to type.</span>
         ) : null}
-        <span className="ml-auto text-xs text-muted" aria-live="polite">
-          {autosave.state === 'saving' ? 'Saving…' : null}
-          {autosave.state === 'saved' ? 'Saved' : null}
-        </span>
+        <SaveControl className="ml-auto" state={autosave.state} onSave={autosave.save} />
       </div>
 
       {/* A failed save is the one thing here that is genuinely our problem rather than
@@ -239,6 +237,7 @@ export function Work() {
           </div>
         ) : (
           <CodeSurface
+            onSave={autosave.save}
             // Remount on file change: Monaco keeps its own undo stack per model, and
             // carrying one file's history into another would let Ctrl-Z paste the wrong
             // program into a child's work.

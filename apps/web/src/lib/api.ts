@@ -402,13 +402,38 @@ export const api = {
       method: 'PATCH',
       body: { username } satisfies Schemas['StudentPatch'],
     }),
-  /** A child's folders and files, read-only, for a teacher's Files app. */
+  /**
+   * A child's folders and files, for a teacher's Files app: read, and since 17 Oct 2026
+   * organised — never their content, which changes only through Live's Help.
+   */
   listChildFolders: (studentId: string) =>
     request<Schemas['FolderOut'][]>(`/students/${studentId}/folders`),
   listChildDocuments: (studentId: string) =>
     request<Schemas['DocumentSummaryOut'][]>(`/students/${studentId}/documents`),
   readChildDocument: (studentId: string, documentId: string) =>
     request<Schemas['DocumentOut']>(`/students/${studentId}/documents/${documentId}`),
+  createChildFolder: (studentId: string, body: Schemas['FolderIn']) =>
+    request<Schemas['FolderOut']>(`/students/${studentId}/folders`, { method: 'POST', body }),
+  updateChildFolder: (studentId: string, folderId: string, body: Schemas['FolderPatch']) =>
+    request<Schemas['FolderOut']>(`/students/${studentId}/folders/${folderId}`, {
+      method: 'PATCH',
+      body,
+    }),
+  deleteChildFolder: (studentId: string, folderId: string) =>
+    request<Schemas['FolderDeletedOut']>(`/students/${studentId}/folders/${folderId}/delete`, {
+      method: 'POST',
+    }),
+  createChildDocument: (studentId: string, body: Schemas['DocumentIn']) =>
+    request<Schemas['DocumentOut']>(`/students/${studentId}/documents`, { method: 'POST', body }),
+  updateChildDocument: (studentId: string, documentId: string, body: Schemas['ChildDocumentPatch']) =>
+    request<Schemas['DocumentOut']>(`/students/${studentId}/documents/${documentId}`, {
+      method: 'PATCH',
+      body,
+    }),
+  archiveChildDocument: (studentId: string, documentId: string) =>
+    request<Schemas['DocumentOut']>(`/students/${studentId}/documents/${documentId}/archive`, {
+      method: 'POST',
+    }),
 
   /** The teacher's saved desktop: which windows are open, and where. */
   readDesktop: () => request<Schemas['DesktopOut']>('/me/desktop'),

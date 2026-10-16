@@ -129,6 +129,11 @@ already started, because Today shows only the current lesson.
 `{type: "help", on}` locks it; the last helper stopping — or their socket going — unlocks
 it, and a reconnecting child is told the current state.
 
+**A teacher may organise a child's files** (Ken, 17 Oct 2026; `routers/student_files.py`):
+new, rename, move, copy in, and delete (archive), but never edit what a file says. That
+still goes through Help. The writes run the child's own rules as the child
+(`scoping.as_child`) and are audited as `student_file.*`.
+
 **`teacher_documents`** are a teacher's private "My code" files, scoped to the centre and
 `user_id` (`scoping.get_own_teacher_document`): another teacher at the same centre gets a
 404. A separate table from `student_documents` for the same reason `users` is separate from

@@ -29,7 +29,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.auth.principal import CurrentStudent
+from app.auth.principal import CurrentStudent, Principal
 from app.db import get_session
 from app.folders import STUDENT, get_folder, live_folder
 from app.models import DocumentStatus, StudentDocument, TeacherDocument
@@ -155,6 +155,12 @@ async def create_document(
     unique index would refuse a second "untitled.py", and a 409 in response to pressing a
     plus button is not an error a ten-year-old can act on.
     """
+    return await create_file(session, principal, body)
+
+
+async def create_file(session: AsyncSession, principal: Principal, body: DocumentIn) -> DocumentOut:
+    """Make a file for the student `principal` is — the child, or a teacher acting on the
+    child's files (`scoping.as_child`). The rules are the same either way."""
     folder_id = await live_folder(session, STUDENT, principal, body.folder_id)
     title = (body.title or "").strip() or await _next_default_title(session, principal, folder_id)
     record = StudentDocument(
@@ -177,7 +183,7 @@ async def create_document(
 
 
 async def _next_default_title(
-    session: AsyncSession, principal: CurrentStudent, folder_id: uuid.UUID | None
+    session: AsyncSession, principal: Principal, folder_id: uuid.UUID | None
 ) -> str:
     return default_title(
         {
@@ -215,6 +221,14 @@ async def save_document(
             status_code=status.HTTP_409_CONFLICT, detail="A quiz is running — finish it first"
         )
 
+    return await change_file(session, principal, record, body)
+
+
+async def change_file(
+    session: AsyncSession, principal: Principal, record: StudentDocument, body: DocumentPatch
+) -> DocumentOut:
+    """Rename, move and/or save a file — a no-op writes nothing. Shared with the teacher's
+    routes on a child's files, which never send content."""
     fields = body.model_dump(exclude_unset=True)
     changed = False
     if "title" in fields and fields["title"] is not None:
@@ -252,7 +266,10 @@ async def archive_document(
     Archive rather than delete, as everywhere else. A child who tidies up mid-term should
     not be able to destroy a term of their own work with one tap.
     """
-    record = await get_owned_document(session, principal, document_id)
+    return await archive_file(session, await get_owned_document(session, principal, document_id))
+
+
+async def archive_file(session: AsyncSession, record: StudentDocument) -> DocumentOut:
     if record.status != DocumentStatus.ARCHIVED:
         record.status = DocumentStatus.ARCHIVED
         session.add(record)

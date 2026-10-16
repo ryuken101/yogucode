@@ -35,6 +35,7 @@ import {
 import { useMemo, useState } from 'react'
 import type { Schemas } from '../lib/api'
 import { isPythonFile } from '../lib/fileType'
+import { canMove, pathOf, subtree } from '../lib/folderTree'
 import { Dialog } from './Dialog'
 import { Select } from './Field'
 
@@ -61,35 +62,6 @@ interface Props {
   busy?: boolean
   /** Said after "will be removed" in the delete confirmation. */
   restoreNote?: string
-}
-
-/** The folder and everything inside it — where a folder may not be moved to. */
-function subtree(folders: Folder[], root: string): Set<string> {
-  const found = new Set([root])
-  let grew = true
-  while (grew) {
-    grew = false
-    for (const f of folders) {
-      if (f.parent_id && found.has(f.parent_id) && !found.has(f.id)) {
-        found.add(f.id)
-        grew = true
-      }
-    }
-  }
-  return found
-}
-
-/** "week 1 / loops" — a folder's path, for the Move to… list. */
-function pathOf(folders: Folder[], id: string): string {
-  const parts: string[] = []
-  let at: string | null = id
-  for (let depth = 0; at && depth < 20; depth++) {
-    const folder = folders.find((f) => f.id === at)
-    if (!folder) break
-    parts.unshift(folder.name)
-    at = folder.parent_id ?? null
-  }
-  return parts.join(' / ')
 }
 
 export function FileExplorer({
@@ -193,14 +165,7 @@ export function FileExplorer({
 
   /** Move, unless it would change nothing or put a folder inside itself. */
   function moveTo(item: Item, folderId: string | null) {
-    if (item.kind === 'file') {
-      const file = files.find((f) => f.id === item.id)
-      if (!file || (file.folder_id ?? null) === folderId) return
-    } else {
-      const folder = folders.find((f) => f.id === item.id)
-      if (!folder || (folder.parent_id ?? null) === folderId) return
-      if (folderId && subtree(folders, item.id).has(folderId)) return
-    }
+    if (!canMove(item, folderId, files, folders)) return
     onMove(item, folderId)
     if (folderId) setOpen((current) => new Set(current).add(folderId))
   }

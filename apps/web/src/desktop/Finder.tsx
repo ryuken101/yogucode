@@ -6,23 +6,49 @@
  * Enter) opens: a folder opens in place, a file opens in Code.
  *
  * - A teacher's places are the children in the class chosen in the top bar, and their own
- *   My code. A child's files are read-only here (`/students/{id}/…`); opening one shows it
- *   in Code as "Watching", and changing it goes through Live's Help.
+ *   My code. Opening a child's file shows it in Code as "Watching" — changing what it says
+ *   goes through Live's Help — but the teacher may organise a child's files here.
  * - A child's places are Recents and My work — their own files, which open in their editor.
  *
  * The folder being looked at is in the URL (`?folder=`), so Back and a reload keep it.
- * Organising — new folder, rename, move — stays in the editor's explorer, which already
- * does it; this is for finding and opening.
+ *
+ * **Organising, as in Finder or File Explorer** (Ken, 17 Oct 2026): right-click for New
+ * folder, New file, Rename, Duplicate, Cut, Copy, Paste, Move to… and Delete; drag onto a
+ * folder or a crumb in the path to move; F2, Delete, ⌘C/⌘X/⌘V, ⌘D and ⌘⇧N from the keys.
+ * New things are named in place. Every place does the same through `fileStore.ts`, and
+ * Paste can cross places — a teacher copies a file from My code into a child's folder.
+ * Delete archives, as everywhere. No red: a refused name is not-yet.
  */
 
-import { ChevronLeft, ChevronRight, Clock, Folder, LayoutGrid, List, User } from 'lucide-react'
-import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import {
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  FilePlus2,
+  Folder,
+  FolderPlus,
+  LayoutGrid,
+  List,
+  User,
+} from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
+import { Dialog } from '../components/Dialog'
+import { Select } from '../components/Field'
 import { Notice } from '../components/Notice'
 import { Spinner } from '../components/Spinner'
 import type { Schemas } from '../lib/api'
 import { messageFor } from '../lib/errors'
+import {
+  canMove,
+  copyName,
+  freeName,
+  pathOf,
+  subtree,
+  type TreeItem,
+} from '../lib/folderTree'
 import {
   useChildDocuments,
   useChildFolders,
@@ -31,7 +57,10 @@ import {
   useRoster,
   useTeacherDocuments,
 } from '../lib/queries'
+import { setClip, useClip } from './clipboard'
+import { ContextMenu, SEPARATOR, type ContextEntry } from './ContextMenu'
 import { useDesk } from './context'
+import { placeKey, storeFor, useFileStore, type FileStore, type Place } from './fileStore'
 
 type FolderRow = Schemas['FolderOut']
 type FileRow = Schemas['DocumentSummaryOut']
@@ -55,15 +84,22 @@ export function Finder() {
   if (studentId) return <ChildFiles studentId={studentId} />
   if (pathname === '/files/mine') return <MyFiles />
   // `/files`: nothing chosen yet.
-  return <Shell place={null} title="Files" loading={false} error={null} folders={[]} files={[]} onOpenFile={() => {}} />
+  return (
+    <Shell place={null} title="Files" loading={false} error={null} folders={[]} files={[]} store={null} onOpenFile={() => {}} />
+  )
 }
+
+const TEACHER: Place = { kind: 'teacher' }
+const ME: Place = { kind: 'me' }
 
 function MyFiles() {
   const navigate = useNavigate()
   const folders = useFolders('teacher')
   const files = useTeacherDocuments()
+  const actions = useFileStore(TEACHER)
   return (
     <Shell
+      store={{ place: TEACHER, actions }}
       place="mine"
       title="My code"
       loading={folders.isPending || files.isPending}
@@ -79,8 +115,11 @@ function ChildFiles({ studentId }: { studentId: string }) {
   const navigate = useNavigate()
   const folders = useChildFolders(studentId)
   const files = useChildDocuments(studentId)
+  const child: Place = { kind: 'child', studentId }
+  const actions = useFileStore(child)
   return (
     <Shell
+      store={{ place: child, actions }}
       place={studentId}
       title={null}
       loading={folders.isPending || files.isPending}
@@ -96,8 +135,10 @@ function StudentFiles({ recents }: { recents: boolean }) {
   const navigate = useNavigate()
   const folders = useFolders('me')
   const files = useDocuments()
+  const actions = useFileStore(ME)
   return (
     <Shell
+      store={{ place: ME, actions }}
       place={recents ? 'recents' : 'mine'}
       title={recents ? 'Recents' : 'My work'}
       loading={folders.isPending || files.isPending}
@@ -113,6 +154,9 @@ function StudentFiles({ recents }: { recents: boolean }) {
 
 /* --- the window: sidebar, toolbar, contents, status bar ------------------------------- */
 
+const DRAG_TYPE = 'application/x-yogucode-finder'
+const MOD = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl+'
+
 function Shell({
   place,
   title,
@@ -121,6 +165,7 @@ function Shell({
   folders,
   files,
   flat = false,
+  store,
   onOpenFile,
 }: {
   /** Which sidebar place is chosen: a child's id, "mine", "recents", or none. */
@@ -133,12 +178,24 @@ function Shell({
   files: FileRow[]
   /** Show every file at once, ignoring folders (Recents). */
   flat?: boolean
+  /** Where changes go; none for a place that is only a prompt to choose one. */
+  store: { place: Place; actions: FileStore } | null
   onOpenFile: (file: FileRow) => void
 }) {
   const [params, setParams] = useSearchParams()
   const folderId = flat ? null : params.get('folder')
   const [selected, setSelected] = useState<string | null>(null)
   const [view, setView] = useState<'icons' | 'list'>(savedView)
+  const [menu, setMenu] = useState<{ x: number; y: number; item: Item | null } | null>(null)
+  const [renaming, setRenaming] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<Item | null>(null)
+  const [moving, setMoving] = useState<Item | null>(null)
+  const [moveTarget, setMoveTarget] = useState('')
+  const [dropOn, setDropOn] = useState<string | null | undefined>(undefined)
+  const [problem, setProblem] = useState<string | null>(null)
+  const clip = useClip()
+  const client = useQueryClient()
+  const contents = useRef<HTMLDivElement>(null)
   const places = usePlaces()
   const placeName = title ?? places.flatMap((s) => s.items).find((p) => p.key === place)?.label ?? 'Files'
 
@@ -159,9 +216,12 @@ function Shell({
       .sort((a, b) => (flat ? 0 : a.title.localeCompare(b.title)))
       .map((f): Item => ({ kind: 'file', id: f.id, name: f.title, changed: f.updated_at, file: f })),
   ]
+  const chosen = items.find((i) => i.id === selected) ?? null
+  const actions = store?.actions ?? null
 
   function goTo(id: string | null) {
     setSelected(null)
+    setRenaming(null)
     const next = new URLSearchParams(params)
     if (id) next.set('folder', id)
     else next.delete('folder')
@@ -182,7 +242,294 @@ function Shell({
     }
   }
 
-  const chosen = items.find((i) => i.id === selected) ?? null
+  /** Run a change, saying in not-yet words when the server refuses it. */
+  async function attempt<T>(work: () => Promise<T>): Promise<T | null> {
+    setProblem(null)
+    try {
+      return await work()
+    } catch (refused) {
+      setProblem(messageFor(refused))
+      return null
+    }
+  }
+
+  /* --- the actions ----------------------------------------------------------------- */
+
+  async function newFolder() {
+    if (!actions || flat) return
+    const taken = folders.filter((f) => f.parent_id === here).map((f) => f.name)
+    const made = await attempt(() => actions.createFolder(freeName('untitled folder', taken), here))
+    if (made) {
+      setSelected(made.id)
+      setRenaming(made.id)
+    }
+  }
+
+  async function newFile() {
+    if (!actions) return
+    // The server numbers it — untitled.py, untitled2.py — so two presses never clash.
+    const made = await attempt(() => actions.createFile(here))
+    if (made) {
+      setSelected(made.id)
+      setRenaming(made.id)
+    }
+  }
+
+  async function rename(item: Item, name: string) {
+    if (!actions) return
+    const next = name.trim()
+    if (!next || next === item.name) {
+      setRenaming(null)
+      return
+    }
+    const done = await attempt(() =>
+      item.kind === 'file' ? actions.renameFile(item.id, next) : actions.renameFolder(item.id, next),
+    )
+    // A refused name keeps the box open, so it can be fixed rather than retyped.
+    if (done !== null) setRenaming(null)
+  }
+
+  async function moveInto(item: TreeItem, target: string | null) {
+    if (!actions || !canMove(item, target, files, folders)) return
+    await attempt(() =>
+      item.kind === 'file' ? actions.moveFile(item.id, target) : actions.moveFolder(item.id, target),
+    )
+  }
+
+  async function duplicate(item: Item) {
+    if (!actions || item.kind !== 'file') return
+    const taken = files.filter((f) => f.folder_id === (item.file?.folder_id ?? null)).map((f) => f.title)
+    const content = await attempt(() => actions.readContent(item.id))
+    if (content === null) return
+    const made = await attempt(() =>
+      actions.createFile(item.file?.folder_id ?? null, copyName(item.name, taken), content),
+    )
+    if (made) setSelected(made.id)
+  }
+
+  async function remove(item: Item) {
+    if (!actions) return
+    await attempt(() => (item.kind === 'file' ? actions.deleteFile(item.id) : actions.deleteFolder(item.id)))
+    setSelected(null)
+  }
+
+  function clipTo(mode: 'cut' | 'copy', item: Item) {
+    if (!store) return
+    setClip({ mode, place: store.place, items: [{ kind: item.kind, id: item.id, name: item.name }] })
+  }
+
+  /**
+   * Paste what was cut or copied into the folder being looked at. A cut within the same
+   * place is a move; anything else makes copies — from another place too, which is how a
+   * teacher hands a file from My code to a child.
+   */
+  async function paste() {
+    if (!actions || !store || !clip || flat) return
+    const samePlace = placeKey(clip.place) === placeKey(store.place)
+    if (clip.mode === 'cut' && samePlace) {
+      for (const item of clip.items) await moveInto(item, here)
+      setClip(null)
+      return
+    }
+    const from = samePlace ? actions : storeFor(client, clip.place)
+    for (const item of clip.items) {
+      if (item.kind === 'folder') {
+        if (!samePlace) {
+          setProblem('Folders can only be copied within the same place — copy the files inside instead.')
+          continue
+        }
+        await copyFolder(item.id, here)
+        continue
+      }
+      const taken = files.filter((f) => f.folder_id === here).map((f) => f.title)
+      const content = await attempt(() => from.readContent(item.id))
+      if (content === null) continue
+      await attempt(() => actions.createFile(here, freeName(item.name, taken), content))
+    }
+    if (clip.mode === 'cut') setClip(null)
+  }
+
+  /** A folder and everything in it, copied into `parent` — within one place. */
+  async function copyFolder(sourceId: string, parent: string | null) {
+    if (!actions) return
+    const source = byId.get(sourceId)
+    if (!source || (parent && subtree(folders, sourceId).has(parent))) {
+      setProblem('A folder can’t be copied into itself.')
+      return
+    }
+    const taken = folders.filter((f) => f.parent_id === parent).map((f) => f.name)
+    const made = await attempt(() => actions.createFolder(freeName(source.name, taken), parent))
+    if (!made) return
+    for (const file of files.filter((f) => f.folder_id === sourceId)) {
+      const content = await attempt(() => actions.readContent(file.id))
+      if (content !== null) await attempt(() => actions.createFile(made.id, file.title, content))
+    }
+    for (const child of folders.filter((f) => f.parent_id === sourceId)) await copyFolder(child.id, made.id)
+  }
+
+  /* --- the menu, and the keys ------------------------------------------------------ */
+
+  function entriesFor(item: Item | null): ContextEntry[] {
+    if (!actions) return item ? [{ label: 'Open', onSelect: () => open(item) }] : []
+    if (!item) {
+      return [
+        ...(flat ? [] : [{ label: 'New folder', shortcut: `${MOD}⇧N`, onSelect: () => void newFolder() }]),
+        { label: 'New file', onSelect: () => void newFile() },
+        ...(flat ? [] : [SEPARATOR, { label: 'Paste', shortcut: `${MOD}V`, disabled: !clip, onSelect: () => void paste() }]),
+        SEPARATOR,
+        { label: view === 'icons' ? 'Show as list' : 'Show as icons', onSelect: () => chooseView(view === 'icons' ? 'list' : 'icons') },
+      ]
+    }
+    const file = item.kind === 'file'
+    return [
+      { label: 'Open', shortcut: '↵', onSelect: () => open(item) },
+      SEPARATOR,
+      { label: 'Rename', shortcut: 'F2', onSelect: () => setRenaming(item.id) },
+      ...(file ? [{ label: 'Duplicate', shortcut: `${MOD}D`, onSelect: () => void duplicate(item) }] : []),
+      ...(flat
+        ? []
+        : [
+            { label: 'Cut', shortcut: `${MOD}X`, onSelect: () => clipTo('cut', item) },
+            { label: 'Copy', shortcut: `${MOD}C`, onSelect: () => clipTo('copy', item) },
+            {
+              label: 'Move to…',
+              onSelect: () => {
+                setMoveTarget('')
+                setMoving(item)
+              },
+            },
+          ]),
+      SEPARATOR,
+      { label: 'Delete', shortcut: '⌫', onSelect: () => setDeleting(item) },
+    ]
+  }
+
+  function openMenu(event: React.MouseEvent, item: Item | null) {
+    event.preventDefault()
+    event.stopPropagation()
+    if (place === null) return
+    setSelected(item?.id ?? null)
+    setMenu({ x: event.clientX, y: event.clientY, item })
+  }
+
+  function onKeys(event: React.KeyboardEvent) {
+    if ((event.target as HTMLElement).closest('input, textarea, select') || renaming) return
+    const mod = event.metaKey || event.ctrlKey
+    const key = event.key.toLowerCase()
+    const index = chosen ? items.indexOf(chosen) : -1
+    if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+      event.preventDefault()
+      const box = (chosen && contents.current?.querySelector(`[data-item="${chosen.id}"]`)) || contents.current
+      const rect = box?.getBoundingClientRect()
+      setMenu({ x: rect?.left ?? 0, y: rect?.bottom ?? 0, item: chosen })
+      return
+    }
+    if (['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'].includes(event.key) && !mod) {
+      if (items.length === 0) return
+      event.preventDefault()
+      const step = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : -1
+      const next = items[index === -1 ? 0 : Math.max(0, Math.min(items.length - 1, index + step))]!
+      setSelected(next.id)
+      contents.current?.querySelector<HTMLElement>(`[data-item="${next.id}"]`)?.focus()
+      return
+    }
+    if (mod && event.shiftKey && key === 'n') {
+      event.preventDefault()
+      void newFolder()
+      return
+    }
+    if (mod && key === 'v') {
+      event.preventDefault()
+      void paste()
+      return
+    }
+    if (!chosen) return
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      open(chosen)
+    } else if (event.key === 'F2' && actions) {
+      event.preventDefault()
+      setRenaming(chosen.id)
+    } else if ((event.key === 'Delete' || event.key === 'Backspace') && actions) {
+      event.preventDefault()
+      setDeleting(chosen)
+    } else if (mod && key === 'c' && !flat) {
+      event.preventDefault()
+      clipTo('copy', chosen)
+    } else if (mod && key === 'x' && !flat) {
+      event.preventDefault()
+      clipTo('cut', chosen)
+    } else if (mod && key === 'd') {
+      event.preventDefault()
+      void duplicate(chosen)
+    }
+  }
+
+  /* --- dragging -------------------------------------------------------------------- */
+
+  function dragProps(item: Item) {
+    if (!actions || flat || renaming === item.id) return {}
+    return {
+      draggable: true,
+      onDragStart: (event: React.DragEvent) => {
+        event.dataTransfer.setData(DRAG_TYPE, JSON.stringify({ kind: item.kind, id: item.id }))
+        event.dataTransfer.effectAllowed = 'move'
+        setSelected(item.id)
+      },
+      onDragEnd: () => setDropOn(undefined),
+    }
+  }
+
+  /** A folder icon or a crumb in the path: drop here to move into `target` (null: the top). */
+  function dropProps(target: string | null) {
+    if (!actions || flat) return {}
+    return {
+      onDragOver: (event: React.DragEvent) => {
+        if (!event.dataTransfer.types.includes(DRAG_TYPE)) return
+        event.preventDefault()
+        event.stopPropagation()
+        setDropOn(target)
+      },
+      onDragLeave: () => setDropOn(undefined),
+      onDrop: (event: React.DragEvent) => {
+        event.preventDefault()
+        event.stopPropagation()
+        setDropOn(undefined)
+        const raw = event.dataTransfer.getData(DRAG_TYPE)
+        if (raw) void moveInto(JSON.parse(raw) as TreeItem, target)
+      },
+    }
+  }
+
+  function itemProps(item: Item) {
+    return {
+      'data-item': item.id,
+      'aria-label': `${item.name}, ${item.kind}`,
+      'aria-pressed': item.id === selected,
+      onClick: (event: React.MouseEvent) => {
+        event.stopPropagation()
+        setSelected(item.id)
+      },
+      onDoubleClick: () => renaming !== item.id && open(item),
+      onContextMenu: (event: React.MouseEvent) => openMenu(event, item),
+      ...dragProps(item),
+      ...(item.kind === 'folder' ? dropProps(item.id) : {}),
+    }
+  }
+
+  function label(item: Item, className: string) {
+    if (renaming === item.id) {
+      return <RenameBox name={item.name} onDone={(name) => void rename(item, name)} onCancel={() => setRenaming(null)} />
+    }
+    return <span className={className}>{item.name}</span>
+  }
+
+  const moveChoices = moving
+    ? folders
+        .filter((f) => moving.kind === 'file' || !subtree(folders, moving.id).has(f.id))
+        .map((f) => ({ id: f.id, label: pathOf(folders, f.id) }))
+        .sort((a, b) => a.label.localeCompare(b.label))
+    : []
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-surface">
@@ -197,19 +544,31 @@ function Shell({
           <ChevronLeft size={18} aria-hidden="true" />
         </button>
         <nav aria-label="Folder path" className="flex min-w-0 flex-wrap items-center">
-          <Crumb current={trail.length === 0} onClick={() => goTo(null)}>
+          <Crumb current={trail.length === 0} onClick={() => goTo(null)} dropping={dropOn === null} drop={dropProps(null)}>
             {placeName}
           </Crumb>
           {trail.map((f, i) => (
             <span key={f.id} className="flex items-center">
               <ChevronRight size={14} aria-hidden="true" className="text-lavender" />
-              <Crumb current={i === trail.length - 1} onClick={() => goTo(f.id)}>
+              <Crumb current={i === trail.length - 1} onClick={() => goTo(f.id)} dropping={dropOn === f.id} drop={dropProps(f.id)}>
                 {f.name}
               </Crumb>
             </span>
           ))}
         </nav>
         <span className="flex-1" />
+        {actions ? (
+          <>
+            {flat ? null : (
+              <ToolButton label="New folder" onClick={() => void newFolder()}>
+                <FolderPlus size={17} aria-hidden="true" />
+              </ToolButton>
+            )}
+            <ToolButton label="New file" onClick={() => void newFile()}>
+              <FilePlus2 size={17} aria-hidden="true" />
+            </ToolButton>
+          </>
+        ) : null}
         <button
           type="button"
           disabled={!chosen}
@@ -253,7 +612,20 @@ function Shell({
           ))}
         </nav>
 
-        <div className="min-w-0 flex-1 overflow-auto p-4" onClick={() => setSelected(null)}>
+        <div
+          ref={contents}
+          role="region"
+          aria-label="Folder contents"
+          className="flex min-w-0 flex-1 flex-col overflow-auto p-4"
+          onClick={() => setSelected(null)}
+          onContextMenu={(event) => openMenu(event, null)}
+          onKeyDown={onKeys}
+        >
+          {problem ? (
+            <div className="mb-3">
+              <Notice tone="not-yet">{problem}</Notice>
+            </div>
+          ) : null}
           {place === null ? (
             <p className="p-6 text-center text-sm text-muted">Choose a student, or My code, on the left.</p>
           ) : loading ? (
@@ -261,39 +633,35 @@ function Shell({
           ) : error ? (
             <Notice tone="system-error">{messageFor(error)}</Notice>
           ) : items.length === 0 ? (
-            <p className="p-6 text-center text-sm text-muted">This folder is empty.</p>
+            <p className="p-6 text-center text-sm text-muted">
+              This folder is empty.{actions ? ' Right-click to make a folder or a file.' : ''}
+            </p>
           ) : view === 'icons' ? (
             <ul className="grid grid-cols-[repeat(auto-fill,minmax(108px,1fr))] content-start gap-2">
               {items.map((item) => (
                 <li key={item.id}>
                   <button
                     type="button"
-                    aria-label={`${item.name}, ${item.kind}`}
-                    aria-pressed={item.id === selected}
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      setSelected(item.id)
-                    }}
-                    onDoubleClick={() => open(item)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') open(item)
-                    }}
+                    {...itemProps(item)}
                     className="group flex w-full cursor-default flex-col items-center gap-1.5 rounded-xl px-1 py-1.5 text-grape"
                   >
                     <span
                       className={`flex h-[72px] w-20 items-center justify-center rounded-xl ${
-                        item.id === selected ? 'bg-grape-pale' : 'group-hover:bg-grape-pale/40'
+                        dropOn === item.id
+                          ? 'bg-grape-pale ring-2 ring-grape'
+                          : item.id === selected
+                            ? 'bg-grape-pale'
+                            : 'group-hover:bg-grape-pale/40'
                       }`}
                     >
                       {item.kind === 'folder' ? <FolderIcon /> : <FileIcon name={item.name} />}
                     </span>
-                    <span
-                      className={`max-w-[104px] break-words rounded-md px-1.5 text-center text-[13px] leading-tight ${
+                    {label(
+                      item,
+                      `max-w-[104px] break-words rounded-md px-1.5 text-center text-[13px] leading-tight ${
                         item.id === selected ? 'bg-grape text-surface' : ''
-                      }`}
-                    >
-                      {item.name}
-                    </span>
+                      }`,
+                    )}
                   </button>
                 </li>
               ))}
@@ -317,29 +685,18 @@ function Shell({
                         event.stopPropagation()
                         setSelected(item.id)
                       }}
-                      onDoubleClick={() => open(item)}
-                      className={on ? 'bg-grape text-surface' : 'text-grape'}
+                      onDoubleClick={() => renaming !== item.id && open(item)}
+                      onContextMenu={(event) => openMenu(event, item)}
+                      className={dropOn === item.id ? 'bg-grape-pale' : on ? 'bg-grape text-surface' : 'text-grape'}
                     >
                       <td className="rounded-l-lg px-2.5 py-1.5">
-                        <button
-                          type="button"
-                          aria-label={`${item.name}, ${item.kind}`}
-                          aria-pressed={on}
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            setSelected(item.id)
-                          }}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter') open(item)
-                          }}
-                          className="flex cursor-default items-center gap-2"
-                        >
+                        <button type="button" {...itemProps(item)} className="flex cursor-default items-center gap-2">
                           {item.kind === 'folder' ? (
                             <Folder size={16} aria-hidden="true" className={on ? '' : 'text-lavender'} />
                           ) : (
                             <span aria-hidden="true" className={`h-4 w-3 rounded-sm ${on ? 'bg-surface' : badgeColour(item.name)}`} />
                           )}
-                          {item.name}
+                          {label(item, '')}
                         </button>
                       </td>
                       <td className={`px-2.5 py-1.5 ${on ? '' : 'text-muted'}`}>{kindOf(item)}</td>
@@ -350,6 +707,8 @@ function Shell({
               </tbody>
             </table>
           )}
+          {/* The empty space below the items is part of the folder: right-click it, drop on it. */}
+          <div className="min-h-8 flex-1" />
         </div>
       </div>
 
@@ -357,10 +716,106 @@ function Shell({
         <span>
           {items.length} {items.length === 1 ? 'item' : 'items'}
           {chosen ? ` · ${chosen.name} selected` : ''}
+          {clip ? ` · ${clip.items[0]?.name} ${clip.mode === 'cut' ? 'cut' : 'copied'}` : ''}
         </span>
-        <span>Double-click to open</span>
+        <span>{actions ? 'Double-click to open · right-click for more' : 'Double-click to open'}</span>
       </div>
+
+      {menu ? (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          label={menu.item ? `${menu.item.name} actions` : 'Folder actions'}
+          entries={entriesFor(menu.item)}
+          onClose={() => setMenu(null)}
+        />
+      ) : null}
+
+      <Dialog
+        open={deleting !== null}
+        title={deleting ? `Delete ${deleting.name}?` : ''}
+        onClose={() => setDeleting(null)}
+        confirm={{
+          label: 'Delete',
+          onConfirm: () => {
+            const item = deleting
+            setDeleting(null)
+            if (item) void remove(item)
+          },
+        }}
+      >
+        {deleting?.kind === 'folder'
+          ? 'The folder and everything in it leave this place. They are put away rather than destroyed, so they can be brought back.'
+          : 'It leaves this folder. It is put away rather than destroyed, so it can be brought back.'}
+      </Dialog>
+
+      <Dialog
+        open={moving !== null}
+        title={moving ? `Move ${moving.name}` : ''}
+        onClose={() => setMoving(null)}
+        confirm={{
+          label: 'Move',
+          onConfirm: () => {
+            const item = moving
+            setMoving(null)
+            if (item) void moveInto(item, moveTarget || null)
+          },
+        }}
+      >
+        <Select label="Move to" value={moveTarget} onChange={(event) => setMoveTarget(event.target.value)}>
+          <option value="">{placeName} (the top)</option>
+          {moveChoices.map((choice) => (
+            <option key={choice.id} value={choice.id}>
+              {choice.label}
+            </option>
+          ))}
+        </Select>
+      </Dialog>
     </div>
+  )
+}
+
+/** Naming in place: the name selected up to its extension, Enter keeps, Escape cancels. */
+function RenameBox({ name, onDone, onCancel }: { name: string; onDone: (name: string) => void; onCancel: () => void }) {
+  const box = useRef<HTMLInputElement>(null)
+  const [value, setValue] = useState(name)
+  useEffect(() => {
+    const input = box.current
+    if (!input) return
+    input.focus()
+    const dot = name.lastIndexOf('.')
+    input.setSelectionRange(0, dot > 0 ? dot : name.length)
+  }, [name])
+  return (
+    <input
+      ref={box}
+      aria-label={`New name for ${name}`}
+      value={value}
+      onChange={(event) => setValue(event.target.value)}
+      onClick={(event) => event.stopPropagation()}
+      onDoubleClick={(event) => event.stopPropagation()}
+      onKeyDown={(event) => {
+        event.stopPropagation()
+        if (event.key === 'Enter') onDone(value)
+        if (event.key === 'Escape') onCancel()
+      }}
+      onBlur={() => onDone(value)}
+      className="w-[104px] rounded-md bg-surface px-1.5 text-center text-[13px] text-grape ring-2 ring-grape outline-none"
+    />
+  )
+}
+
+function ToolButton({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      className="flex h-8 w-8 items-center justify-center rounded-xl text-grape hover:bg-grape-pale"
+    >
+      {children}
+    </button>
   )
 }
 
@@ -372,7 +827,7 @@ interface Item {
   file?: FileRow
 }
 
-interface Place {
+interface SidebarPlace {
   key: string
   label: string
   icon: typeof Folder
@@ -380,7 +835,7 @@ interface Place {
 }
 
 /** The sidebar: a teacher's class and My code, or a child's Recents and My work. */
-function usePlaces(): { title: string; items: Place[] }[] {
+function usePlaces(): { title: string; items: SidebarPlace[] }[] {
   const { role, classId } = useDesk()
   const navigate = useNavigate()
   const roster = useRoster(classId ?? '', role === 'teacher')
@@ -413,13 +868,30 @@ function usePlaces(): { title: string; items: Place[] }[] {
   ]
 }
 
-function Crumb({ current, onClick, children }: { current: boolean; onClick: () => void; children: ReactNode }) {
+function Crumb({
+  current,
+  onClick,
+  children,
+  dropping = false,
+  drop = {},
+}: {
+  current: boolean
+  onClick: () => void
+  children: ReactNode
+  /** Something is being dragged over it. */
+  dropping?: boolean
+  /** Dropping here moves into this folder — Finder's path bar does the same. */
+  drop?: object
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-current={current ? 'location' : undefined}
-      className={`rounded-lg px-2 py-1 text-sm hover:bg-grape-pale ${current ? 'font-semibold text-grape' : 'text-muted'}`}
+      {...drop}
+      className={`rounded-lg px-2 py-1 text-sm hover:bg-grape-pale ${current ? 'font-semibold text-grape' : 'text-muted'} ${
+        dropping ? 'bg-grape-pale ring-2 ring-grape' : ''
+      }`}
     >
       {children}
     </button>

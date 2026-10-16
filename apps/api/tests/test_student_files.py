@@ -1,15 +1,16 @@
-"""A child's files, read by a teacher in the Files app (16 Oct 2026).
+"""A child's files, for a teacher in the Files app (16 Oct 2026; organising, 17 Oct).
 
-Read-only, and the tenancy cases carry the weight: another centre's child is a 404, a file
-id belonging to a different child is a 404 under this child's path, and a student cannot
-use these routes at all.
+The tenancy cases carry the weight: another centre's child is a 404, a file or folder id
+belonging to a different child is a 404 under this child's path, and a student cannot use
+these routes at all. The writes are audited, and none of them can change what a file says.
 """
 
 import uuid
 
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.models import Student, StudentDocument, StudentFolder
+from app.models import AuditLog, DocumentStatus, Student, StudentDocument, StudentFolder
 
 
 async def a_childs_work(session: AsyncSession, student: dict) -> dict:
@@ -106,3 +107,105 @@ async def test_without_credentials_it_is_401(client, student_on_roster) -> None:
     aria = await student_on_roster()
     response = await client.get(f"/students/{aria['student_id']}/documents")
     assert response.status_code == 401
+
+
+# --- organising a child's files (17 Oct 2026) -------------------------------------------
+
+
+async def test_a_teacher_organises_a_childs_files_and_each_change_is_audited(
+    client, student_on_roster, session: AsyncSession
+) -> None:
+    aria = await student_on_roster()
+    work = await a_childs_work(session, aria)
+    base, headers = f"/students/{aria['student_id']}", aria["headers"]
+
+    made = await client.post(f"{base}/folders", json={"name": "Week 2"}, headers=headers)
+    assert made.status_code == 201
+    week2 = made.json()["id"]
+    copied = await client.post(
+        f"{base}/documents",
+        json={"title": "handout.py", "content": "print(1)\n", "folder_id": week2},
+        headers=headers,
+    )
+    assert copied.status_code == 201 and copied.json()["content"] == "print(1)\n"
+
+    moved = await client.patch(
+        f"{base}/documents/{work['loose'].id}",
+        json={"title": "ideas.txt", "folder_id": week2},
+        headers=headers,
+    )
+    assert moved.json()["title"] == "ideas.txt" and moved.json()["folder_id"] == week2
+    renamed = await client.patch(
+        f"{base}/folders/{work['folder'].id}", json={"name": "Lesson six"}, headers=headers
+    )
+    assert renamed.json()["name"] == "Lesson six"
+    gone = await client.post(f"{base}/documents/{work['inside'].id}/archive", headers=headers)
+    assert gone.json()["status"] == "archived"
+    deleted = await client.post(f"{base}/folders/{week2}/delete", headers=headers)
+    assert deleted.json() == {"files_archived": 2}
+
+    rows = (
+        await session.exec(select(AuditLog).where(AuditLog.target_id == work["folder"].student_id))
+    ).all()
+    assert sorted(r.action for r in rows if r.action.startswith("student_file.")) == sorted(
+        [
+            "student_file.folder_created",
+            "student_file.created",
+            "student_file.changed",
+            "student_file.folder_changed",
+            "student_file.deleted",
+            "student_file.folder_deleted",
+        ]
+    )
+
+
+async def test_a_teacher_cannot_change_what_a_childs_file_says(
+    client, student_on_roster, session: AsyncSession
+) -> None:
+    aria = await student_on_roster()
+    work = await a_childs_work(session, aria)
+    response = await client.patch(
+        f"/students/{aria['student_id']}/documents/{work['inside'].id}",
+        json={"content": "print('teacher')"},
+        headers=aria["headers"],
+    )
+    assert response.status_code == 200
+    await session.refresh(work["inside"])
+    assert work["inside"].content == 'print("*")\n'
+
+
+async def test_the_childs_own_rules_apply(client, student_on_roster, session: AsyncSession) -> None:
+    aria = await student_on_roster("Aria K")
+    ben = await student_on_roster("Ben T", class_name="Year 2-3")
+    arias = await a_childs_work(session, aria)
+    bens = await a_childs_work(session, ben)
+    base, headers = f"/students/{aria['student_id']}", aria["headers"]
+
+    into_bens = await client.patch(
+        f"{base}/documents/{arias['loose'].id}",
+        json={"folder_id": str(bens["folder"].id)},
+        headers=headers,
+    )
+    assert into_bens.status_code == 404, "another child's folder is not a place in Aria's files"
+    bens_file = await client.post(f"{base}/documents/{bens['inside'].id}/archive", headers=headers)
+    assert bens_file.status_code == 404
+    await session.refresh(bens["inside"])
+    assert bens["inside"].status == DocumentStatus.ACTIVE
+    # Last: a refused insert rolls the test's session back.
+    clash = await client.post(f"{base}/documents", json={"title": "notes.txt"}, headers=headers)
+    assert clash.status_code == 409
+
+
+async def test_writes_are_refused_outside_the_centre_and_to_students(
+    client, signed_in, foreign_centre, signed_in_student
+) -> None:
+    headers = await signed_in()
+    base = f"/students/{foreign_centre['student'].id}"
+    assert (
+        await client.post(f"{base}/folders", json={"name": "x"}, headers=headers)
+    ).status_code == 404
+    assert (await client.post(f"{base}/documents", json={}, headers=headers)).status_code == 404
+
+    aria = await signed_in_student()
+    mine = f"/students/{aria['student_id']}"
+    assert (await client.post(f"{mine}/folders", json={"name": "x"})).status_code == 403
