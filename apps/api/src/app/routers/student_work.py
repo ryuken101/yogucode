@@ -6,8 +6,9 @@ reached only through a class the child is actively enrolled in (`app.scoping`).
 
 **What a child is sent, and what they are not.** The problem's prompt, starter code and
 test cases — hidden ones included, because the tests run in their browser and a test
-cannot be run without its expected value. That is the accepted trade-off of running code
-client-side (spec §4: not an anti-cheat product). Never sent: the reference solution, and
+cannot be run without its expected value — and a custom check's code, for the same reason.
+That is the accepted trade-off of running code client-side (spec §4: not an anti-cheat
+product). Never sent: the reference solution, and
 any hint rung they have not unlocked. Examples go as their transcripts only — what the
 solution printed, never the solution.
 
@@ -59,6 +60,7 @@ from app.problem_bank import (
     FunctionTest,
     IoTest,
     LeafDoc,
+    ScriptTest,
     TranscriptLine,
     read_document,
 )
@@ -136,7 +138,7 @@ class StudentLeafOut(BaseModel):
     item_id: uuid.UUID
     label: str | None
     prompt_md: str
-    tests: list[IoTest | FunctionTest]
+    tests: list[IoTest | FunctionTest | ScriptTest]
     examples: list[list[TranscriptLine]]
     hints: list[UnlockedHintOut]
     next_hint: NextHintOut | None

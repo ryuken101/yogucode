@@ -391,3 +391,41 @@ async def test_an_archived_problem_comes_back_as_a_draft(
     assert (await client.get("/items", headers=headers)).json() == []
     restored = await client.post(f"/items/{created['id']}/unarchive", headers=headers)
     assert restored.json()["status"] == "draft"
+
+
+async def test_a_custom_check_is_saved_and_read_back(client, signed_in, session) -> None:
+    """The teacher's own Python check (17 Oct 2026): stored as `{code}`, read back whole."""
+    from app.models import Concept
+
+    headers = await signed_in()
+    concept = Concept(key="input-ex", label="Input")
+    session.add(concept)
+    await session.flush()
+    check = {
+        "kind": "script",
+        "name": "hits and misses",
+        "hidden": False,
+        "code": (
+            "for g in range(10):\n"
+            "    out, v = run(g)\n"
+            "    check(('HIT!' in out) == (g in v['ships']))\n"
+        ),
+    }
+    body = {
+        "title": "Battleship",
+        "concept_ids": [str(concept.id)],
+        "primary_concept_id": str(concept.id),
+        "solution_code": "ships = [2]\nprint('HIT!' if int(input()) in ships else 'MISS!')\n",
+        "tests": [check],
+    }
+    created = await client.post("/items", json=body, headers=headers)
+    assert created.status_code == 201, created.text
+    assert created.json()["document"]["tests"] == [check]
+    assert created.json()["publish_problems"] == []
+
+    empty = await client.put(
+        f"/items/{created.json()['id']}",
+        json=body | {"tests": [check | {"code": ""}]},
+        headers=headers,
+    )
+    assert empty.status_code == 422

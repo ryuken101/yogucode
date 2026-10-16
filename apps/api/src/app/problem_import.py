@@ -5,9 +5,10 @@ problems one web form at a time. A file can be written in an editor, reviewed, s
 another teacher and imported in one go.
 
 **The file format is written for teachers, not for the API.** `prints:` and `returns:`
-rather than `kind: io` and `expected:`; concepts by key (`lists`) rather than by uuid.
-`to_document` translates one entry into the `ProblemDoc` the editor saves, so an imported
-problem is indistinguishable from a typed one.
+rather than `kind: io` and `expected:`, and `check:` for a custom Python check; concepts
+by key (`lists`) rather than by uuid. `to_document` translates one entry into the
+`ProblemDoc` the editor saves, so an imported problem is indistinguishable from a typed
+one.
 
 **Importing is two steps: plan, then apply.** The plan says, per entry, what would happen —
 create, update the draft, start a new version, or nothing — and the apply does exactly
@@ -46,6 +47,7 @@ from app.problem_bank import (
     OptionDoc,
     PartDoc,
     ProblemDoc,
+    ScriptTest,
     publish_problems,
     read_document,
     write_document,
@@ -74,11 +76,14 @@ class FileTest(_Strict):
     match: Literal["exact", "contains"] = "exact"
     call: str | None = None
     returns: str | None = None
+    # A custom check: the teacher's Python, with run() and check() (17 Oct 2026).
+    check: str | None = None
 
     @model_validator(mode="after")
     def _one_shape(self) -> "FileTest":
-        if (self.prints is None) == (self.call is None):
-            raise ValueError("a test needs either `prints:` or `call:` + `returns:`")
+        shapes = sum(value is not None for value in (self.prints, self.call, self.check))
+        if shapes != 1:
+            raise ValueError("a test needs one of `prints:`, `call:` + `returns:`, or `check:`")
         if self.call is not None and self.returns is None:
             raise ValueError("a `call:` test needs `returns:`")
         return self
@@ -152,6 +157,8 @@ def _leaf_fields(leaf: FileLeaf, concept_ids: dict[str, uuid.UUID]) -> dict:
         "tests": [
             IoTest(name=t.name, hidden=t.hidden, stdin=t.input, expected=t.prints, match=t.match)
             if t.prints is not None
+            else ScriptTest(kind="script", name=t.name, hidden=t.hidden, code=t.check)
+            if t.check is not None
             else FunctionTest(
                 kind="function", name=t.name, hidden=t.hidden, call=t.call, expected=t.returns
             )

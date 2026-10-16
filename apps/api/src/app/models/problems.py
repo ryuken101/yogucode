@@ -30,8 +30,10 @@ a test case cannot silently change what last fortnight's marks meant. Drafts are
 editable — nothing can have been attempted against a draft.
 
 **Test-case `spec` is JSONB, validated per `kind` by the API.** `io` holds
-`{stdin, expected, match}`; `function` holds `{call, expected}`. A future turtle kind is
-a new `kind` value and a new Pydantic shape, not a migration.
+`{stdin, expected, match}`; `function` holds `{call, expected}`; `script` (17 Oct 2026)
+holds `{code}` — the teacher's own Python check, for checks that depend on values the
+child chose (`runtime/grader.py`). A new kind is a new Pydantic shape plus a one-line
+change to the `kind` CHECK constraint.
 
 `source_key` is the YAML import's identity for a problem (step 5): re-importing a file
 updates the problem it created rather than adding a second copy. Every version of a
@@ -66,6 +68,7 @@ class ItemStatus(StrEnum):
 class TestKind(StrEnum):
     IO = "io"
     FUNCTION = "function"
+    SCRIPT = "script"
 
 
 class Item(TimestampMixin, table=True):
@@ -153,7 +156,7 @@ class ItemConcept(SQLModel, table=True):
 
 class TestCase(SQLModel, table=True):
     __tablename__ = "test_cases"
-    __table_args__ = (CheckConstraint("kind IN ('io', 'function')", name="kind"),)
+    __table_args__ = (CheckConstraint("kind IN ('io', 'function', 'script')", name="kind"),)
     # pytest collects classes named Test*; this is a model, not a test.
     __test__ = False
 

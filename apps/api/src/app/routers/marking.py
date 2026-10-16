@@ -43,7 +43,7 @@ from app.models import (
     SubmissionSource,
 )
 from app.models.base import utcnow
-from app.problem_bank import FunctionTest, IoTest, read_document
+from app.problem_bank import FunctionTest, IoTest, ScriptTest, read_document
 from app.scoping import (
     get_centre_attempt,
     get_owned_assignment,
@@ -129,7 +129,7 @@ class QuestionMarkingOut(BaseModel):
     prompt_md: str
     solution_code: str
     concept_ids: list[uuid.UUID]
-    tests: list[IoTest | FunctionTest]
+    tests: list[IoTest | FunctionTest | ScriptTest]
     # Multiple choice: every option with its count — spec §3.6's "six chose 'range is
     # inclusive'", which is a reteaching plan rather than a score.
     options: list[OptionCountOut]

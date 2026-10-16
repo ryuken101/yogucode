@@ -13,6 +13,11 @@ Three properties matter more than the rest:
 - **`input()` reads the test's stdin and its prompt is not captured.** So an io test's
   `expected` is what the program *prints*, and a teacher writing
   `name = input("Name? ")` does not have to put "Name? " in the expected output.
+- **A custom check** (`script`, 17 Oct 2026) is Python the teacher wrote, for checks
+  that depend on the child's own values — "for every guess, HIT! exactly when the guess is
+  in *their* ships". It gets `run(*inputs)`, which runs the child's program fresh and
+  returns `(output, variables)`, and `check(condition, message)`. A failure says the
+  teacher's message and what that run printed.
 - **A runaway loop fails one test, not the page.** A wall-clock deadline is checked from a
   trace function; the page's Stop button cannot help here, because it cannot know which
   test is running.
@@ -167,6 +172,88 @@ def _run_function(code, test):
     }
 
 
+# --- custom checks (17 Oct 2026) -----------------------------------------------------
+
+# A whole custom check, across all its runs. Each run keeps its own TIME_LIMIT_SECONDS.
+SCRIPT_TIME_LIMIT_SECONDS = 10.0
+SCRIPT_MISTAKE = "This check has a mistake in it — tell your teacher"
+
+
+class CheckFailed(Exception):
+    """A case of a custom check did not hold. The message is the teacher's, for the child."""
+
+
+class _Variables(dict):
+    """The program's variables. Asking for one it does not have fails the check, in words
+    a child can act on, rather than crashing the teacher's code with a KeyError."""
+
+    def __missing__(self, name):
+        raise CheckFailed(f"Your program has no variable called `{name}`")
+
+
+def _variables(namespace):
+    """The program's own values: no functions, classes, modules or `__dunder__` names."""
+    import types
+
+    return _Variables(
+        {
+            name: value
+            for name, value in namespace.items()
+            if not name.startswith("__")
+            and name != "input"
+            and not isinstance(value, (types.FunctionType, types.ModuleType, type))
+        }
+    )
+
+
+def _run_script(code, test):
+    """Run the teacher's check against the child's program."""
+    state = {"got": None, "runs": 0}
+    deadline = time.monotonic() + SCRIPT_TIME_LIMIT_SECONDS
+
+    def run(*inputs):
+        if time.monotonic() > deadline:
+            raise CheckFailed("took too long — is there a loop that never ends?")
+        stdin = "".join(f"{value}\n" for value in inputs)
+        namespace, output, error = _execute(code, stdin, function_test=False)
+        state["runs"] += 1
+        state["got"] = _normalise(output)
+        if error is not None:
+            if error.startswith("EOFError"):
+                error = "your program asked for more input than this check gives it"
+            raise CheckFailed(error)
+        return state["got"], _variables(namespace)
+
+    def check(condition, message=""):
+        if not condition:
+            raise CheckFailed(str(message) or "This check did not hold")
+
+    def contains(output, text):
+        """Whether `text` is in `output`, ignoring case and spacing."""
+        squash = lambda value: " ".join(str(value).split()).casefold()  # noqa: E731
+        return squash(text) in squash(output)
+
+    scope = {"__builtins__": builtins, "run": run, "check": check, "contains": contains}
+    try:
+        exec(compile(test["code"], "<check>", "exec"), scope)
+    except CheckFailed as failed:
+        result = {"passed": False, "error": str(failed)}
+        if state["got"] is not None:
+            result["got"] = _shown(state["got"])
+        return result
+    except KeyboardInterrupt:
+        raise
+    except Exception as exc:  # noqa: BLE001 — the teacher's mistake, not the child's
+        detail = f"{type(exc).__name__}: {exc}" if str(exc) else type(exc).__name__
+        if isinstance(exc, SyntaxError) and exc.lineno:
+            detail = f"SyntaxError on line {exc.lineno} of the check: {exc.msg}"
+        return {"passed": False, "error": detail if test.get("reveal") else SCRIPT_MISTAKE}
+    if state["runs"] == 0:
+        return {"passed": False, "error": "this check never runs the program — call run()"
+                if test.get("reveal") else SCRIPT_MISTAKE}
+    return {"passed": True, "error": None}
+
+
 def run_tests(code, tests_json):
     """Run every test. Returns JSON: {"compile_error": str|null, "results": [...]}."""
     tests = json.loads(tests_json)
@@ -183,6 +270,8 @@ def run_tests(code, tests_json):
     for test in tests:
         if test["kind"] == "function":
             result = _run_function(code, test)
+        elif test["kind"] == "script":
+            result = _run_script(code, test)
         else:
             result = _run_io(code, test)
         result["name"] = test["name"]

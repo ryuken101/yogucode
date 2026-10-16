@@ -3573,7 +3573,7 @@ export interface components {
              */
             starter_code: string;
             /** Tests */
-            tests?: (components["schemas"]["IoTest"] | components["schemas"]["FunctionTest"])[];
+            tests?: (components["schemas"]["IoTest"] | components["schemas"]["FunctionTest"] | components["schemas"]["ScriptTest"])[];
         };
         /** PartRef */
         PartRef: {
@@ -3686,7 +3686,7 @@ export interface components {
              */
             starter_code: string;
             /** Tests */
-            tests?: (components["schemas"]["IoTest"] | components["schemas"]["FunctionTest"])[];
+            tests?: (components["schemas"]["IoTest"] | components["schemas"]["FunctionTest"] | components["schemas"]["ScriptTest"])[];
             /** Title */
             title: string;
         };
@@ -3792,7 +3792,7 @@ export interface components {
             /** Solution Code */
             solution_code: string;
             /** Tests */
-            tests: (components["schemas"]["IoTest"] | components["schemas"]["FunctionTest"])[];
+            tests: (components["schemas"]["IoTest"] | components["schemas"]["FunctionTest"] | components["schemas"]["ScriptTest"])[];
             /** Title */
             title: string;
         };
@@ -3937,6 +3937,30 @@ export interface components {
             passed?: number | null;
             /** Total */
             total?: number | null;
+        };
+        /**
+         * ScriptTest
+         * @description The teacher's own Python check (17 Oct 2026), for what a fixed expected value cannot
+         *     say — a check that depends on values the child chose.
+         *
+         *     `code` gets `run(*inputs)`, which runs the child's program and returns `(output,
+         *     variables)`, and `check(condition, message)`. See `runtime/grader.py`.
+         */
+        ScriptTest: {
+            /** Code */
+            code: string;
+            /**
+             * Hidden
+             * @default false
+             */
+            hidden: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "script";
+            /** Name */
+            name: string;
         };
         /** SessionsRevokedOut */
         SessionsRevokedOut: {
@@ -4194,7 +4218,7 @@ export interface components {
             /** Prompt Md */
             prompt_md: string;
             /** Tests */
-            tests: (components["schemas"]["IoTest"] | components["schemas"]["FunctionTest"])[];
+            tests: (components["schemas"]["IoTest"] | components["schemas"]["FunctionTest"] | components["schemas"]["ScriptTest"])[];
         };
         /** StudentMeOut */
         StudentMeOut: {

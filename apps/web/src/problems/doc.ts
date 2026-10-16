@@ -16,7 +16,7 @@ import type { TestCheck } from '../runtime/protocol'
 
 export type ProblemDoc = Schemas['ProblemDoc']
 export type PartDoc = Schemas['PartDoc']
-export type TestDoc = Schemas['IoTest'] | Schemas['FunctionTest']
+export type TestDoc = Schemas['IoTest'] | Schemas['FunctionTest'] | Schemas['ScriptTest']
 export type HintDoc = Schemas['HintDoc']
 export type ExampleDoc = Schemas['ExampleDoc']
 export type ExamplePiece = Schemas['TranscriptLine']
@@ -94,8 +94,40 @@ export function nextPartLabel(parts: PartDoc[]): string | null {
   return PART_LABELS.find((label) => !used.has(label)) ?? null
 }
 
+/**
+ * Starting points for a custom check (17 Oct 2026). Each one is a working example of a
+ * shape that a fixed expected value cannot express.
+ */
+export const SCRIPT_TEMPLATES: { label: string; code: string }[] = [
+  {
+    label: 'Every input in a range',
+    code: `# Try every guess, and check the answer against the ships THEY chose.
+for guess in range(10):
+    out, v = run(guess)          # run their program, typing the guess
+    hit = guess in v["ships"]    # v holds their program's variables
+    check(("HIT!" in out) == hit,
+          f"Guessing {guess} should say {'HIT!' if hit else 'MISS!'}")
+`,
+  },
+  {
+    label: 'Uses a variable they chose',
+    code: `out, v = run()
+check(len(v["names"]) >= 3, "Make a list called names with at least 3 names in it")
+check(contains(out, v["names"][0]), "Print the first name in your list")
+`,
+  },
+  {
+    label: 'Output contains a value they set',
+    code: `out, v = run("Ken")
+check(contains(out, "Ken"), "Say hello to the name that was typed in")
+check(contains(out, str(v["age"])), "Print the age you stored in age")
+`,
+  },
+]
+
 export function newTest(kind: TestDoc['kind'], index: number): TestDoc {
   const name = `Check ${index + 1}`
+  if (kind === 'script') return { kind: 'script', name, hidden: false, code: SCRIPT_TEMPLATES[0]!.code }
   return kind === 'io'
     ? { kind: 'io', name, hidden: false, stdin: '', expected: '', match: 'exact' }
     : { kind: 'function', name, hidden: false, call: '', expected: '' }
@@ -127,8 +159,10 @@ export function toChecks(
   tests: TestDoc[] | undefined,
   { revealHidden = false }: { revealHidden?: boolean } = {},
 ): TestCheck[] {
-  return (tests ?? []).map((test) =>
-    test.kind === 'io'
+  return (tests ?? []).map((test): TestCheck =>
+    test.kind === 'script'
+      ? { kind: 'script', name: test.name, hidden: test.hidden && !revealHidden, code: test.code, reveal: revealHidden }
+      : test.kind === 'io'
       ? {
           kind: 'io',
           name: test.name,

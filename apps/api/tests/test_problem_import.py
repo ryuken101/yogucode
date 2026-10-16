@@ -195,3 +195,41 @@ async def test_a_student_cannot_import(client, signed_in_student) -> None:
     await signed_in_student()
     response = await client.post("/items/import", json={"yaml": FILE, "apply": True})
     assert response.status_code == 403
+
+
+async def test_a_custom_check_imports_as_one(client, signed_in, session: AsyncSession) -> None:
+    """`check:` is the teacher's own Python check (17 Oct 2026)."""
+    headers = await signed_in()
+    await lists_concept(session)
+    text = FILE.replace(
+        """      - name: last is 5
+        call: numbers[-1]
+        returns: "5"
+""",
+        """      - name: ends with 5
+        check: |
+          out, v = run()
+          check(v["numbers"][-1] == 5, "The last number should be 5")
+""",
+    )
+    report = await run_import(client, headers, text, apply=True)
+    assert report["applied"], report
+    item_id = report["entries"][0]["item_id"]
+    doc = (await client.get(f"/items/{item_id}", headers=headers)).json()["document"]
+    assert doc["tests"][1] == {
+        "kind": "script",
+        "name": "ends with 5",
+        "hidden": False,
+        "code": 'out, v = run()\ncheck(v["numbers"][-1] == 5, "The last number should be 5")\n',
+    }
+
+
+async def test_a_test_with_two_shapes_is_an_error(client, signed_in, session: AsyncSession) -> None:
+    headers = await signed_in()
+    await lists_concept(session)
+    text = FILE.replace(
+        '        prints: "[1, 2, 3, 5]"\n', '        prints: "[1, 2, 3, 5]"\n        check: run()\n'
+    )
+    report = await run_import(client, headers, text, apply=False)
+    assert not report["applied"]
+    assert "one of `prints:`" in report["error"]

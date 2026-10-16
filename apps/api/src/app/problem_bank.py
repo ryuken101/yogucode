@@ -82,7 +82,21 @@ class FunctionTest(BaseModel):
     expected: str = Field(min_length=1, max_length=MAX_TEST_TEXT)
 
 
-TestDoc = Annotated[IoTest | FunctionTest, Field(discriminator="kind")]
+class ScriptTest(BaseModel):
+    """The teacher's own Python check (17 Oct 2026), for what a fixed expected value cannot
+    say — a check that depends on values the child chose.
+
+    `code` gets `run(*inputs)`, which runs the child's program and returns `(output,
+    variables)`, and `check(condition, message)`. See `runtime/grader.py`.
+    """
+
+    kind: Literal["script"]
+    name: str = Field(min_length=1, max_length=120)
+    hidden: bool = False
+    code: str = Field(min_length=1, max_length=MAX_TEST_TEXT)
+
+
+TestDoc = Annotated[IoTest | FunctionTest | ScriptTest, Field(discriminator="kind")]
 
 
 class HintDoc(BaseModel):
@@ -187,9 +201,11 @@ class ProblemDoc(LeafDoc):
 # --- reading ------------------------------------------------------------------------
 
 
-def _test_doc(row: TestCase) -> IoTest | FunctionTest:
+def _test_doc(row: TestCase) -> IoTest | FunctionTest | ScriptTest:
     if row.kind == TestKind.IO:
         return IoTest(name=row.name, hidden=row.hidden, **row.spec)
+    if row.kind == TestKind.SCRIPT:
+        return ScriptTest(kind="script", name=row.name, hidden=row.hidden, **row.spec)
     return FunctionTest(kind="function", name=row.name, hidden=row.hidden, **row.spec)
 
 

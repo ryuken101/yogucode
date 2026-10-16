@@ -26,6 +26,12 @@ export type TestCheck =
       match?: 'exact' | 'contains'
     }
   | { kind: 'function'; name: string; hidden?: boolean; call: string; expected: string }
+  /**
+   * A custom check (17 Oct 2026): the teacher's Python, with `run()` and `check()`.
+   * `reveal` is the teacher's own run — a mistake in the check's code is shown as itself
+   * rather than as "tell your teacher".
+   */
+  | { kind: 'script'; name: string; hidden?: boolean; code: string; reveal?: boolean }
 
 /** One test's outcome. A hidden test carries only `name`, `hidden` and `passed`. */
 export interface TestResult {

@@ -1,15 +1,19 @@
 /**
  * A leaf's test cases.
  *
- * Two kinds, in the order a Year 4–6 class meets them: "prints" (give it this input, it
- * should print this) and "returns" (call this function, it should give back this). The
- * row's fields change with its kind; everything else — name, hidden — is shared.
+ * Three kinds: "prints" (give it this input, it should print this), "returns" (call this
+ * function, it should give back this), and since 17 Oct 2026 "passes my check" — the
+ * teacher's own Python, for checks that depend on values the child chose (their `ships`,
+ * their list of names). The row's fields change with its kind; everything else — name,
+ * hidden — is shared.
  */
 
+import { useState } from 'react'
 import { Button } from '../components/Button'
 import { Select, TextInput, Textarea } from '../components/Field'
+import { CodeSurface } from '../editor/CodeSurface'
 import type { TestResult } from '../runtime/protocol'
-import { newTest, type TestDoc } from './doc'
+import { SCRIPT_TEMPLATES, newTest, type TestDoc } from './doc'
 import { TestResultLine } from './TestResults'
 
 interface Props {
@@ -21,6 +25,10 @@ interface Props {
 }
 
 export function TestsEditor({ tests, onChange, results, disabled }: Props) {
+  // Bumped when a template replaces a check's code: Monaco is uncontrolled after mount, so
+  // the editor has to be remounted to show it — but never on ordinary typing.
+  const [round, setRound] = useState<Record<number, number>>({})
+
   function update(index: number, next: TestDoc) {
     onChange(tests.map((test, i) => (i === index ? next : test)))
   }
@@ -48,6 +56,7 @@ export function TestsEditor({ tests, onChange, results, disabled }: Props) {
             >
               <option value="io">prints</option>
               <option value="function">returns</option>
+              <option value="script">passes my check (Python)</option>
             </Select>
             <label className="flex items-end gap-2 pb-2 text-sm text-grape">
               <input
@@ -60,7 +69,46 @@ export function TestsEditor({ tests, onChange, results, disabled }: Props) {
             </label>
           </div>
 
-          {test.kind === 'io' ? (
+          {test.kind === 'script' ? (
+            <div className="mt-3 flex flex-col gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm text-muted">
+                  <code className="font-mono text-grape">run(…)</code> runs their program, typing what
+                  you give it, and gives back <code className="font-mono text-grape">(output, variables)</code>.{' '}
+                  <code className="font-mono text-grape">check(condition, message)</code> shows your
+                  message when it isn&rsquo;t true.
+                </p>
+                {disabled ? null : (
+                  <Select
+                    label="Start from an example"
+                    value=""
+                    onChange={(event) => {
+                      const template = SCRIPT_TEMPLATES.find((t) => t.label === event.target.value)
+                      if (!template) return
+                      update(index, { ...test, code: template.code })
+                      setRound((now) => ({ ...now, [index]: (now[index] ?? 0) + 1 }))
+                    }}
+                  >
+                    <option value="">Choose…</option>
+                    {SCRIPT_TEMPLATES.map((template) => (
+                      <option key={template.label} value={template.label}>
+                        {template.label}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+              </div>
+              <div className="h-48 overflow-hidden rounded-lg ring-1 ring-grape/25" aria-label="Check code">
+                <CodeSurface
+                  key={`${index}-${round[index] ?? 0}`}
+                  value={test.code}
+                  readOnly={disabled}
+                  autoFocus={false}
+                  onChange={(code) => update(index, { ...test, code })}
+                />
+              </div>
+            </div>
+          ) : test.kind === 'io' ? (
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <Textarea
                 label="Typed in (one answer per line)"

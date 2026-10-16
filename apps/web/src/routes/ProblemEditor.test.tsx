@@ -260,3 +260,19 @@ test('Preview as student shows the problem as a child meets it', async () => {
   // The starter, in the one file, whichever part is showing.
   expect(preview.getByLabelText('code')).toHaveValue(readyDoc().starter_code)
 })
+
+test('a custom check starts from an example and is run against the solution as one', async () => {
+  check.mockResolvedValue(passing)
+  const { user } = renderEditor()
+  await user.selectOptions(await screen.findByLabelText('Checks that it…'), 'script')
+
+  expect(screen.getByText(/runs their program/)).toBeInTheDocument()
+  const codes = screen.getAllByLabelText('code')
+  expect((codes.at(-1) as HTMLTextAreaElement).value).toContain('for guess in range(10):')
+
+  await user.click(screen.getByRole('button', { name: 'Check solution' }))
+  await screen.findByText('The solution passes every check.')
+  expect(check.mock.calls[0]![1]).toEqual([
+    expect.objectContaining({ kind: 'script', code: expect.stringContaining('run(guess)'), reveal: true }),
+  ])
+})

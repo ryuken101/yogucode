@@ -168,3 +168,80 @@ test('an example of a program that does not parse has nothing to show', () => {
   expect(run.transcript).toEqual([])
   expect(run.error).toMatch(/^SyntaxError/)
 })
+
+/* --- custom checks: the child's own values (17 Oct 2026) -------------------------------- */
+
+const BATTLESHIP = `board = ["-"] * 10
+ships = [2, 5, 7]
+guess = int(input("Pick a position (0-9): "))
+if guess in ships:
+    print("HIT!")
+    board[guess] = "X"
+else:
+    print("MISS!")
+    board[guess] = "O"
+print(" ".join(board))
+`
+
+const EVERY_GUESS = `for guess in range(10):
+    out, v = run(guess)
+    hit = guess in v["ships"]
+    check(("HIT!" in out) == hit, f"Guessing {guess} should say {'HIT!' if hit else 'MISS!'}")
+`
+
+const script = (code: string, extra: Partial<TestCheck> = {}): TestCheck =>
+  ({ kind: 'script', name: 'hits and misses', code, ...extra }) as TestCheck
+
+test('a custom check follows the ships the child chose', () => {
+  expect(check(BATTLESHIP, [script(EVERY_GUESS)]).results[0]).toMatchObject({ passed: true })
+  const theirs = BATTLESHIP.replace('[2, 5, 7]', '[0, 1, 9]')
+  expect(check(theirs, [script(EVERY_GUESS)]).results[0]).toMatchObject({ passed: true })
+})
+
+test('a failing case gives the teacher’s message and what that run printed', () => {
+  const alwaysHit = BATTLESHIP.replace('if guess in ships:', 'if True:')
+  const result = check(alwaysHit, [script(EVERY_GUESS)]).results[0]!
+  expect(result).toMatchObject({ passed: false, error: 'Guessing 0 should say MISS!' })
+  expect(result.got).toContain('HIT!')
+})
+
+test('a variable the program does not have is said in words, not a KeyError', () => {
+  const renamed = BATTLESHIP.replaceAll('ships', 'boats')
+  expect(check(renamed, [script(EVERY_GUESS)]).results[0]!.error).toBe(
+    'Your program has no variable called `ships`',
+  )
+})
+
+test('a crash in the child’s program is the usual line message', () => {
+  const result = check('print(x)\n', [script('out, v = run()\ncheck(True)\n')]).results[0]!
+  expect(result).toMatchObject({ passed: false })
+  expect(result.error).toMatch(/^NameError on line 1/)
+})
+
+test('too few inputs is said plainly', () => {
+  const result = check('a = input()\nb = input()\n', [script('run(1)\n')]).results[0]!
+  expect(result.error).toBe('your program asked for more input than this check gives it')
+})
+
+test('a mistake in the teacher’s check is theirs to see, and not the child’s', () => {
+  const broken = script('for g in range(3)\n    run(g)\n')
+  expect(check(BATTLESHIP, [broken]).results[0]!.error).toBe(
+    'This check has a mistake in it — tell your teacher',
+  )
+  const teachers = check(BATTLESHIP, [{ ...broken, reveal: true } as TestCheck]).results[0]!
+  expect(teachers.error).toMatch(/^SyntaxError on line 1 of the check/)
+})
+
+test('a hidden custom check says only whether it passed', () => {
+  const result = check(BATTLESHIP.replace('if guess in ships:', 'if True:'), [
+    script(EVERY_GUESS, { hidden: true }),
+  ]).results[0]!
+  expect(result).toEqual({ name: 'hits and misses', hidden: true, passed: false })
+})
+
+test('run() types each value, as text, at the next input()', () => {
+  const result = check('a = input()\nb = input()\nprint(int(a) + int(b))\n', [
+    script('out, v = run(2, 3)\ncheck(out == "5", out)\ncheck(v["a"] == "2")\n'),
+  ]).results[0]!
+  expect(result).toMatchObject({ passed: true })
+})

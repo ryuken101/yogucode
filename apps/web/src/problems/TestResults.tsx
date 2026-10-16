@@ -24,6 +24,13 @@ export function TestResultLine({ result }: { result: TestResult }) {
       {!result.passed && result.error ? (
         <p className="mt-1 font-mono text-xs text-grape">{result.error}</p>
       ) : null}
+      {/* A custom check: the teacher's message above, then what that run printed. */}
+      {!result.passed && result.error && result.expected === undefined && result.got !== undefined ? (
+        <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 font-mono text-xs text-grape">
+          <dt className="text-muted">your program printed</dt>
+          <dd className="whitespace-pre-wrap">{result.got || '(nothing printed)'}</dd>
+        </dl>
+      ) : null}
       {!result.passed && !result.error && result.expected !== undefined ? (
         <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 font-mono text-xs text-grape">
           <dt className="text-muted">expected</dt>

@@ -156,6 +156,15 @@ both write without a newline, and a line-oriented handler puts the prompt above 
 instead of in front of it. The console keeps the newest 200k characters and drops the
 oldest, like terminal scrollback.
 
+Checks come in three kinds (`grader.py`): `io` (prints), `function` (returns), and since
+17 Oct 2026 **`script`**, the teacher's own Python check for answers that depend on values
+the child chose. It gets `run(*inputs)`, which runs the child's program in fresh globals
+and returns `(output, variables)`; `check(condition, message)`; and `contains()`. A missing
+variable, a crash or too few inputs fail the check in a child's words. A mistake in the
+check's own code shows as "tell your teacher" to a child, and as the real error on the
+teacher's run (`reveal`, from `toChecks(..., { revealHidden })`). Templates are in
+`problems/doc.ts` (`SCRIPT_TEMPLATES`), and YAML files write it as `check: |`.
+
 Besides Run and Check there is **`example`** (`grader.run_example`, 17 Oct 2026). It runs a
 program once, typing a list of inputs, and records the conversation as `out`/`in` pieces.
 Unlike a check, the `input()` prompt is part of the output. The editor's Check solution
