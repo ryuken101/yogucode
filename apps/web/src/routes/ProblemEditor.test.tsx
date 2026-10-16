@@ -299,3 +299,17 @@ test('"matches my solution" is a form, and Check solution runs it with the plain
     }),
   ])
 })
+
+test('a problem with no checks can still be checked and published', async () => {
+  stored = problemOut({
+    document: { ...readyDoc(), tests: [] },
+    publish_warnings: ['The problem has no checks — students can Run it, but there is nothing to Check'],
+  })
+  check.mockResolvedValue({ compile_error: null, results: [] })
+  const { user } = renderEditor()
+  await user.click(await screen.findByRole('button', { name: 'Check solution' }))
+  await screen.findByText('The solution passes every check.')
+  expect(screen.getByText(/has no checks/)).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Publish' }))
+  await waitFor(() => expect(published).not.toBeNull())
+})

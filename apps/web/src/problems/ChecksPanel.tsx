@@ -27,6 +27,10 @@ export function ChecksPanel({ enabled, count, run, sharedFile = false }: Props) 
         <p className="text-sm text-muted">
           Checks are off for this quiz — use Run to try your code yourself.
         </p>
+      ) : count === 0 ? (
+        <p className="text-sm text-muted">
+          There are no checks for this one — use Run to try your code and see what it does.
+        </p>
       ) : run === undefined ? (
         <p className="text-sm text-muted">
           Press <strong>Check</strong> to see how your code does on {count} check

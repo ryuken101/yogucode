@@ -119,6 +119,7 @@ export function StudentPreview({ open, onClose, doc, runs, python }: Props) {
                 <Button variant="secondary" onClick={python.stop} disabled={!busy}>
                   Stop
                 </Button>
+                {(leaf.leaf.tests ?? []).length === 0 ? null : (
                 <Button
                   variant="secondary"
                   disabled={busy || status === 'loading'}
@@ -129,6 +130,7 @@ export function StudentPreview({ open, onClose, doc, runs, python }: Props) {
                 >
                   {status === 'checking' ? 'Checking…' : 'Check'}
                 </Button>
+                )}
               </div>
               <div className="min-h-48 flex-[2] overflow-hidden rounded-lg ring-1 ring-grape/25">
                 <CodeSurface

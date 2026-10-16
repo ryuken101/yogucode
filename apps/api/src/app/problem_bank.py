@@ -11,11 +11,12 @@ never delete": a draft has never been in front of a child — sets accept only p
 problems — so its rows are not history, they are an unsaved page. Published problems are
 never written here at all; they change by new version (see `models/problems.py`).
 
-**Publishing is checked twice.** The checks here are structural: a solution, at least one
-test, a primary concept, on every leaf. Whether the solution actually *passes* its tests
-can only be known by running Python, which this server does not do (spec §5.1) — the
-teacher's browser runs them, and the publish route requires proof that it did so against
-the version being published.
+**Publishing is checked twice.** The checks here are structural: a solution and a primary
+concept on every leaf. Checks are optional since 17 Oct 2026 (Ken): a problem with none
+publishes with a warning, and its students can Run but have nothing to Check. Whether the
+solution actually *passes* its tests can only be known by running Python, which this
+server does not do (spec §5.1) — the teacher's browser runs them, and the publish route
+requires proof that it did so against the version being published.
 
 **Example transcripts are written at publish, never at save.** The teacher gives the
 inputs; what the solution printed with them is only known after the browser runs it, and
@@ -558,8 +559,6 @@ def publish_problems(doc: ProblemDoc) -> list[str]:
     def check_leaf(leaf: LeafDoc, where: str) -> None:
         if not leaf.solution_code.strip():
             problems.append(f"{where} needs a reference solution")
-        if not leaf.tests:
-            problems.append(f"{where} needs at least one test")
         if leaf.primary_concept_id is None:
             problems.append(f"{where} needs a main concept")
 
@@ -572,8 +571,6 @@ def publish_problems(doc: ProblemDoc) -> list[str]:
             where = f"Part ({part.label})"
             if part.starter_code.strip() or part.solution_code.strip():
                 problems.append(f"{where} shares the problem's file, so has no code of its own")
-            if not part.tests:
-                problems.append(f"{where} needs at least one test")
             if part.primary_concept_id is None:
                 problems.append(f"{where} needs a main concept")
     elif doc.parts:
@@ -591,12 +588,20 @@ def publish_problems(doc: ProblemDoc) -> list[str]:
 def publish_warnings(doc: ProblemDoc) -> list[str]:
     """What is worth fixing but does not block publishing."""
     if doc.kind != "mcq":
+        warnings: list[str] = []
+        leaves = [(f"Part ({p.label})", p) for p in doc.parts] or [("The problem", doc)]
+        unchecked = [where for where, leaf in leaves if not leaf.tests]
+        if unchecked:
+            warnings.append(
+                f"{', '.join(unchecked)} {'has' if len(unchecked) == 1 else 'have'} no checks — "
+                "students can Run it, but there is nothing to Check"
+            )
         if doc.shared_file and any(t.kind == "io" for part in doc.parts for t in part.tests):
-            return [
+            warnings.append(
                 "An output check on a part sees everything the whole file prints, other "
                 "parts included — function checks suit a shared file better"
-            ]
-        return []
+            )
+        return warnings
     unexplained = [
         option.text for option in doc.options if not option.correct and not option.misconception
     ]

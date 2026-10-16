@@ -27,10 +27,12 @@ export interface Verification {
   examples: Record<string, (ExampleRun | null)[]>
 }
 
+/**
+ * The solution runs and passes every check. A leaf with no checks passes when its solution
+ * at least parses — checks are optional since 17 Oct 2026 (Ken).
+ */
 export function runPassed(run: TestRun | null | undefined): boolean {
-  return Boolean(
-    run && !run.compile_error && run.results.length > 0 && run.results.every((r) => r.passed),
-  )
+  return Boolean(run && !run.compile_error && run.results.every((r) => r.passed))
 }
 
 export async function verifyProblem(

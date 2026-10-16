@@ -223,3 +223,15 @@ test('a "matches my solution" check takes the server’s scrambled solution to t
   ])
   expect(check.mock.calls[0]![1][0]).not.toHaveProperty('solution')
 })
+
+test('a part with no checks offers Run, not a Check with nothing to try', async () => {
+  server.use(
+    http.post(`/api/me/assignments/${ASSIGNMENT}/items/${ITEM}/open`, () =>
+      HttpResponse.json({ ...problem(), leaves: [leaf({ tests: [] })] }),
+    ),
+  )
+  renderAttempt()
+  expect(await screen.findByText(/no checks for this one/)).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Run' })).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Check' })).not.toBeInTheDocument()
+})

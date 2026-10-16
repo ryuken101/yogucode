@@ -165,9 +165,12 @@ async def test_a_draft_may_be_half_written(client, signed_in) -> None:
     assert created["status"] == "draft"
     assert set(created["publish_problems"]) == {
         "The problem needs a reference solution",
-        "The problem needs at least one test",
         "The problem needs a main concept",
     }
+    # Checks are optional (Ken, 17 Oct 2026): their absence is a warning, not a gap.
+    assert created["publish_warnings"] == [
+        "The problem has no checks — students can Run it, but there is nothing to Check"
+    ]
 
 
 async def test_the_main_concept_must_be_one_of_the_tags(
@@ -238,7 +241,6 @@ async def test_a_problem_with_parts_is_checked_part_by_part(
 
     assert set(created["publish_problems"]) == {
         "Part (b) needs a reference solution",
-        "Part (b) needs at least one test",
         "Part (b) needs a main concept",
     }
 

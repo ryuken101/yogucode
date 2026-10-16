@@ -322,7 +322,7 @@ export function ProblemAttempt() {
           <Button variant="secondary" onClick={python.stop} disabled={!busy}>
             Stop
           </Button>
-          {data.checks ? (
+          {data.checks && leaf.tests.length > 0 ? (
             <Button variant="secondary" onClick={() => void onCheck()} disabled={busy || loading}>
               {python.state.status === 'checking' ? 'Checking…' : 'Check'}
             </Button>
