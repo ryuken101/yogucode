@@ -8,6 +8,7 @@
   lesson can be finished at home.
 """
 
+import base64
 import uuid
 
 from sqlmodel import select
@@ -253,3 +254,58 @@ async def test_my_work_is_only_my_own(client, session: AsyncSession, signed_in_s
 async def test_a_teacher_has_no_lesson_work(client, signed_in) -> None:
     headers = await signed_in()
     assert (await client.get("/me/problems", headers=headers)).status_code == 403
+
+
+# --- "matches my solution": the solution, scrambled, for the child's browser -------------
+
+COMPARE = {
+    "kind": "compare",
+    "name": "plays like mine",
+    "hidden": False,
+    "inputs": [{"mode": "range", "start": 0, "end": 9}],
+    "chosen": [
+        {
+            "name": "ships",
+            "rule": {"type": "numbers", "count": 3, "min": 0, "max": 9, "distinct": True},
+        }
+    ],
+    "match": "exact",
+}
+
+
+async def test_a_compare_check_round_trips_without_the_solution_in_it(
+    client, session: AsyncSession, signed_in
+) -> None:
+    headers = await signed_in()
+    doc = greet_doc(await a_concept(session)) | {"tests": [COMPARE], "examples": []}
+    created = (await client.post("/items", json=doc, headers=headers)).json()
+    assert created["document"]["tests"] == [COMPARE | {"reference": None}]
+
+    too_many = COMPARE | {
+        "inputs": [
+            {"mode": "range", "start": 0, "end": 20},
+            {"mode": "range", "start": 0, "end": 20},
+        ]
+    }
+    refused = await client.put(
+        f"/items/{created['id']}", json=doc | {"tests": [too_many]}, headers=headers
+    )
+    assert refused.status_code == 422
+
+
+async def test_a_child_gets_the_solution_only_scrambled_inside_the_check(
+    client, session: AsyncSession, signed_in_student
+) -> None:
+    from app.problem_bank import SCRAMBLE_KEY
+
+    aria = await signed_in_student()
+    doc = greet_doc(await a_concept(session)) | {"tests": [COMPARE], "examples": []}
+    item = await published(client, aria["headers"], doc)
+    await on_today(client, aria, [item["id"]])
+
+    opened = await open_first(client)
+    reference = opened["leaves"][0]["tests"][0]["reference"]
+    assert reference and GREET not in str(opened)
+    raw = base64.b64decode(reference)
+    plain = bytes(b ^ SCRAMBLE_KEY[i % len(SCRAMBLE_KEY)] for i, b in enumerate(raw)).decode()
+    assert plain == GREET

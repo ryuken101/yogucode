@@ -31,6 +31,15 @@ export function TestResultLine({ result }: { result: TestResult }) {
           <dd className="whitespace-pre-wrap">{result.got || '(nothing printed)'}</dd>
         </dl>
       ) : null}
+      {/* "Matches my solution": the case that differed, what it should print, what it did. */}
+      {!result.passed && result.error && result.expected !== undefined && result.got !== undefined ? (
+        <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 font-mono text-xs text-grape">
+          <dt className="text-muted">should print</dt>
+          <dd className="whitespace-pre-wrap">{result.expected || '(nothing)'}</dd>
+          <dt className="text-muted">your program printed</dt>
+          <dd className="whitespace-pre-wrap">{result.got || '(nothing printed)'}</dd>
+        </dl>
+      ) : null}
       {!result.passed && !result.error && result.expected !== undefined ? (
         <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 font-mono text-xs text-grape">
           <dt className="text-muted">expected</dt>

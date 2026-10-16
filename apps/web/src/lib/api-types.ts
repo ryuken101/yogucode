@@ -2508,6 +2508,16 @@ export interface components {
             choice: number;
         };
         /**
+         * ChosenValue
+         * @description A value the child chooses in their own program (`ships`), and what it must be.
+         */
+        ChosenValue: {
+            /** Name */
+            name: string;
+            /** Rule */
+            rule?: components["schemas"]["NoRule"] | components["schemas"]["NumberRule"] | components["schemas"]["NumbersRule"] | components["schemas"]["ListRule"] | components["schemas"]["TextRule"];
+        };
+        /**
          * ClassCurriculumIn
          * @description The course a class follows and the lesson it is on. Both fields are always sent.
          *
@@ -2651,6 +2661,42 @@ export interface components {
          * @enum {string}
          */
         ClassTeacherRole: "lead" | "assistant";
+        /**
+         * CompareTest
+         * @description "Matches my solution" (Ken's decision, 17 Oct 2026): the child's program and the
+         *     reference solution are run on every case, with the child's `chosen` values put into
+         *     the solution, and their output compared. Correct checks for student-chosen data, with
+         *     no code to write. See `runtime/grader.py`.
+         *
+         *     `reference` is the scrambled solution, added only when the check is sent to a child's
+         *     browser (`with_reference`) — never stored, and null in a teacher's document.
+         */
+        CompareTest: {
+            /** Chosen */
+            chosen?: components["schemas"]["ChosenValue"][];
+            /**
+             * Hidden
+             * @default false
+             */
+            hidden: boolean;
+            /** Inputs */
+            inputs?: (components["schemas"]["RangeInput"] | components["schemas"]["ValuesInput"] | components["schemas"]["RandomInput"])[];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "compare";
+            /**
+             * Match
+             * @default exact
+             * @enum {string}
+             */
+            match: "exact" | "contains";
+            /** Name */
+            name: string;
+            /** Reference */
+            reference?: string | null;
+        };
         /** ConceptOut */
         ConceptOut: {
             /**
@@ -3377,6 +3423,19 @@ export interface components {
              */
             unit_id: string;
         };
+        /** ListRule */
+        ListRule: {
+            /**
+             * Min Length
+             * @default 1
+             */
+            min_length: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "list";
+        };
         /** MarkIn */
         MarkIn: {
             /** Approach */
@@ -3492,6 +3551,14 @@ export interface components {
             /** Seconds Needed */
             seconds_needed: number;
         };
+        /** NoRule */
+        NoRule: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "none";
+        };
         /**
          * NodePatch
          * @description Every field optional — an absent field means "leave it alone".
@@ -3506,6 +3573,49 @@ export interface components {
         NoteIn: {
             /** Note */
             note: string;
+        };
+        /** NumberRule */
+        NumberRule: {
+            /**
+             * Max
+             * @default 9
+             */
+            max: number;
+            /**
+             * Min
+             * @default 0
+             */
+            min: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "number";
+        };
+        /** NumbersRule */
+        NumbersRule: {
+            /** Count */
+            count?: number | null;
+            /**
+             * Distinct
+             * @default false
+             */
+            distinct: boolean;
+            /**
+             * Max
+             * @default 9
+             */
+            max: number;
+            /**
+             * Min
+             * @default 0
+             */
+            min: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "numbers";
         };
         /**
          * OptionCountOut
@@ -3573,7 +3683,7 @@ export interface components {
              */
             starter_code: string;
             /** Tests */
-            tests?: (components["schemas"]["IoTest"] | components["schemas"]["FunctionTest"] | components["schemas"]["ScriptTest"])[];
+            tests?: (components["schemas"]["IoTest"] | components["schemas"]["FunctionTest"] | components["schemas"]["ScriptTest"] | components["schemas"]["CompareTest"])[];
         };
         /** PartRef */
         PartRef: {
@@ -3686,7 +3796,7 @@ export interface components {
              */
             starter_code: string;
             /** Tests */
-            tests?: (components["schemas"]["IoTest"] | components["schemas"]["FunctionTest"] | components["schemas"]["ScriptTest"])[];
+            tests?: (components["schemas"]["IoTest"] | components["schemas"]["FunctionTest"] | components["schemas"]["ScriptTest"] | components["schemas"]["CompareTest"])[];
             /** Title */
             title: string;
         };
@@ -3792,7 +3902,7 @@ export interface components {
             /** Solution Code */
             solution_code: string;
             /** Tests */
-            tests: (components["schemas"]["IoTest"] | components["schemas"]["FunctionTest"] | components["schemas"]["ScriptTest"])[];
+            tests: (components["schemas"]["IoTest"] | components["schemas"]["FunctionTest"] | components["schemas"]["ScriptTest"] | components["schemas"]["CompareTest"])[];
             /** Title */
             title: string;
         };
@@ -3882,6 +3992,38 @@ export interface components {
             kind: components["schemas"]["ItemKind"];
             /** Title */
             title: string;
+        };
+        /**
+         * RandomInput
+         * @description `count` whole numbers picked from `start`..`end` — the same ones on every press.
+         */
+        RandomInput: {
+            /** Count */
+            count: number;
+            /** End */
+            end: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            mode: "random";
+            /** Start */
+            start: number;
+        };
+        /**
+         * RangeInput
+         * @description Every whole number from `start` to `end`, inclusive.
+         */
+        RangeInput: {
+            /** End */
+            end: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            mode: "range";
+            /** Start */
+            start: number;
         };
         /** ReleaseOut */
         ReleaseOut: {
@@ -4218,7 +4360,7 @@ export interface components {
             /** Prompt Md */
             prompt_md: string;
             /** Tests */
-            tests: (components["schemas"]["IoTest"] | components["schemas"]["FunctionTest"] | components["schemas"]["ScriptTest"])[];
+            tests: (components["schemas"]["IoTest"] | components["schemas"]["FunctionTest"] | components["schemas"]["ScriptTest"] | components["schemas"]["CompareTest"])[];
         };
         /** StudentMeOut */
         StudentMeOut: {
@@ -4355,6 +4497,14 @@ export interface components {
             /** Teachers */
             teachers: components["schemas"]["TeacherRowOut"][];
         };
+        /** TextRule */
+        TextRule: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "text";
+        };
         /** TitleIn */
         TitleIn: {
             /** Title */
@@ -4454,6 +4604,16 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** ValuesInput */
+        ValuesInput: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            mode: "values";
+            /** Values */
+            values: string[];
         };
         /**
          * WindowState

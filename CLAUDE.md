@@ -134,6 +134,12 @@ new, rename, move, copy in, and delete (archive), but never edit what a file say
 still goes through Help. The writes run the child's own rules as the child
 (`scoping.as_child`) and are audited as `student_file.*`.
 
+**The reference solution never reaches a child, with one exception.** A "matches my
+solution" check (`compare`, Ken, 17 Oct 2026) runs it in the child's browser, so it is sent
+inside that check, scrambled (`problem_bank.with_reference`). That's not security: it's the
+same accepted trade-off as hidden checks' expected values (spec §4). It is never stored on
+the test row.
+
 **`teacher_documents`** are a teacher's private "My code" files, scoped to the centre and
 `user_id` (`scoping.get_own_teacher_document`): another teacher at the same centre gets a
 404. A separate table from `student_documents` for the same reason `users` is separate from

@@ -287,6 +287,52 @@
         "title": "ChoiceIn",
         "type": "object"
       },
+      "ChosenValue": {
+        "description": "A value the child chooses in their own program (`ships`), and what it must be.",
+        "properties": {
+          "name": {
+            "maxLength": 60,
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+            "title": "Name",
+            "type": "string"
+          },
+          "rule": {
+            "discriminator": {
+              "mapping": {
+                "list": "#/components/schemas/ListRule",
+                "none": "#/components/schemas/NoRule",
+                "number": "#/components/schemas/NumberRule",
+                "numbers": "#/components/schemas/NumbersRule",
+                "text": "#/components/schemas/TextRule"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoRule"
+              },
+              {
+                "$ref": "#/components/schemas/NumberRule"
+              },
+              {
+                "$ref": "#/components/schemas/NumbersRule"
+              },
+              {
+                "$ref": "#/components/schemas/ListRule"
+              },
+              {
+                "$ref": "#/components/schemas/TextRule"
+              }
+            ],
+            "title": "Rule"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "ChosenValue",
+        "type": "object"
+      },
       "ClassCurriculumIn": {
         "description": "The course a class follows and the lesson it is on. Both fields are always sent.\n\nA PUT rather than a PATCH field on the class: the two values constrain each other (the\nlesson must be in the course), so they are set together and validated together.",
         "properties": {
@@ -634,6 +680,87 @@
         ],
         "title": "ClassTeacherRole",
         "type": "string"
+      },
+      "CompareTest": {
+        "description": "\"Matches my solution\" (Ken's decision, 17 Oct 2026): the child's program and the\nreference solution are run on every case, with the child's `chosen` values put into\nthe solution, and their output compared. Correct checks for student-chosen data, with\nno code to write. See `runtime/grader.py`.\n\n`reference` is the scrambled solution, added only when the check is sent to a child's\nbrowser (`with_reference`) \u2014 never stored, and null in a teacher's document.",
+        "properties": {
+          "chosen": {
+            "items": {
+              "$ref": "#/components/schemas/ChosenValue"
+            },
+            "maxItems": 4,
+            "title": "Chosen",
+            "type": "array"
+          },
+          "hidden": {
+            "default": false,
+            "title": "Hidden",
+            "type": "boolean"
+          },
+          "inputs": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "random": "#/components/schemas/RandomInput",
+                  "range": "#/components/schemas/RangeInput",
+                  "values": "#/components/schemas/ValuesInput"
+                },
+                "propertyName": "mode"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/RangeInput"
+                },
+                {
+                  "$ref": "#/components/schemas/ValuesInput"
+                },
+                {
+                  "$ref": "#/components/schemas/RandomInput"
+                }
+              ]
+            },
+            "maxItems": 4,
+            "title": "Inputs",
+            "type": "array"
+          },
+          "kind": {
+            "const": "compare",
+            "title": "Kind",
+            "type": "string"
+          },
+          "match": {
+            "default": "exact",
+            "enum": [
+              "exact",
+              "contains"
+            ],
+            "title": "Match",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference"
+          }
+        },
+        "required": [
+          "kind",
+          "name"
+        ],
+        "title": "CompareTest",
+        "type": "object"
       },
       "ConceptOut": {
         "properties": {
@@ -2414,6 +2541,27 @@
         "title": "LessonOut",
         "type": "object"
       },
+      "ListRule": {
+        "properties": {
+          "min_length": {
+            "default": 1,
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Min Length",
+            "type": "integer"
+          },
+          "type": {
+            "const": "list",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "ListRule",
+        "type": "object"
+      },
       "MarkIn": {
         "properties": {
           "approach": {
@@ -2795,6 +2943,20 @@
         "title": "NextHintOut",
         "type": "object"
       },
+      "NoRule": {
+        "properties": {
+          "type": {
+            "const": "none",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "NoRule",
+        "type": "object"
+      },
       "NodePatch": {
         "description": "Every field optional \u2014 an absent field means \"leave it alone\".",
         "properties": {
@@ -2838,6 +3000,72 @@
           "note"
         ],
         "title": "NoteIn",
+        "type": "object"
+      },
+      "NumberRule": {
+        "properties": {
+          "max": {
+            "default": 9,
+            "title": "Max",
+            "type": "integer"
+          },
+          "min": {
+            "default": 0,
+            "title": "Min",
+            "type": "integer"
+          },
+          "type": {
+            "const": "number",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "NumberRule",
+        "type": "object"
+      },
+      "NumbersRule": {
+        "properties": {
+          "count": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Count"
+          },
+          "distinct": {
+            "default": false,
+            "title": "Distinct",
+            "type": "boolean"
+          },
+          "max": {
+            "default": 9,
+            "title": "Max",
+            "type": "integer"
+          },
+          "min": {
+            "default": 0,
+            "title": "Min",
+            "type": "integer"
+          },
+          "type": {
+            "const": "numbers",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "NumbersRule",
         "type": "object"
       },
       "OptionCountOut": {
@@ -2981,6 +3209,7 @@
             "items": {
               "discriminator": {
                 "mapping": {
+                  "compare": "#/components/schemas/CompareTest",
                   "function": "#/components/schemas/FunctionTest",
                   "io": "#/components/schemas/IoTest",
                   "script": "#/components/schemas/ScriptTest"
@@ -2996,6 +3225,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/ScriptTest"
+                },
+                {
+                  "$ref": "#/components/schemas/CompareTest"
                 }
               ]
             },
@@ -3273,6 +3505,7 @@
             "items": {
               "discriminator": {
                 "mapping": {
+                  "compare": "#/components/schemas/CompareTest",
                   "function": "#/components/schemas/FunctionTest",
                   "io": "#/components/schemas/IoTest",
                   "script": "#/components/schemas/ScriptTest"
@@ -3288,6 +3521,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/ScriptTest"
+                },
+                {
+                  "$ref": "#/components/schemas/CompareTest"
                 }
               ]
             },
@@ -3556,6 +3792,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/ScriptTest"
+                },
+                {
+                  "$ref": "#/components/schemas/CompareTest"
                 }
               ]
             },
@@ -3828,6 +4067,71 @@
           "difficulty"
         ],
         "title": "QuizQuestionOut",
+        "type": "object"
+      },
+      "RandomInput": {
+        "description": "`count` whole numbers picked from `start`..`end` \u2014 the same ones on every press.",
+        "properties": {
+          "count": {
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "end": {
+            "maximum": 1000000.0,
+            "minimum": -1000000.0,
+            "title": "End",
+            "type": "integer"
+          },
+          "mode": {
+            "const": "random",
+            "title": "Mode",
+            "type": "string"
+          },
+          "start": {
+            "maximum": 1000000.0,
+            "minimum": -1000000.0,
+            "title": "Start",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "mode",
+          "count",
+          "start",
+          "end"
+        ],
+        "title": "RandomInput",
+        "type": "object"
+      },
+      "RangeInput": {
+        "description": "Every whole number from `start` to `end`, inclusive.",
+        "properties": {
+          "end": {
+            "maximum": 1000000.0,
+            "minimum": -1000000.0,
+            "title": "End",
+            "type": "integer"
+          },
+          "mode": {
+            "const": "range",
+            "title": "Mode",
+            "type": "string"
+          },
+          "start": {
+            "maximum": 1000000.0,
+            "minimum": -1000000.0,
+            "title": "Start",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "mode",
+          "start",
+          "end"
+        ],
+        "title": "RangeInput",
         "type": "object"
       },
       "ReleaseOut": {
@@ -4625,6 +4929,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/ScriptTest"
+                },
+                {
+                  "$ref": "#/components/schemas/CompareTest"
                 }
               ]
             },
@@ -4977,6 +5284,20 @@
         "title": "TeachersOut",
         "type": "object"
       },
+      "TextRule": {
+        "properties": {
+          "type": {
+            "const": "text",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "TextRule",
+        "type": "object"
+      },
       "TitleIn": {
         "properties": {
           "title": {
@@ -5216,6 +5537,31 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "ValuesInput": {
+        "properties": {
+          "mode": {
+            "const": "values",
+            "title": "Mode",
+            "type": "string"
+          },
+          "values": {
+            "items": {
+              "maxLength": 200,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "mode",
+          "values"
+        ],
+        "title": "ValuesInput",
         "type": "object"
       },
       "WindowState": {

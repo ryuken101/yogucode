@@ -42,7 +42,7 @@ export async function verifyProblem(
   for (const leaf of leavesOf(doc)) {
     runs[leaf.key] = await runner.check(
       solutionOf(doc, leaf.leaf),
-      toChecks(leaf.leaf.tests, { revealHidden: true }),
+      toChecks(leaf.leaf.tests, { revealHidden: true, solution: solutionOf(doc, leaf.leaf) }),
     )
   }
   const examples: Verification['examples'] = {}

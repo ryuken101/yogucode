@@ -203,3 +203,23 @@ test('on a shared file, the parts are one program: switching keeps the code, che
   // Everything typed went to the one file's attempt.
   await waitFor(() => expect(saves.at(-1)).toBe('numbers = [1, 2, 3]\nx = 1'))
 })
+
+test('a "matches my solution" check takes the server’s scrambled solution to the grader', async () => {
+  const compare: Schemas['CompareTest'] = {
+    kind: 'compare', name: 'plays like mine', hidden: false, match: 'exact',
+    inputs: [{ mode: 'range', start: 0, end: 9 }], chosen: [], reference: 'c2NyYW1ibGVk',
+  }
+  server.use(
+    http.post(`/api/me/assignments/${ASSIGNMENT}/items/${ITEM}/open`, () =>
+      HttpResponse.json({ ...problem(), leaves: [leaf({ tests: [compare] })] }),
+    ),
+  )
+  check.mockResolvedValue({ compile_error: null, results: [{ name: 'plays like mine', hidden: false, passed: true }] })
+  const { user } = renderAttempt()
+  await user.click(await screen.findByRole('button', { name: 'Check' }))
+  await waitFor(() => expect(check).toHaveBeenCalled())
+  expect(check.mock.calls[0]![1]).toEqual([
+    expect.objectContaining({ kind: 'compare', reference: 'c2NyYW1ibGVk', reveal: false }),
+  ])
+  expect(check.mock.calls[0]![1][0]).not.toHaveProperty('solution')
+})

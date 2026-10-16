@@ -156,9 +156,18 @@ both write without a newline, and a line-oriented handler puts the prompt above 
 instead of in front of it. The console keeps the newest 200k characters and drops the
 oldest, like terminal scrollback.
 
-Checks come in three kinds (`grader.py`): `io` (prints), `function` (returns), and since
-17 Oct 2026 **`script`**, the teacher's own Python check for answers that depend on values
-the child chose. It gets `run(*inputs)`, which runs the child's program in fresh globals
+Checks come in four kinds (`grader.py`): `io` (prints), `function` (returns), and since
+17 Oct 2026 two for answers that depend on values the child chose.
+
+**`compare`, "matches my solution"** (`problems/CompareEditor.tsx`), is a form, with no
+code. It runs the child's program and the reference solution on every case, meaning every
+combination of the input rows. Random rows are seeded by the check's name. The child's
+chosen values (`ships`) are put into the solution by rewriting its top-level assignment
+(the AST), and the outputs are compared. Rules on those values fail first, in words. A
+child's copy of the check carries the solution scrambled (`reference`, from the server).
+The teacher's own runs pass it plain (`toChecks(..., { solution })`).
+
+**`script`** is the teacher's own Python check. It gets `run(*inputs)`, which runs the child's program in fresh globals
 and returns `(output, variables)`; `check(condition, message)`; and `contains()`. A missing
 variable, a crash or too few inputs fail the check in a child's words. A mistake in the
 check's own code shows as "tell your teacher" to a child, and as the real error on the

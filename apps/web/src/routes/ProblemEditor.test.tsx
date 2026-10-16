@@ -276,3 +276,26 @@ test('a custom check starts from an example and is run against the solution as o
     expect.objectContaining({ kind: 'script', code: expect.stringContaining('run(guess)'), reveal: true }),
   ])
 })
+
+test('"matches my solution" is a form, and Check solution runs it with the plain solution', async () => {
+  check.mockResolvedValue(passing)
+  const { user } = renderEditor()
+  await user.selectOptions(await screen.findByLabelText('Checks that it…'), 'compare')
+
+  expect(screen.getByText('Tries 10 cases')).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Add a value they choose' }))
+  await user.type(screen.getByLabelText('Variable'), 'ships')
+  await user.selectOptions(screen.getByLabelText('It must be'), 'numbers')
+
+  await user.click(screen.getByRole('button', { name: 'Check solution' }))
+  await screen.findByText('The solution passes every check.')
+  expect(check.mock.calls[0]![1]).toEqual([
+    expect.objectContaining({
+      kind: 'compare',
+      inputs: [{ mode: 'range', start: 0, end: 9 }],
+      chosen: [{ name: 'ships', rule: { type: 'numbers', count: 3, min: 0, max: 9, distinct: true } }],
+      solution: readyDoc().solution_code,
+      reveal: true,
+    }),
+  ])
+})

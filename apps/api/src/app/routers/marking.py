@@ -43,7 +43,14 @@ from app.models import (
     SubmissionSource,
 )
 from app.models.base import utcnow
-from app.problem_bank import FunctionTest, IoTest, ScriptTest, read_document
+from app.problem_bank import (
+    CompareTest,
+    FunctionTest,
+    IoTest,
+    ScriptTest,
+    read_document,
+    with_reference,
+)
 from app.scoping import (
     get_centre_attempt,
     get_owned_assignment,
@@ -129,7 +136,7 @@ class QuestionMarkingOut(BaseModel):
     prompt_md: str
     solution_code: str
     concept_ids: list[uuid.UUID]
-    tests: list[IoTest | FunctionTest | ScriptTest]
+    tests: list[IoTest | FunctionTest | ScriptTest | CompareTest]
     # Multiple choice: every option with its count — spec §3.6's "six chose 'range is
     # inclusive'", which is a reteaching plan rather than a score.
     options: list[OptionCountOut]
@@ -372,6 +379,7 @@ async def mark_question(
                 choice=choice,
             )
         )
+    solution = doc.solution_code if doc.shared_file else leaf_doc.solution_code
     counts = [0] * len(leaf_doc.options) if leaf.leaf.kind == ItemKind.MCQ else []
     for entry in entries:
         if entry.choice is not None and 0 <= entry.choice < len(counts):
@@ -393,9 +401,10 @@ async def mark_question(
         else [],
         title=leaf.label,
         prompt_md=prompt,
-        solution_code=leaf_doc.solution_code,
+        # A part of a shared file has no solution of its own: the file's is the one.
+        solution_code=solution,
         concept_ids=leaf_doc.concept_ids,
-        tests=leaf_doc.tests,
+        tests=with_reference(leaf_doc.tests, solution),
         entries=entries,
     )
 

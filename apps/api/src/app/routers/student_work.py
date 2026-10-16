@@ -9,8 +9,10 @@ test cases — hidden ones included, because the tests run in their browser and 
 cannot be run without its expected value — and a custom check's code, for the same reason.
 That is the accepted trade-off of running code client-side (spec §4: not an anti-cheat
 product). Never sent: the reference solution, and
-any hint rung they have not unlocked. Examples go as their transcripts only — what the
-solution printed, never the solution.
+any hint rung they have not unlocked — with one exception: a "matches my solution" check
+(Ken, 17 Oct 2026) has to run the solution in the child's browser, so it carries it,
+scrambled (`problem_bank.with_reference`). Examples go as their transcripts only — what
+the solution printed, never the solution.
 
 **A shared-file problem is one program across its parts** (17 Oct 2026). Each part keeps
 its own attempt — its checks, hints and marks are its own — but the code in them is one
@@ -56,6 +58,7 @@ from app.models import (
 )
 from app.models.base import utcnow
 from app.problem_bank import (
+    CompareTest,
     ExampleDoc,
     FunctionTest,
     IoTest,
@@ -63,6 +66,7 @@ from app.problem_bank import (
     ScriptTest,
     TranscriptLine,
     read_document,
+    with_reference,
 )
 from app.quiz import is_running, running_quiz_for
 from app.routers.documents import MAX_CONTENT_BYTES
@@ -138,7 +142,7 @@ class StudentLeafOut(BaseModel):
     item_id: uuid.UUID
     label: str | None
     prompt_md: str
-    tests: list[IoTest | FunctionTest | ScriptTest]
+    tests: list[IoTest | FunctionTest | ScriptTest | CompareTest]
     examples: list[list[TranscriptLine]]
     hints: list[UnlockedHintOut]
     next_hint: NextHintOut | None
@@ -389,7 +393,9 @@ async def open_problem(
                 item_id=row.id,
                 label=label,
                 prompt_md=prompt,
-                tests=leaf.tests,
+                tests=with_reference(
+                    leaf.tests, item.solution_code if doc.shared_file else leaf.solution_code
+                ),
                 examples=transcripts(leaf.examples),
                 hints=hints,
                 next_hint=next_hint,
@@ -537,7 +543,9 @@ async def unlock_hint(
         item_id=leaf.id,
         label=label,
         prompt_md=prompt,
-        tests=leaf_doc.tests,
+        tests=with_reference(
+            leaf_doc.tests, doc.solution_code if doc.shared_file else leaf_doc.solution_code
+        ),
         examples=transcripts(leaf_doc.examples),
         hints=hints,
         next_hint=next_hint,

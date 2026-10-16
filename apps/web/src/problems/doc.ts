@@ -12,11 +12,16 @@
  */
 
 import type { Schemas } from '../lib/api'
-import type { TestCheck } from '../runtime/protocol'
+import type { ChosenValue, TestCheck } from '../runtime/protocol'
 
 export type ProblemDoc = Schemas['ProblemDoc']
 export type PartDoc = Schemas['PartDoc']
-export type TestDoc = Schemas['IoTest'] | Schemas['FunctionTest'] | Schemas['ScriptTest']
+export type TestDoc =
+  | Schemas['IoTest']
+  | Schemas['FunctionTest']
+  | Schemas['ScriptTest']
+  | Schemas['CompareTest']
+export type CompareDoc = Schemas['CompareTest']
 export type HintDoc = Schemas['HintDoc']
 export type ExampleDoc = Schemas['ExampleDoc']
 export type ExamplePiece = Schemas['TranscriptLine']
@@ -127,6 +132,16 @@ check(contains(out, str(v["age"])), "Print the age you stored in age")
 
 export function newTest(kind: TestDoc['kind'], index: number): TestDoc {
   const name = `Check ${index + 1}`
+  if (kind === 'compare') {
+    return {
+      kind: 'compare',
+      name,
+      hidden: false,
+      inputs: [{ mode: 'range', start: 0, end: 9 }],
+      chosen: [],
+      match: 'exact',
+    }
+  }
   if (kind === 'script') return { kind: 'script', name, hidden: false, code: SCRIPT_TEMPLATES[0]!.code }
   return kind === 'io'
     ? { kind: 'io', name, hidden: false, stdin: '', expected: '', match: 'exact' }
@@ -155,12 +170,48 @@ export function leavesOf(doc: ProblemDoc): Leaf[] {
  * test's result so a child cannot read the expected answer back out of it, but the teacher
  * wrote that answer and needs to see why their solution fails it.
  */
+/** How many cases a "matches my solution" check tries: every combination of its inputs. */
+export function caseCount(test: CompareDoc): number {
+  return (test.inputs ?? []).reduce(
+    (total, row) =>
+      total *
+      (row.mode === 'range'
+        ? Math.max(0, row.end - row.start + 1)
+        : row.mode === 'values'
+          ? (row.values ?? []).length
+          : row.count),
+    1,
+  )
+}
+
 export function toChecks(
   tests: TestDoc[] | undefined,
-  { revealHidden = false }: { revealHidden?: boolean } = {},
+  {
+    revealHidden = false,
+    solution,
+  }: {
+    revealHidden?: boolean
+    /** The teacher's own runs: the plain solution for "matches my solution" checks. */
+    solution?: string
+  } = {},
 ): TestCheck[] {
   return (tests ?? []).map((test): TestCheck =>
-    test.kind === 'script'
+    test.kind === 'compare'
+      ? {
+          kind: 'compare',
+          name: test.name,
+          hidden: test.hidden && !revealHidden,
+          inputs: test.inputs ?? [],
+          chosen: (test.chosen ?? []).map((value) => ({
+            name: value.name,
+            rule: value.rule ?? { type: 'none' },
+          })) as ChosenValue[],
+          match: test.match,
+          // A child's check carries the server's scrambled copy; the teacher's, the plain one.
+          ...(solution !== undefined ? { solution } : { reference: test.reference ?? null }),
+          reveal: revealHidden,
+        }
+      : test.kind === 'script'
       ? { kind: 'script', name: test.name, hidden: test.hidden && !revealHidden, code: test.code, reveal: revealHidden }
       : test.kind === 'io'
       ? {

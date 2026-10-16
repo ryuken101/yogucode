@@ -147,7 +147,7 @@ export function Marking() {
     if (!data) return
     let cancelled = false
     void (async () => {
-      const checks = toChecks(data.tests, { revealHidden: true })
+      const checks = toChecks(data.tests, { revealHidden: true, solution: data.solution_code })
       // Multiple choice has nothing to run.
       const withCode = data.kind === 'mcq' ? [] : data.entries.filter((e) => e.code !== null)
       setRerunning(withCode.length)

@@ -32,6 +32,40 @@ export type TestCheck =
    * rather than as "tell your teacher".
    */
   | { kind: 'script'; name: string; hidden?: boolean; code: string; reveal?: boolean }
+  /**
+   * "Matches my solution" (17 Oct 2026): the child's program and the teacher's solution, run
+   * on every case, with the child's chosen values put into the solution. A child's check
+   * carries the solution scrambled (`reference`, from the server); the teacher's own run
+   * carries it plain (`solution`).
+   */
+  | {
+      kind: 'compare'
+      name: string
+      hidden?: boolean
+      inputs: CompareInput[]
+      chosen: ChosenValue[]
+      match?: 'exact' | 'contains'
+      reference?: string | null
+      solution?: string
+      reveal?: boolean
+    }
+
+export type CompareInput =
+  | { mode: 'range'; start: number; end: number }
+  | { mode: 'values'; values: string[] }
+  | { mode: 'random'; count: number; start: number; end: number }
+
+export type ChosenRule =
+  | { type: 'none' }
+  | { type: 'number'; min: number; max: number }
+  | { type: 'numbers'; count: number | null; min: number; max: number; distinct: boolean }
+  | { type: 'list'; min_length: number }
+  | { type: 'text' }
+
+export interface ChosenValue {
+  name: string
+  rule: ChosenRule
+}
 
 /** One test's outcome. A hidden test carries only `name`, `hidden` and `passed`. */
 export interface TestResult {

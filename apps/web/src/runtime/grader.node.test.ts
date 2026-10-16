@@ -245,3 +245,84 @@ test('run() types each value, as text, at the next input()', () => {
   ]).results[0]!
   expect(result).toMatchObject({ passed: true })
 })
+
+/* --- "matches my solution": the solution, with the child's values (17 Oct 2026) ----------- */
+
+const compare = (extra: Partial<Extract<TestCheck, { kind: 'compare' }>> = {}): TestCheck => ({
+  kind: 'compare',
+  name: 'plays like mine',
+  inputs: [{ mode: 'range', start: 0, end: 9 }],
+  chosen: [{ name: 'ships', rule: { type: 'numbers', count: 3, min: 0, max: 9, distinct: true } }],
+  solution: BATTLESHIP,
+  ...extra,
+})
+
+test('a correct program with its own ships matches the solution on every guess', () => {
+  const theirs = BATTLESHIP.replace('[2, 5, 7]', '[0, 1, 9]')
+  expect(check(theirs, [compare()]).results[0]).toMatchObject({ passed: true })
+})
+
+test('the first guess that differs says what it should print and what it printed', () => {
+  const alwaysHit = BATTLESHIP.replace('[2, 5, 7]', '[0, 1, 9]').replace('if guess in ships:', 'if True:')
+  const result = check(alwaysHit, [compare()]).results[0]!
+  expect(result).toMatchObject({ passed: false, error: 'Typing 2 gives a different result' })
+  expect(result.expected).toContain('MISS!')
+  expect(result.got).toContain('HIT!')
+})
+
+test('their values are held to the rules, in words', () => {
+  const broken = BATTLESHIP.replace('[2, 5, 7]', '[0, 0, 12]')
+  expect(check(broken, [compare()]).results[0]!.error).toBe(
+    '`ships` should be a list of 3 different whole numbers from 0 to 9',
+  )
+})
+
+test('a program without the chosen variable is told to make it', () => {
+  expect(check(BATTLESHIP.replaceAll('ships', 'boats'), [compare()]).results[0]!.error).toBe(
+    'Make a variable called `ships` at the top of your program',
+  )
+})
+
+test('a solution that never sets the chosen variable is the teacher’s to fix', () => {
+  const noShips = { solution: BATTLESHIP.replace('ships = [2, 5, 7]\n', '') }
+  expect(check(BATTLESHIP, [compare(noShips)]).results[0]!.error).toBe(
+    'This check has a mistake in it — tell your teacher',
+  )
+  expect(check(BATTLESHIP, [compare({ ...noShips, reveal: true })]).results[0]!.error).toBe(
+    "Your solution doesn't set `ships` at the top of the file",
+  )
+})
+
+test('random inputs are the same on every press, and rows combine', () => {
+  const echo = 'a = input()\nb = input()\nprint(a, b)\n'
+  const random = compare({
+    chosen: [],
+    solution: echo,
+    inputs: [
+      { mode: 'random', count: 3, start: 1, end: 100 },
+      { mode: 'values', values: ['x', 'y'] },
+    ],
+  })
+  const broken = check('a = input()\nb = input()\nprint(b, a)\n', [random]).results[0]!
+  const again = check('a = input()\nb = input()\nprint(b, a)\n', [random]).results[0]!
+  expect(broken.error).toMatch(/^Typing \d+, x gives a different result$/)
+  expect(again.error).toBe(broken.error)
+  expect(check(echo, [random]).results[0]).toMatchObject({ passed: true })
+})
+
+test('a hidden compare check says only whether it passed', () => {
+  const alwaysHit = BATTLESHIP.replace('if guess in ships:', 'if True:')
+  expect(check(alwaysHit, [compare({ hidden: true })]).results[0]).toEqual({
+    name: 'plays like mine',
+    hidden: true,
+    passed: false,
+  })
+})
+
+test('a scrambled solution from the server is read back', () => {
+  const key = new TextEncoder().encode('yogucode-matches-my-solution')
+  const bytes = new TextEncoder().encode(BATTLESHIP).map((b, i) => b ^ key[i % key.length]!)
+  const reference = btoa(String.fromCharCode(...bytes))
+  const theirs = BATTLESHIP.replace('[2, 5, 7]', '[3, 4, 8]')
+  expect(check(theirs, [compare({ solution: undefined, reference })]).results[0]).toMatchObject({ passed: true })
+})

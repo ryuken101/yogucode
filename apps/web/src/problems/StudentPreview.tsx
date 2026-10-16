@@ -16,7 +16,7 @@ import { CodeSurface } from '../editor/CodeSurface'
 import type { ExamplePiece, ExampleRun, TestRun } from '../runtime/protocol'
 import type { usePython } from '../runtime/usePython'
 import { ChecksPanel } from './ChecksPanel'
-import { isSharedFile, leavesOf, toChecks, type ExampleDoc, type ProblemDoc } from './doc'
+import { isSharedFile, leavesOf, solutionOf, toChecks, type ExampleDoc, type ProblemDoc } from './doc'
 import { ProblemBrief } from './ProblemBrief'
 
 interface Props {
@@ -123,7 +123,7 @@ export function StudentPreview({ open, onClose, doc, runs, python }: Props) {
                   variant="secondary"
                   disabled={busy || status === 'loading'}
                   onClick={async () => {
-                    const outcome = await python.check(current, toChecks(leaf.leaf.tests))
+                    const outcome = await python.check(current, toChecks(leaf.leaf.tests, { solution: solutionOf(doc, leaf.leaf) }))
                     setResults((now) => ({ ...now, [leaf.key]: outcome }))
                   }}
                 >

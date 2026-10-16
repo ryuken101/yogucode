@@ -24,6 +24,7 @@ save keeps the inputs and drops any transcript, and the publish route stores the
 transcripts its browser run produced (`apply_transcripts`).
 """
 
+import base64
 import re
 import uuid
 from typing import Annotated, Literal
@@ -96,7 +97,142 @@ class ScriptTest(BaseModel):
     code: str = Field(min_length=1, max_length=MAX_TEST_TEXT)
 
 
-TestDoc = Annotated[IoTest | FunctionTest | ScriptTest, Field(discriminator="kind")]
+class RangeInput(BaseModel):
+    """Every whole number from `start` to `end`, inclusive."""
+
+    mode: Literal["range"]
+    start: int = Field(ge=-1_000_000, le=1_000_000)
+    end: int = Field(ge=-1_000_000, le=1_000_000)
+
+    @model_validator(mode="after")
+    def _small(self) -> "RangeInput":
+        if not 0 <= self.end - self.start < 100:
+            raise ValueError("A range runs upwards and tries at most 100 values")
+        return self
+
+
+class ValuesInput(BaseModel):
+    mode: Literal["values"]
+    values: list[Annotated[str, Field(max_length=200)]] = Field(min_length=1, max_length=50)
+
+
+class RandomInput(BaseModel):
+    """`count` whole numbers picked from `start`..`end` — the same ones on every press."""
+
+    mode: Literal["random"]
+    count: int = Field(ge=1, le=50)
+    start: int = Field(ge=-1_000_000, le=1_000_000)
+    end: int = Field(ge=-1_000_000, le=1_000_000)
+
+
+CompareInput = Annotated[RangeInput | ValuesInput | RandomInput, Field(discriminator="mode")]
+
+
+class NoRule(BaseModel):
+    type: Literal["none"]
+
+
+class NumberRule(BaseModel):
+    type: Literal["number"]
+    min: int = 0
+    max: int = 9
+
+
+class NumbersRule(BaseModel):
+    type: Literal["numbers"]
+    count: int | None = Field(default=None, ge=0, le=100)
+    min: int = 0
+    max: int = 9
+    distinct: bool = False
+
+
+class ListRule(BaseModel):
+    type: Literal["list"]
+    min_length: int = Field(default=1, ge=0, le=100)
+
+
+class TextRule(BaseModel):
+    type: Literal["text"]
+
+
+ChosenRule = Annotated[
+    NoRule | NumberRule | NumbersRule | ListRule | TextRule, Field(discriminator="type")
+]
+
+
+class ChosenValue(BaseModel):
+    """A value the child chooses in their own program (`ships`), and what it must be."""
+
+    name: str = Field(pattern=r"^[A-Za-z_][A-Za-z0-9_]*$", max_length=60)
+    rule: ChosenRule = Field(default_factory=lambda: NoRule(type="none"))
+
+
+MAX_COMPARE_CASES = 200
+
+
+class CompareTest(BaseModel):
+    """ "Matches my solution" (Ken's decision, 17 Oct 2026): the child's program and the
+    reference solution are run on every case, with the child's `chosen` values put into
+    the solution, and their output compared. Correct checks for student-chosen data, with
+    no code to write. See `runtime/grader.py`.
+
+    `reference` is the scrambled solution, added only when the check is sent to a child's
+    browser (`with_reference`) — never stored, and null in a teacher's document.
+    """
+
+    kind: Literal["compare"]
+    name: str = Field(min_length=1, max_length=120)
+    hidden: bool = False
+    inputs: list[CompareInput] = Field(default_factory=list, max_length=4)
+    chosen: list[ChosenValue] = Field(default_factory=list, max_length=4)
+    match: Literal["exact", "contains"] = "exact"
+    # Only ever set on the way to a child's browser; always None in what is stored or read.
+    reference: str | None = None
+
+    @model_validator(mode="after")
+    def _few_enough_cases(self) -> "CompareTest":
+        cases = 1
+        for row in self.inputs:
+            cases *= (
+                row.end - row.start + 1
+                if isinstance(row, RangeInput)
+                else len(row.values)
+                if isinstance(row, ValuesInput)
+                else row.count
+            )
+        if cases > MAX_COMPARE_CASES:
+            raise ValueError(
+                f"A check tries at most {MAX_COMPARE_CASES} cases; this one has {cases}"
+            )
+        names = [c.name for c in self.chosen]
+        if len(set(names)) != len(names):
+            raise ValueError("A value is listed twice")
+        return self
+
+
+TestDoc = Annotated[IoTest | FunctionTest | ScriptTest | CompareTest, Field(discriminator="kind")]
+
+# Not security: the solution has to reach the child's browser to be run. This keeps it from
+# being readable at a glance. The same key is in `runtime/grader.py`.
+SCRAMBLE_KEY = b"yogucode-matches-my-solution"
+
+
+def scramble(text: str) -> str:
+    data = text.encode()
+    return base64.b64encode(
+        bytes(b ^ SCRAMBLE_KEY[i % len(SCRAMBLE_KEY)] for i, b in enumerate(data))
+    ).decode()
+
+
+def with_reference(tests: list, solution: str) -> list:
+    """A leaf's tests as a child's browser gets them: compare checks carry the solution,
+    scrambled. Other kinds pass through unchanged."""
+    return [
+        test.model_copy(update={"reference": scramble(solution)})
+        if isinstance(test, CompareTest)
+        else test
+        for test in tests
+    ]
 
 
 class HintDoc(BaseModel):
@@ -201,11 +337,13 @@ class ProblemDoc(LeafDoc):
 # --- reading ------------------------------------------------------------------------
 
 
-def _test_doc(row: TestCase) -> IoTest | FunctionTest | ScriptTest:
+def _test_doc(row: TestCase) -> IoTest | FunctionTest | ScriptTest | CompareTest:
     if row.kind == TestKind.IO:
         return IoTest(name=row.name, hidden=row.hidden, **row.spec)
     if row.kind == TestKind.SCRIPT:
         return ScriptTest(kind="script", name=row.name, hidden=row.hidden, **row.spec)
+    if row.kind == TestKind.COMPARE:
+        return CompareTest(kind="compare", name=row.name, hidden=row.hidden, **row.spec)
     return FunctionTest(kind="function", name=row.name, hidden=row.hidden, **row.spec)
 
 
@@ -319,7 +457,7 @@ async def _replace_leaf(
                 item_id=item.id,
                 name=test.name.strip(),
                 kind=TestKind(test.kind),
-                spec=test.model_dump(exclude={"kind", "name", "hidden"}),
+                spec=test.model_dump(exclude={"kind", "name", "hidden", "reference"}),
                 hidden=test.hidden,
                 sort_order=order,
             )

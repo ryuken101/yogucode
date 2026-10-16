@@ -1,10 +1,11 @@
 /**
  * A leaf's test cases.
  *
- * Three kinds: "prints" (give it this input, it should print this), "returns" (call this
- * function, it should give back this), and since 17 Oct 2026 "passes my check" — the
- * teacher's own Python, for checks that depend on values the child chose (their `ships`,
- * their list of names). The row's fields change with its kind; everything else — name,
+ * Four kinds: "prints" (give it this input, it should print this), "returns" (call this
+ * function, it should give back this), and since 17 Oct 2026 two for checks that depend on
+ * values the child chose (their `ships`, their list of names): "matches my solution", a
+ * form that compares their program with the reference solution run on their values, and
+ * "passes my check", the teacher's own Python. The row's fields change with its kind; everything else — name,
  * hidden — is shared.
  */
 
@@ -13,6 +14,7 @@ import { Button } from '../components/Button'
 import { Select, TextInput, Textarea } from '../components/Field'
 import { CodeSurface } from '../editor/CodeSurface'
 import type { TestResult } from '../runtime/protocol'
+import { CompareEditor } from './CompareEditor'
 import { SCRIPT_TEMPLATES, newTest, type TestDoc } from './doc'
 import { TestResultLine } from './TestResults'
 
@@ -56,6 +58,7 @@ export function TestsEditor({ tests, onChange, results, disabled }: Props) {
             >
               <option value="io">prints</option>
               <option value="function">returns</option>
+              <option value="compare">matches my solution</option>
               <option value="script">passes my check (Python)</option>
             </Select>
             <label className="flex items-end gap-2 pb-2 text-sm text-grape">
@@ -69,7 +72,9 @@ export function TestsEditor({ tests, onChange, results, disabled }: Props) {
             </label>
           </div>
 
-          {test.kind === 'script' ? (
+          {test.kind === 'compare' ? (
+            <CompareEditor test={test} disabled={disabled} onChange={(next) => update(index, next)} />
+          ) : test.kind === 'script' ? (
             <div className="mt-3 flex flex-col gap-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm text-muted">
