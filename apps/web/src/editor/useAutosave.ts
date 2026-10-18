@@ -21,6 +21,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSaveDocument } from '../lib/queries'
+import { track } from './inflight'
 
 /** Long enough to coalesce a sentence of typing, short enough to lose almost nothing. */
 export const AUTOSAVE_DELAY_MS = 2_000
@@ -34,7 +35,38 @@ export type SaveState = 'saved' | 'pending' | 'saving' | 'failed'
  */
 export type Saver = (id: string, content: string) => Promise<unknown>
 
-export function useAutosave(documentId: string | null, saver?: Saver) {
+/**
+ * Typing not yet on the server, kept in this browser too (17 Oct 2026), so a lost
+ * connection or a closed tab costs nothing: reopening the work offers it back. Per viewer,
+ * best effort — `localStorage` can be missing or full, and the server copy is always the
+ * real one.
+ */
+const BACKUP_PREFIX = 'yogucode-unsaved:'
+
+function readBackup(id: string): string | null {
+  try {
+    const raw = window.localStorage.getItem(BACKUP_PREFIX + id)
+    return raw === null ? null : (JSON.parse(raw) as { content: string }).content
+  } catch {
+    return null
+  }
+}
+
+function writeBackup(id: string, content: string | null) {
+  try {
+    if (content === null) window.localStorage.removeItem(BACKUP_PREFIX + id)
+    else window.localStorage.setItem(BACKUP_PREFIX + id, JSON.stringify({ content, at: Date.now() }))
+  } catch {
+    // Private window or full storage: the server copy is still the real one.
+  }
+}
+
+export function useAutosave(
+  documentId: string | null,
+  saver?: Saver,
+  /** What ⌘/Ctrl+S does, when it is more than saving — a problem's first Save asks where. */
+  onShortcut?: () => void,
+) {
   const saveDocument = useSaveDocument()
   const saveDocumentAsync = saveDocument.mutateAsync
   // The newest saver, kept in a ref so `flush` stays stable and the pagehide listener is
@@ -44,6 +76,12 @@ export function useAutosave(documentId: string | null, saver?: Saver) {
     write.current = saver ?? ((id, content) => saveDocumentAsync({ documentId: id, content }))
   })
   const [state, setState] = useState<SaveState>('saved')
+  /** Typing from an earlier visit that never reached the server, offered back on open. */
+  const [recovered, setRecovered] = useState<string | null>(null)
+  const shortcut = useRef(onShortcut)
+  useEffect(() => {
+    shortcut.current = onShortcut
+  })
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   /** The text last known to be on the server, so an unchanged editor writes nothing. */
@@ -62,10 +100,15 @@ export function useAutosave(documentId: string | null, saver?: Saver) {
 
     pending.current = null
     setState('saving')
-    write.current(id, content).then(
+    const sent = write.current(id, content)
+    track(sent)
+    sent.then(
       () => {
         persisted.current = content
-        setState('saved')
+        // Typing since this save went is still waiting: say so, rather than "Saved".
+        const waiting = pending.current !== null && pending.current !== content
+        setState(waiting ? 'pending' : 'saved')
+        if (!waiting) writeBackup(id, null)
       },
       // Deliberately not retried: the usual cause is a revoked or expired session, and
       // retrying would hide that behind a spinner while the child keeps typing into
@@ -80,10 +123,25 @@ export function useAutosave(documentId: string | null, saver?: Saver) {
 
   /** Tell the hook what the server already has, when a file is opened or created. */
   const adopt = useCallback((documentId: string | null, content: string) => {
+    // The same file reporting what was just saved, while newer typing waits to go: keep
+    // the typing. Clearing it here lost the last words typed during a save (17 Oct 2026).
+    if (documentId !== null && documentId === activeId.current && pending.current !== null && pending.current !== content) {
+      persisted.current = content
+      return
+    }
     activeId.current = documentId
     persisted.current = content
     pending.current = null
     setState('saved')
+    const backup = documentId ? readBackup(documentId) : null
+    if (backup !== null && backup === content && documentId) writeBackup(documentId, null)
+    setRecovered(backup !== null && backup !== content ? backup : null)
+  }, [])
+
+  /** Throw away the recovered typing: the server's copy stays. */
+  const discardRecovered = useCallback(() => {
+    if (activeId.current) writeBackup(activeId.current, null)
+    setRecovered(null)
   }, [])
 
   const onChange = useCallback(
@@ -96,6 +154,7 @@ export function useAutosave(documentId: string | null, saver?: Saver) {
         return
       }
       setState((now) => (now === 'saving' ? now : 'pending'))
+      if (activeId.current) writeBackup(activeId.current, content)
       if (timer.current !== null) clearTimeout(timer.current)
       timer.current = setTimeout(flush, AUTOSAVE_DELAY_MS)
     },
@@ -113,18 +172,39 @@ export function useAutosave(documentId: string | null, saver?: Saver) {
     }
   }, [flush])
 
+  // Unsent work and a failed save: closing the tab now would lose it, so the browser asks.
+  useEffect(() => {
+    if (state !== 'failed') return
+    const onLeave = (event: BeforeUnloadEvent) => event.preventDefault()
+    window.addEventListener('beforeunload', onLeave)
+    return () => window.removeEventListener('beforeunload', onLeave)
+  }, [state])
+
   // ⌘/Ctrl+S saves wherever the focus is — the console, a button — and never opens the
   // browser's "Save page". Inside the editor Monaco takes the key first (`onSave`).
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
         event.preventDefault()
-        flush()
+        if (shortcut.current) shortcut.current()
+        else flush()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [flush])
 
-  return { state, onChange, adopt, flush, save: flush }
+  /**
+   * Take the recovered typing back: it becomes unsaved work, sent like any typing. Returns
+   * it, for the page to put in the editor. The backup stays until the save succeeds.
+   */
+  const restoreRecovered = useCallback((): string | null => {
+    const text = recovered
+    if (text === null) return null
+    setRecovered(null)
+    onChange(text)
+    return text
+  }, [recovered, onChange])
+
+  return { state, onChange, adopt, flush, save: flush, recovered, discardRecovered, restoreRecovered }
 }

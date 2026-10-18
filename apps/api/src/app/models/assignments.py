@@ -149,3 +149,7 @@ class Attempt(TimestampMixin, table=True):
     last_total: int | None = Field(default=None)
     # The highest hint rung unlocked; 0 for none. Rungs unlock in order.
     hints_unlocked: int = Field(default=0)
+    # A file in the child's own Files that this work is also saved to (Ken's decision, 17
+    # Oct 2026): the first Save asks where, and every save after keeps it up to date. The
+    # attempt stays the record that is checked and marked; the file is the child's copy.
+    document_id: uuid.UUID | None = Field(default=None, foreign_key="student_documents.id")

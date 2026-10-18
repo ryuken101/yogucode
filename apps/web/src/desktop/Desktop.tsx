@@ -138,7 +138,9 @@ function DesktopCore({ role, pages, name, subtitle, isOwner, classes, saved, loc
   /** Run a window action; then, if the front window changed page, the URL follows it. */
   const act = useCallback(
     (action: Action, options: { follow?: boolean } = {}) => {
-      if (!teacher && (action.type === 'toggleMax' || action.type === 'place')) return
+      // A child's windows are never dragged or resized; they may switch between a window
+      // and full screen (18 Oct 2026).
+      if (!teacher && action.type === 'place') return
       const next = reduce(winsRef.current, action)
       setWins(next)
       if (options.follow === false) return
@@ -264,6 +266,23 @@ function DesktopCore({ role, pages, name, subtitle, isOwner, classes, saved, loc
     act({ type: 'layout', items: items.map(([app, path, geom]) => ({ app, loc: fromPath(path), geom })) })
   }
 
+  /** The front window on the left, `app` showing `path` on the right, as one layout. */
+  const openBeside = useCallback(
+    (app: AppId, path: string) => {
+      const front = frontOf(winsRef.current)
+      const right = { x: 0.55, y: 0, w: 0.45, h: 1 }
+      if (!front || front.app === app) return void act({ type: 'layout', items: [{ app, loc: fromPath(path), geom: null }] })
+      act({
+        type: 'layout',
+        items: [
+          { app: front.app, loc: front.loc, geom: { x: 0, y: 0, w: 0.55, h: 1 } },
+          { app, loc: fromPath(path), geom: right },
+        ],
+      })
+    },
+    [act],
+  )
+
   const layouts: MenuItem[] = teacher
     ? [
         {
@@ -330,7 +349,7 @@ function DesktopCore({ role, pages, name, subtitle, isOwner, classes, saved, loc
   }
 
   return (
-    <DeskContext.Provider value={{ role, classId, isOwner }}>
+    <DeskContext.Provider value={{ role, classId, isOwner, openBeside }}>
       <div className="flex h-dvh min-h-[600px] flex-col overflow-hidden bg-cream text-grape">
         <header className="relative z-[5000] flex h-14 shrink-0 items-center gap-2 border-b border-line bg-surface px-4">
           {teacher ? <Lockup size={26} /> : <CupMark size={28} />}

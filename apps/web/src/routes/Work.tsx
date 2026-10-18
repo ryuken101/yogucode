@@ -21,6 +21,7 @@ import { FileTabs } from '../components/FileTabs'
 import { Notice } from '../components/Notice'
 import { Spinner } from '../components/Spinner'
 import { CodeSurface } from '../editor/CodeSurface'
+import { RecoveredWork } from '../editor/RecoveredWork'
 import { SaveControl } from '../editor/SaveControl'
 import { useAutosave } from '../editor/useAutosave'
 import { useOpenTabs } from '../editor/useOpenTabs'
@@ -55,6 +56,7 @@ export function Work() {
   const { tabs, activeId, open, close } = useOpenTabs(files.data, flush)
   const active = useDocument(activeId)
   const autosave = useAutosave(activeId)
+  const [restored, setRestored] = useState<{ id: string; text: string | null } | null>(null)
   useEffect(() => {
     flushRef.current = autosave.flush
   })
@@ -141,7 +143,8 @@ export function Work() {
 
   const busy = state.status === 'running' || state.status === 'asking'
   const loading = state.status === 'loading'
-  const code = active.data?.content ?? ''
+  // Recovered typing, shown in place of the saved copy until it is saved (17 Oct 2026).
+  const code = (restored?.id === activeId ? restored.text : null) ?? active.data?.content ?? ''
   // A file's type is its name, as in VS Code: only .py runs (lib/fileType.ts).
   const python = isPythonFile(active.data?.title)
 
@@ -186,8 +189,14 @@ export function Work() {
           something the child did, so it is the one thing allowed to be system-error. */}
       {autosave.state === 'failed' ? (
         <Notice tone="system-error">
-          Your work is not saving. Tell your teacher — you may need to sign in again.
+          Your work is not saving. Tell your teacher — you may need to sign in again. Your typing is kept on this computer for now — don’t close the tab, and press Save to try again.
         </Notice>
+      ) : null}
+      {autosave.recovered !== null && active.data ? (
+        <RecoveredWork
+          onDiscard={autosave.discardRecovered}
+          onRestore={() => setRestored({ id: active.data.id, text: autosave.restoreRecovered() })}
+        />
       ) : null}
 
       {/* Two live files cannot share a name — the API refuses with a 409 and a sentence

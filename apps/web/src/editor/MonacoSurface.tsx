@@ -99,6 +99,14 @@ export default function MonacoSurface({
   notifySave.current = onSave
   /** True while the page, not the person, is replacing the text. */
   const applying = useRef(false)
+  /**
+   * Every text this editor has reported through `onChange`, newest last (capped). A `value`
+   * that is one of these is the page catching up with the editor, not new text — and it can
+   * be *behind* the editor: render reads the text, the person types two more letters, and
+   * only then does the effect below run. Writing that stale echo back is what replaced the
+   * whole file and threw the cursor to line 1 when someone typed fast (bug, 17 Oct 2026).
+   */
+  const reported = useRef<string[]>([value])
 
   useEffect(() => {
     if (!host.current) return
@@ -108,7 +116,10 @@ export default function MonacoSurface({
       readOnly,
     })
     created.onDidChangeModelContent((event) => {
-      notify.current(created.getValue())
+      const text = created.getValue()
+      reported.current.push(text)
+      if (reported.current.length > 200) reported.current.splice(0, reported.current.length - 200)
+      notify.current(text)
       if (applying.current) return
       notifyEdit.current?.(
         event.changes.map((c) => ({ offset: c.rangeOffset, length: c.rangeLength, text: c.text })),
@@ -147,10 +158,12 @@ export default function MonacoSurface({
   }, [])
 
   // Switching file, or restoring saved work — replace the text without remounting, so the
-  // editor keeps its layout and the child keeps their scroll position where possible.
+  // editor keeps its layout and the child keeps their scroll position where possible. Only
+  // for text the editor has never had: an echo of its own typing is ignored (see `reported`).
   useEffect(() => {
     const current = editor.current
-    if (current && value !== current.getValue()) {
+    if (!current || reported.current.includes(value)) return
+    if (value !== current.getValue()) {
       applying.current = true
       current.setValue(value)
       applying.current = false

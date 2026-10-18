@@ -94,9 +94,11 @@ Ken's decisions, 16 Oct 2026; the clickable prototype is the artifact "Yogucode 
   the other's guard. Hence `/my-files` and `/my-desk` for children.
 - **Teachers** drag, resize and snap (local state in `Window.tsx` while dragging, so the page
   inside never re-renders), and the layout saves to `/me/desktop` ~0.8 s after it settles.
-  The desktop starts in Live for the class in the top bar. **Children** cannot arrange
-  windows, nothing is saved, and only the front window (or its layout group) is mounted —
-  two mounted editors would both stream to the live view.
+  The desktop starts in Live for the class in the top bar. **Children** cannot drag or
+  resize windows, nothing is saved, and only the front window (or its layout group) is
+  mounted — two mounted editors would both stream to the live view. They can switch any
+  window between a window and full screen (18 Oct 2026). A page asks for another app beside
+  it with `useDesk().openBeside` ("Put it away in Files…" opens `/my-files?select=<id>`).
 - The front window is a tinted title bar, never a shadow. Windows grow from their dock icon
   (`desktop.css`), with no animation under `prefers-reduced-motion`.
 - **Files** (`Finder.tsx`) finds, opens and, since 17 Oct 2026, **organises**, as Finder
@@ -245,6 +247,33 @@ A failed save is the one thing on that screen allowed to be **`system-error`** �
 genuinely our fault, and a child typing into a page that silently discards their work is
 the failure most worth shouting about. Saves are deliberately not retried: the usual cause is a revoked
 session, and retrying hides it behind a spinner.
+
+**Rules from the lost-work bugs of 17 Oct 2026.** Break any of these and work goes missing
+again. A Playwright run with eight students and a teacher reproduced every one of them
+before the fixes went in.
+- **Never reopen work from a cached copy.** A child's work is fetched fresh every time a
+  page opens it (`gcTime: 0` on `useStudentProblem`, `useSheet`, `useDocument`,
+  `useTeacherDocument`), and only after every save in flight has landed
+  (`editor/inflight.ts`, `afterSaves`). The old cache showed the starter on reopen and
+  then autosaved it over the real work.
+- **An editor ignores echoes of its own text.** `MonacoSurface` remembers every text it
+  has reported, and a `value` prop equal to one of them is stale page state, not new
+  text. Writing it back replaced the whole file and threw the cursor to line 1 whenever
+  someone typed fast, the teacher in Help included.
+- **A finished save never clears newer typing.** `adopt` for the same file keeps whatever
+  is still pending.
+- **Typing not yet sent is also kept in `localStorage`** (`yogucode-unsaved:<id>`) and
+  offered back on the next open (`RecoveredWork`). A failed save asks before the tab
+  closes.
+
+**Lesson and homework problems save to a file too** (Ken, 17 Oct 2026). The first Save
+opens `editor/SaveToFiles.tsx` to choose a folder and name. The attempt is then linked
+(`PUT /me/attempts/{id}/file`), and every save of it rewrites that file, so the work is in
+the child's Files. "Put it away in Files…" saves the same way and then opens Files beside
+the problem with the file selected, to drag into a folder; the link survives the move.
+`Button` defaults to `type="button"`, because the browser's default (submit) once made
+every button in this window save to My work. Editing the file doesn't change the attempt, which is what gets checked
+and marked.
 
 ## The live classroom (`src/collab/`)
 

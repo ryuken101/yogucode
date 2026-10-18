@@ -6,14 +6,16 @@
  * `grader.node.test.ts`; here it is what the page does with the result.
  */
 
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { Route, Routes } from 'react-router'
+import { useState } from 'react'
 import { beforeEach, expect, test, vi } from 'vitest'
 import type { Schemas } from '../lib/api'
 import type { TestRun } from '../runtime/protocol'
 import { renderScreen } from '../test/render'
 import { server } from '../test/server'
+import { DeskContext } from '../desktop/context'
 import { ProblemAttempt } from './ProblemAttempt'
 
 vi.mock('../editor/CodeSurface', () => ({
@@ -234,4 +236,123 @@ test('a part with no checks offers Run, not a Check with nothing to try', async 
   expect(await screen.findByText(/no checks for this one/)).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Run' })).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Check' })).not.toBeInTheDocument()
+})
+
+/* --- bugs from the class of 17 Oct 2026 --------------------------------------------------- */
+
+/** The problem in a window that can be closed and opened again, as the desktop does. */
+function Reopenable() {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button type="button" onClick={() => setOpen((now) => !now)}>
+        {open ? 'Close the window' : 'Open the window'}
+      </button>
+      {open ? (
+        <Routes>
+          <Route path="/lesson/:assignmentId/:itemId" element={<ProblemAttempt />} />
+        </Routes>
+      ) : null}
+    </>
+  )
+}
+
+test('closing and reopening the problem shows what was saved, not the copy it opened with', async () => {
+  let onServer = 'numbers = [1, 2, 3]\n'
+  server.use(
+    http.post(`/api/me/assignments/${ASSIGNMENT}/items/${ITEM}/open`, () =>
+      HttpResponse.json({ ...problem(), leaves: [leaf({ attempt: { ...leaf().attempt, code: onServer } })] }),
+    ),
+    http.patch(`/api/me/attempts/${ATTEMPT}`, async ({ request }) => {
+      onServer = ((await request.json()) as Schemas['AttemptSaveIn']).code
+      return HttpResponse.json({ ...leaf().attempt, code: onServer })
+    }),
+  )
+  const { user, client } = renderScreen(<Reopenable />, { route: `/lesson/${ASSIGNMENT}/${ITEM}` })
+  // The app keeps queries after they unmount; the test client normally does not.
+  client.setDefaultOptions({ queries: { retry: false, gcTime: Infinity } })
+
+  await user.click(screen.getByRole('button', { name: 'Open the window' }))
+  await user.type(await screen.findByLabelText('Your program'), 'numbers.append(5)')
+  await user.click(screen.getByRole('button', { name: 'Close the window' })) // saves what is waiting
+  await user.click(screen.getByRole('button', { name: 'Open the window' }))
+  await waitFor(() =>
+    expect(screen.getByLabelText('Your program')).toHaveValue('numbers = [1, 2, 3]\nnumbers.append(5)'),
+  )
+})
+
+test('the first Save asks where to keep it, then keeps the work in that file', async () => {
+  let linked: Schemas['FileLinkIn'] | null = null
+  let made: Schemas['DocumentIn'] | null = null
+  server.use(
+    http.get('/api/me/folders', () => HttpResponse.json([])),
+    http.get('/api/me/documents', () => HttpResponse.json([])),
+    http.post('/api/me/documents', async ({ request }) => {
+      made = (await request.json()) as Schemas['DocumentIn']
+      return HttpResponse.json(
+        { id: 'file-1', title: made.title, folder_id: null, status: 'active', content: made.content ?? '', created_at: '2026-10-17T00:00:00Z', updated_at: '2026-10-17T00:00:00Z' },
+        { status: 201 },
+      )
+    }),
+    http.put(`/api/me/attempts/${ATTEMPT}/file`, async ({ request }) => {
+      linked = (await request.json()) as Schemas['FileLinkIn']
+      return HttpResponse.json({ ...leaf().attempt, document_id: 'file-1' })
+    }),
+  )
+  const { user } = renderAttempt()
+  await screen.findByLabelText('Your program')
+  await user.click(screen.getByRole('button', { name: 'Save' }))
+
+  const dialog = within(screen.getByRole('dialog', { name: 'Save to my files' }))
+  expect(dialog.getByLabelText('File name')).toHaveValue('Add to the end.py')
+  await user.click(dialog.getByRole('button', { name: 'Save' }))
+  await waitFor(() => expect(linked).toEqual({ document_id: 'file-1' }))
+  expect(made).toMatchObject({ title: 'Add to the end.py', folder_id: null, content: 'numbers = [1, 2, 3]\n' })
+})
+
+test('New folder makes a folder without closing the Save window, and Put it away opens Files', async () => {
+  const FOLDER = '018f0000-0000-7000-8000-0000000000f1'
+  let folders: Schemas['FolderOut'][] = []
+  let made: Schemas['DocumentIn'] | null = null
+  const openBeside = vi.fn()
+  server.use(
+    http.get('/api/me/folders', () => HttpResponse.json(folders)),
+    http.post('/api/me/folders', async ({ request }) => {
+      const body = (await request.json()) as Schemas['FolderIn']
+      const folder = { id: FOLDER, name: body.name, parent_id: body.parent_id ?? null, status: 'active', created_at: '2026-10-18T00:00:00Z', updated_at: '2026-10-18T00:00:00Z' } as Schemas['FolderOut']
+      folders = [folder]
+      return HttpResponse.json(folder, { status: 201 })
+    }),
+    http.get('/api/me/documents', () => HttpResponse.json([])),
+    http.post('/api/me/documents', async ({ request }) => {
+      made = (await request.json()) as Schemas['DocumentIn']
+      return HttpResponse.json(
+        { id: 'file-1', title: made.title, folder_id: made.folder_id, status: 'active', content: made.content ?? '', created_at: '2026-10-18T00:00:00Z', updated_at: '2026-10-18T00:00:00Z' },
+        { status: 201 },
+      )
+    }),
+    http.put(`/api/me/attempts/${ATTEMPT}/file`, () => HttpResponse.json({ ...leaf().attempt, document_id: 'file-1' })),
+  )
+  const { user } = renderScreen(
+    <DeskContext.Provider value={{ role: 'student', classId: null, isOwner: false, openBeside }}>
+      <Routes>
+        <Route path="/lesson/:assignmentId/:itemId" element={<ProblemAttempt />} />
+      </Routes>
+    </DeskContext.Provider>,
+    { route: `/lesson/${ASSIGNMENT}/${ITEM}` },
+  )
+  await screen.findByLabelText('Your program')
+  await user.click(screen.getByRole('button', { name: 'Save' }))
+  const dialog = within(screen.getByRole('dialog', { name: 'Save to my files' }))
+
+  // Every button here used to submit the form, saving to My work and closing the window.
+  await user.click(dialog.getByRole('button', { name: /New folder/ }))
+  await user.type(dialog.getByLabelText('New folder name'), 'Games')
+  await user.click(dialog.getByRole('button', { name: 'Make it' }))
+  expect(await dialog.findByRole('option', { name: 'My work / Games', selected: true })).toBeInTheDocument()
+  expect(made).toBeNull()
+
+  await user.click(dialog.getByRole('button', { name: 'Put it away in Files…' }))
+  await waitFor(() => expect(openBeside).toHaveBeenCalledWith('files', `/my-files?select=file-1&folder=${FOLDER}`))
+  expect(made).toMatchObject({ folder_id: FOLDER })
 })

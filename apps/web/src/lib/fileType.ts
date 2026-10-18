@@ -16,3 +16,9 @@ export type EditorLanguage = 'python' | 'plaintext'
 export function languageOf(title: string | null | undefined): EditorLanguage {
   return isPythonFile(title) ? 'python' : 'plaintext'
 }
+
+/** A file name for a problem's work: its title, as a Python file ("Battleship.py"). */
+export function fileNameFor(title: string): string {
+  const stem = title.replace(/[\\/]/g, '-').trim() || 'my code'
+  return /\.[a-z0-9]+$/i.test(stem) ? stem : `${stem}.py`
+}

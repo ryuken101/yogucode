@@ -8,6 +8,9 @@
  * in a Dialog instead, which asks the question in words.
  *
  * Nothing in this product is deleted, so nothing here needs to look like deletion.
+ *
+ * `type` is `button` unless a form's own submit says `type="submit"`. The browser default
+ * is submit, which made every button in the Save window save to My work (18 Oct 2026).
  */
 
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
@@ -26,10 +29,11 @@ interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode
 }
 
-export function Button({ variant = 'secondary', className = '', children, ...rest }: Props) {
+export function Button({ variant = 'secondary', className = '', type = 'button', children, ...rest }: Props) {
   return (
     <button
       {...rest}
+      type={type}
       className={`inline-flex items-center justify-center rounded-2xl px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${VARIANTS[variant]} ${className}`}
     >
       {children}

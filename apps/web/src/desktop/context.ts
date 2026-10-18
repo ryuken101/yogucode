@@ -6,12 +6,17 @@
  */
 
 import { createContext, useContext } from 'react'
-import type { Role } from './apps'
+import type { AppId, Role } from './apps'
 
 export interface Desk {
   role: Role
   classId: string | null
   isOwner: boolean
+  /**
+   * Open `path` in `app` beside the front window, the two side by side (18 Oct 2026): a
+   * problem's "Put it away in Files…" opens Files next to it. Does nothing off a desktop.
+   */
+  openBeside?: (app: AppId, path: string) => void
 }
 
 export const DeskContext = createContext<Desk>({ role: 'teacher', classId: null, isOwner: false })

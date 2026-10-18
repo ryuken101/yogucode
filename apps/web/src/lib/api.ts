@@ -505,6 +505,13 @@ export const api = {
       body: { code } satisfies Schemas['AttemptSaveIn'],
       anonymous: true,
     }),
+  /** Keep this work in one of the child's files from now on (the Save window). */
+  linkAttemptFile: (attemptId: string, documentId: string | null) =>
+    request<Schemas['AttemptOut']>(`/me/attempts/${attemptId}/file`, {
+      method: 'PUT',
+      body: { document_id: documentId } satisfies Schemas['FileLinkIn'],
+      anonymous: true,
+    }),
   choose: (attemptId: string, choice: number) =>
     request<Schemas['AttemptOut']>(`/me/attempts/${attemptId}/choice`, {
       method: 'PUT',

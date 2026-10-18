@@ -1313,6 +1313,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/attempts/{attempt_id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Link File
+         * @description Save this work to one of the child's own files, from now on (the Save window).
+         *
+         *     The file is written straight away with the work as it is. Only a live file of their own
+         *     can be chosen — another child's is a 404, as everywhere.
+         */
+        put: operations["link_file_me_attempts__attempt_id__file_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/attempts/{attempt_id}/hints": {
         parameters: {
             query?: never;
@@ -2422,6 +2445,8 @@ export interface components {
             choice: number | null;
             /** Code */
             code: string;
+            /** Document Id */
+            document_id?: string | null;
             /**
              * Id
              * Format: uuid
@@ -2947,6 +2972,14 @@ export interface components {
              * @enum {string}
              */
             outcome: "good" | "not_yet";
+        };
+        /**
+         * FileLinkIn
+         * @description The child's file to keep this work in, or null to stop.
+         */
+        FileLinkIn: {
+            /** Document Id */
+            document_id: string | null;
         };
         /** FolderDeletedOut */
         FolderDeletedOut: {
@@ -7087,6 +7120,43 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ChoiceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttemptOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    link_file_me_attempts__attempt_id__file_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                attempt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FileLinkIn"];
             };
         };
         responses: {

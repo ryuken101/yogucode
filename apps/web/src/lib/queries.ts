@@ -16,6 +16,7 @@ import {
   useQueryClient,
   type UseQueryOptions,
 } from '@tanstack/react-query'
+import { afterSaves } from '../editor/inflight'
 import { api, type FolderScope, type ProblemFilters, type Schemas } from './api'
 import { ApiError } from './errors'
 import { isStudentTab } from './tabSession'
@@ -344,9 +345,15 @@ export function useDocuments() {
 export function useDocument(documentId: string | null) {
   return useQuery({
     queryKey: keys.document(documentId ?? 'none'),
-    queryFn: () => api.readDocument(documentId as string),
+    queryFn: async () => {
+      await afterSaves()
+      return api.readDocument(documentId as string)
+    },
     enabled: documentId !== null,
     staleTime: Infinity,
+    // Read afresh whenever a file is opened, never from a copy kept since — see
+    // `useStudentProblem`.
+    gcTime: 0,
   })
 }
 
@@ -454,9 +461,13 @@ export function useTeacherDocuments() {
 export function useTeacherDocument(documentId: string | null) {
   return useQuery({
     queryKey: keys.teacherDocument(documentId ?? 'none'),
-    queryFn: () => api.readTeacherDocument(documentId as string),
+    queryFn: async () => {
+      await afterSaves()
+      return api.readTeacherDocument(documentId as string)
+    },
     enabled: documentId !== null,
     staleTime: Infinity,
+    gcTime: 0,
   })
 }
 
@@ -650,11 +661,21 @@ export function useToday() {
  * Never refetched in the background: the editor is uncontrolled and owns the code once
  * open, and a refetch would hand it a stale copy of what the child is typing.
  */
+/**
+ * A problem as the child works it. Fetched fresh every time the page opens (`gcTime: 0`)
+ * and after any save still in flight: the editor owns the code while it is open, so the
+ * copy here goes stale as they type, and reopening the window used to show that old copy —
+ * the "my work is gone" of 17 Oct 2026 — and then autosave it over the real work.
+ */
 export function useStudentProblem(assignmentId: string, itemId: string) {
   return useQuery({
     queryKey: keys.studentProblem(assignmentId, itemId),
-    queryFn: () => api.openProblem(assignmentId, itemId),
+    queryFn: async () => {
+      await afterSaves()
+      return api.openProblem(assignmentId, itemId)
+    },
     staleTime: Infinity,
+    gcTime: 0,
   })
 }
 
@@ -669,8 +690,17 @@ export function useStartedProblems(enabled = true) {
   return useQuery({ queryKey: keys.startedProblems, queryFn: api.startedProblems, enabled })
 }
 
+/** A homework sheet — fresh on every open, since it carries each part's code for hand-in. */
 export function useSheet(assignmentId: string) {
-  return useQuery({ queryKey: keys.sheet(assignmentId), queryFn: () => api.sheet(assignmentId) })
+  return useQuery({
+    queryKey: keys.sheet(assignmentId),
+    queryFn: async () => {
+      await afterSaves()
+      return api.sheet(assignmentId)
+    },
+    staleTime: 0,
+    gcTime: 0,
+  })
 }
 
 export function useClassHomework(classId: string) {

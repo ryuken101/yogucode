@@ -184,7 +184,14 @@ function Shell({
 }) {
   const [params, setParams] = useSearchParams()
   const folderId = flat ? null : params.get('folder')
-  const [selected, setSelected] = useState<string | null>(null)
+  // `?select=<id>`: a file to show selected, as "Put it away in Files…" sends (18 Oct 2026).
+  const asked = params.get('select')
+  const [selected, setSelected] = useState<string | null>(asked)
+  const [lastAsked, setLastAsked] = useState(asked)
+  if (asked !== lastAsked) {
+    setLastAsked(asked)
+    if (asked) setSelected(asked)
+  }
   const [view, setView] = useState<'icons' | 'list'>(savedView)
   const [menu, setMenu] = useState<{ x: number; y: number; item: Item | null } | null>(null)
   const [renaming, setRenaming] = useState<string | null>(null)
@@ -624,6 +631,14 @@ function Shell({
           {problem ? (
             <div className="mb-3">
               <Notice tone="not-yet">{problem}</Notice>
+            </div>
+          ) : null}
+          {actions && asked && chosen?.id === asked ? (
+            <div className="mb-3">
+              <Notice tone="info">
+                Here’s {chosen.name}. Drag it onto a folder to put it there — it keeps saving
+                wherever it goes.
+              </Notice>
             </div>
           ) : null}
           {place === null ? (

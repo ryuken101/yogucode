@@ -19,7 +19,18 @@ const LABEL: Record<SaveState, string> = {
   failed: 'Not saved',
 }
 
-export function SaveControl({ state, onSave, className = '' }: { state: SaveState; onSave: () => void; className?: string }) {
+export function SaveControl({
+  state,
+  onSave,
+  className = '',
+  alwaysEnabled = false,
+}: {
+  state: SaveState
+  onSave: () => void
+  className?: string
+  /** Save does more than send typing — it opens the Save window — so it is never greyed. */
+  alwaysEnabled?: boolean
+}) {
   return (
     <span className={`flex items-center gap-2 ${className}`}>
       <span className="text-xs text-muted" aria-live="polite">
@@ -28,7 +39,7 @@ export function SaveControl({ state, onSave, className = '' }: { state: SaveStat
       <Button
         variant="secondary"
         onClick={onSave}
-        disabled={state === 'saved' || state === 'saving'}
+        disabled={!alwaysEnabled && (state === 'saved' || state === 'saving')}
         title={`Save (${SHORTCUT})`}
       >
         Save

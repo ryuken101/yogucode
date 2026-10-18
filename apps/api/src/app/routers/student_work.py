@@ -14,6 +14,13 @@ any hint rung they have not unlocked — with one exception: a "matches my solut
 scrambled (`problem_bank.with_reference`). Examples go as their transcripts only — what
 the solution printed, never the solution.
 
+**Saving to a file** (Ken's decision, 17 Oct 2026). The first Save on a problem asks where
+in the child's Files to keep it; the attempt is then linked to that file
+(`PUT /me/attempts/{id}/file`), and every save of the attempt writes the file too — so the
+work is in their Files to find, and to open at home. One way: editing the file in Code
+does not change the attempt, which stays what is checked and marked. During a quiz the
+file is left alone, as all their files are.
+
 **A shared-file problem is one program across its parts** (17 Oct 2026). Each part keeps
 its own attempt — its checks, hints and marks are its own — but the code in them is one
 file: it starts from the problem's starter, and saving any of them writes all of them, so
@@ -47,6 +54,7 @@ from app.models import (
     AssignmentStatus,
     Attempt,
     AttemptStatus,
+    DocumentStatus,
     Enrolment,
     EnrolmentStatus,
     Item,
@@ -54,6 +62,7 @@ from app.models import (
     Lesson,
     Mark,
     SetItem,
+    StudentDocument,
     SubmissionSource,
 )
 from app.models.base import utcnow
@@ -70,7 +79,12 @@ from app.problem_bank import (
 )
 from app.quiz import is_running, running_quiz_for
 from app.routers.documents import MAX_CONTENT_BYTES
-from app.scoping import get_own_attempt, get_student_assignment, get_student_class
+from app.scoping import (
+    get_own_attempt,
+    get_owned_document,
+    get_student_assignment,
+    get_student_class,
+)
 
 router = APIRouter(prefix="/me", tags=["student work"])
 
@@ -105,12 +119,15 @@ class AttemptOut(BaseModel):
     last_passed: int | None
     last_total: int | None
     choice: int | None
+    # The file in their Files this work is also saved to, once they have chosen one.
+    document_id: uuid.UUID | None = None
 
     @classmethod
     def build(cls, attempt: Attempt) -> "AttemptOut":
         return cls(
             id=attempt.id,
             code=attempt.code,
+            document_id=attempt.document_id,
             choice=attempt.choice,
             status=attempt.status,
             run_count=attempt.run_count,
@@ -430,8 +447,66 @@ async def save_attempt(
         for row in await _same_file(session, principal, attempt):
             row.code = body.code
             session.add(row)
+        await _write_linked_file(session, principal, attempt, body.code)
         await session.commit()
         await session.refresh(attempt)
+    return AttemptOut.build(attempt)
+
+
+async def _write_linked_file(
+    session: AsyncSession, principal: CurrentStudent, attempt: Attempt, code: str
+) -> None:
+    """Keep the file this work is saved to the same as the work. A file since deleted ends
+    the link; a running quiz leaves it alone, since files are locked during one."""
+    if attempt.document_id is None:
+        return
+    document = (
+        await session.exec(
+            select(StudentDocument).where(
+                StudentDocument.id == attempt.document_id,
+                StudentDocument.student_id == principal.subject_id,
+                StudentDocument.centre_id == principal.centre_id,
+            )
+        )
+    ).one_or_none()
+    if document is None or document.status != DocumentStatus.ACTIVE:
+        for row in await _same_file(session, principal, attempt):
+            row.document_id = None
+            session.add(row)
+        return
+    if await running_quiz_for(session, principal) is not None:
+        return
+    if document.content != code:
+        document.content = code
+        session.add(document)
+
+
+class FileLinkIn(BaseModel):
+    """The child's file to keep this work in, or null to stop."""
+
+    document_id: uuid.UUID | None
+
+
+@router.put("/attempts/{attempt_id}/file", response_model=AttemptOut)
+async def link_file(
+    attempt_id: uuid.UUID, body: FileLinkIn, principal: CurrentStudent, session: SessionDep
+) -> AttemptOut:
+    """Save this work to one of the child's own files, from now on (the Save window).
+
+    The file is written straight away with the work as it is. Only a live file of their own
+    can be chosen — another child's is a 404, as everywhere.
+    """
+    attempt, _ = await _writable_attempt(session, principal, attempt_id)
+    if body.document_id is not None:
+        document = await get_owned_document(session, principal, body.document_id)
+        if document.status != DocumentStatus.ACTIVE:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="document not found")
+    for row in await _same_file(session, principal, attempt):
+        row.document_id = body.document_id
+        session.add(row)
+    await _write_linked_file(session, principal, attempt, attempt.code)
+    await session.commit()
+    await session.refresh(attempt)
     return AttemptOut.build(attempt)
 
 

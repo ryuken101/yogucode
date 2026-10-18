@@ -22,6 +22,7 @@ import { FileTabs } from '../components/FileTabs'
 import { Notice } from '../components/Notice'
 import { Spinner } from '../components/Spinner'
 import { CodeSurface } from '../editor/CodeSurface'
+import { RecoveredWork } from '../editor/RecoveredWork'
 import { SaveControl } from '../editor/SaveControl'
 import { useAutosave } from '../editor/useAutosave'
 import { useOpenTabs } from '../editor/useOpenTabs'
@@ -60,6 +61,7 @@ export function MyCode() {
   const autosave = useAutosave(activeId, (id, content) =>
     save.mutateAsync({ documentId: id, content }),
   )
+  const [restored, setRestored] = useState<{ id: string; text: string | null } | null>(null)
   useEffect(() => {
     flushRef.current = autosave.flush
   })
@@ -128,7 +130,8 @@ export function MyCode() {
 
   const busy = state.status === 'running' || state.status === 'asking'
   const loading = state.status === 'loading'
-  const code = active.data?.content ?? ''
+  // Recovered typing, shown in place of the saved copy until it is saved (17 Oct 2026).
+  const code = (restored?.id === activeId ? restored.text : null) ?? active.data?.content ?? ''
   const python = isPythonFile(active.data?.title)
 
   if (state.status === 'unsupported') {
@@ -218,8 +221,14 @@ export function MyCode() {
 
           {autosave.state === 'failed' ? (
             <Notice tone="system-error">
-              Your code isn’t saving. Check your connection, or sign in again.
+              Your code isn’t saving. Check your connection, or sign in again. Your typing is kept on this computer for now — don’t close the tab, and press Save to try again.
             </Notice>
+          ) : null}
+          {autosave.recovered !== null && active.data ? (
+            <RecoveredWork
+              onDiscard={autosave.discardRecovered}
+              onRestore={() => setRestored({ id: active.data.id, text: autosave.restoreRecovered() })}
+            />
           ) : null}
           {rename.error ? <Notice tone="not-yet">{messageFor(rename.error)}</Notice> : null}
 

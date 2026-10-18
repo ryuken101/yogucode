@@ -7,8 +7,10 @@
  * editor is never re-rendered by the mouse.
  *
  * The front window is shown by its tinted title bar, not by a shadow (Ken's decision,
- * 16 Oct 2026). Students' windows cannot be arranged at all: no drag, no resize, no
- * full-screen toggle — they open full screen and stay there.
+ * 16 Oct 2026). Students' windows cannot be dragged or resized. They open full screen,
+ * and like everyone's they switch between a window and **Full screen** with the title-bar
+ * button or a double-click (17–18 Oct 2026): without it, a child who picked a layout by
+ * accident was stuck in half a window. Minimise is everyone's.
  */
 
 import { Maximize2, Minimize2, Minus, X } from 'lucide-react'
@@ -23,7 +25,7 @@ interface Props {
   win: Win
   title: string
   active: boolean
-  /** Teachers may drag, resize, snap and toggle full screen; students may not. */
+  /** Teachers may drag, resize and snap; students may not. Everyone toggles full screen. */
   arrange: boolean
   tabs: (Tab & { on: boolean })[]
   desk: RefObject<HTMLElement | null>
@@ -177,17 +179,15 @@ export function Window({
             onPointerMove={move}
             onPointerUp={end}
             onPointerCancel={end}
-            onDoubleClick={arrange ? onToggleMax : undefined}
+            onDoubleClick={onToggleMax}
           >
             <h2 className="min-w-0 flex-1 truncate font-display text-sm font-semibold">{title}</h2>
             <TitleButton label={`Minimise ${title}`} onClick={onMinimise}>
               <Minus size={16} aria-hidden="true" />
             </TitleButton>
-            {arrange ? (
-              <TitleButton label={floating ? 'Full screen' : 'Make it a window'} onClick={onToggleMax}>
-                {floating ? <Maximize2 size={15} aria-hidden="true" /> : <Minimize2 size={15} aria-hidden="true" />}
-              </TitleButton>
-            ) : null}
+            <TitleButton label={floating ? 'Full screen' : 'Make it a window'} onClick={onToggleMax}>
+              {floating ? <Maximize2 size={15} aria-hidden="true" /> : <Minimize2 size={15} aria-hidden="true" />}
+            </TitleButton>
             <TitleButton label={`Close ${title}`} onClick={onClose}>
               <X size={16} aria-hidden="true" />
             </TitleButton>

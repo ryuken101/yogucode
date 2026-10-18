@@ -309,3 +309,54 @@ async def test_a_child_gets_the_solution_only_scrambled_inside_the_check(
     raw = base64.b64decode(reference)
     plain = bytes(b ^ SCRAMBLE_KEY[i % len(SCRAMBLE_KEY)] for i, b in enumerate(raw)).decode()
     assert plain == GREET
+
+
+# --- Save: the work kept in a file of the child's choosing (17 Oct 2026) -----------------
+
+
+async def test_saving_to_a_file_keeps_the_file_up_to_date(
+    client, session: AsyncSession, signed_in_student
+) -> None:
+    from app.models import StudentDocument
+
+    aria = await signed_in_student()
+    await today(client, session, aria)
+    opened = await open_first(client)
+    attempt_id = opened["leaves"][0]["attempt"]["id"]
+    made = (
+        await client.post("/me/documents", json={"title": "battleship.py", "content": "x = 1\n"})
+    ).json()
+
+    linked = await client.put(f"/me/attempts/{attempt_id}/file", json={"document_id": made["id"]})
+    assert linked.status_code == 200 and linked.json()["document_id"] == made["id"]
+    # Linking writes the work into the file at once.
+    file = (await client.get(f"/me/documents/{made['id']}")).json()
+    assert file["content"] == opened["leaves"][0]["attempt"]["code"]
+
+    await client.patch(f"/me/attempts/{attempt_id}", json={"code": "print('saved')\n"})
+    assert (await client.get(f"/me/documents/{made['id']}")).json()["content"] == "print('saved')\n"
+    again = await open_first(client)
+    assert again["leaves"][0]["attempt"]["document_id"] == made["id"]
+
+    # A deleted file ends the link rather than failing the save.
+    await client.post(f"/me/documents/{made['id']}/archive")
+    saved = await client.patch(f"/me/attempts/{attempt_id}", json={"code": "print(2)\n"})
+    assert saved.status_code == 200 and saved.json()["document_id"] is None
+    row = await session.get(StudentDocument, uuid.UUID(made["id"]))
+    assert row is not None and row.content == "print('saved')\n"
+
+
+async def test_only_my_own_file_can_be_chosen(
+    client, session: AsyncSession, signed_in_student
+) -> None:
+    await signed_in_student("Bella N")
+    bellas = (await client.post("/me/documents", json={"title": "mine.py"})).json()
+
+    aria = await signed_in_student("Aria K")
+    await today(client, session, aria)
+    opened = await open_first(client)
+    refused = await client.put(
+        f"/me/attempts/{opened['leaves'][0]['attempt']['id']}/file",
+        json={"document_id": bellas["id"]},
+    )
+    assert refused.status_code == 404

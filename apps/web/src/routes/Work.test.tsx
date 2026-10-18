@@ -13,10 +13,12 @@
 
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { http, HttpResponse } from 'msw'
 import { Route, Routes } from 'react-router'
 import { expect, test, vi } from 'vitest'
 import { renderScreen } from '../test/render'
 import {
+  DOC_ID,
   countSaves,
   createsDocument,
   noDocuments,
@@ -277,4 +279,53 @@ test('a signed-in student sees whose account they are in', async () => {
   expect(await screen.findByText('Aria K')).toBeInTheDocument()
   expect(screen.getByText(/Year 4-6 Python/)).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
+})
+
+test('typing that never reached the server is offered back next time', async () => {
+  server.use(savesRefused())
+  const user = userEvent.setup()
+  const first = renderScreen(<Work />, { route: '/work' })
+  const box = await editorWithValue('print("spiral")\n')
+  await user.type(box, 'x')
+  await user.click(screen.getByRole('button', { name: 'Save' }))
+  await screen.findByText(/kept on this computer/)
+  first.unmount() // tries once more, and is refused again
+  await new Promise((resolve) => setTimeout(resolve, 100))
+
+  server.resetHandlers()
+  const { calls, handler } = countSaves()
+  server.use(handler)
+  renderScreen(<Work />, { route: '/work' })
+  await editorWithValue('print("spiral")\n')
+  await user.click(await screen.findByRole('button', { name: 'Bring it back' }))
+  // Brought back as unsaved typing, and sent.
+  await waitFor(() => expect(calls.at(-1)?.content).toBe('print("spiral")\nx'), AFTER_AUTOSAVE)
+})
+
+test('typing while a save is on its way is saved too', async () => {
+  // The first save is slow; the child types more meanwhile and stops. The second burst
+  // must still reach the server — a finished save used to wipe it.
+  const contents: (string | null | undefined)[] = []
+  let first = true
+  server.use(
+    http.patch('/api/me/documents/:id', async ({ request }) => {
+      const body = (await request.json()) as { content?: string | null }
+      contents.push(body.content)
+      if (first) {
+        first = false
+        await new Promise((resolve) => setTimeout(resolve, 600))
+      }
+      return HttpResponse.json({
+        id: DOC_ID, title: 'spiral', folder_id: null, status: 'active', content: body.content ?? '',
+        created_at: '2026-10-01T00:00:00Z', updated_at: '2026-10-02T00:00:00Z',
+      })
+    }),
+  )
+  const user = userEvent.setup()
+  renderScreen(<Work />, { route: '/work' })
+  const box = await editorWithValue('print("spiral")\n')
+  await user.type(box, 'a')
+  await user.click(screen.getByRole('button', { name: 'Save' }))
+  await user.type(box, 'b')
+  await waitFor(() => expect(contents.at(-1)).toBe('print("spiral")\nab'), AFTER_AUTOSAVE)
 })

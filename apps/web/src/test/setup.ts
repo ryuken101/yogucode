@@ -43,3 +43,24 @@ if (typeof HTMLDialogElement !== 'undefined' && !HTMLDialogElement.prototype.sho
 if (typeof Element !== 'undefined' && !Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = function scrollIntoView() {}
 }
+
+// Newer Node versions put an unusable `localStorage` on the global (no `setItem` without
+// `--localstorage-file`), which hides jsdom's. Give the tests a working one in memory, the
+// shape the browser has, cleared before each test.
+if (typeof window !== 'undefined' && typeof window.localStorage?.setItem !== 'function') {
+  const store = new Map<string, string>()
+  const memory: Storage = {
+    get length() {
+      return store.size
+    },
+    clear: () => store.clear(),
+    getItem: (key) => store.get(key) ?? null,
+    key: (index) => [...store.keys()][index] ?? null,
+    removeItem: (key) => void store.delete(key),
+    setItem: (key, value) => void store.set(key, String(value)),
+  }
+  Object.defineProperty(window, 'localStorage', { value: memory, configurable: true })
+}
+beforeEach(() => {
+  if (typeof window !== 'undefined') window.localStorage?.clear?.()
+})

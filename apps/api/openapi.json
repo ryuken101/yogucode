@@ -62,6 +62,18 @@
             "title": "Code",
             "type": "string"
           },
+          "document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -1346,6 +1358,28 @@
           "outcome"
         ],
         "title": "FeedbackOut",
+        "type": "object"
+      },
+      "FileLinkIn": {
+        "description": "The child's file to keep this work in, or null to stop.",
+        "properties": {
+          "document_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          }
+        },
+        "required": [
+          "document_id"
+        ],
+        "title": "FileLinkIn",
         "type": "object"
       },
       "FolderDeletedOut": {
@@ -10210,6 +10244,76 @@
           }
         },
         "summary": "Choose",
+        "tags": [
+          "student work"
+        ]
+      }
+    },
+    "/me/attempts/{attempt_id}/file": {
+      "put": {
+        "description": "Save this work to one of the child's own files, from now on (the Save window).\n\nThe file is written straight away with the work as it is. Only a live file of their own\ncan be chosen \u2014 another child's is a 404, as everywhere.",
+        "operationId": "link_file_me_attempts__attempt_id__file_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attempt_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Attempt Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FileLinkIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttemptOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Link File",
         "tags": [
           "student work"
         ]

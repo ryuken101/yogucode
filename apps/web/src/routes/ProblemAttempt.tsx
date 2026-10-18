@@ -21,6 +21,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router'
 import { Button } from '../components/Button'
 import { Console } from '../components/Console'
@@ -30,11 +31,15 @@ import { Markdown } from '../components/Markdown'
 import { Notice } from '../components/Notice'
 import { Spinner } from '../components/Spinner'
 import { CodeSurface } from '../editor/CodeSurface'
+import { RecoveredWork } from '../editor/RecoveredWork'
 import { SaveControl } from '../editor/SaveControl'
+import { SaveToFiles } from '../editor/SaveToFiles'
+import { useDesk } from '../desktop/context'
 import { useAutosave } from '../editor/useAutosave'
 import { api, type Schemas } from '../lib/api'
 import { messageFor } from '../lib/errors'
-import { useStudentProblem } from '../lib/queries'
+import { fileNameFor } from '../lib/fileType'
+import { keys, useDocuments, useStudentProblem } from '../lib/queries'
 import { toChecks } from '../problems/doc'
 import { ChecksPanel } from '../problems/ChecksPanel'
 import { ProblemBrief } from '../problems/ProblemBrief'
@@ -107,7 +112,19 @@ export function ProblemAttempt() {
   // Where this visit's latest text is kept: one slot for a shared file, one per part else.
   const codeKey = shared ? 'file' : (leaf?.item_id ?? '')
   const startingCode = shared ? (leaves[0]?.attempt.code ?? '') : (leaf?.attempt.code ?? '')
-  const autosave = useAutosave(fileAttemptId, (id, code) => api.saveAttempt(id, code))
+  // Save (17 Oct 2026): the first press asks where in their Files to keep it; after that
+  // the work is saved to that file too, on every save (`PUT /me/attempts/{id}/file`).
+  const [choosingFile, setChoosingFile] = useState(false)
+  const linkedFile = shared ? (leaves[0]?.attempt.document_id ?? null) : (leaf?.attempt.document_id ?? null)
+  const onSave = () => {
+    if (problem.data?.mode === 'quiz' || linkedFile) autosave.save()
+    else setChoosingFile(true)
+  }
+  const autosave = useAutosave(fileAttemptId, (id, code) => api.saveAttempt(id, code), onSave)
+  const myFiles = useDocuments()
+  const client = useQueryClient()
+  const desk = useDesk()
+  const linkedTitle = linkedFile ? myFiles.data?.find((f) => f.id === linkedFile)?.title : undefined
   // The process trace (step 7): every edit, run, check, error and hint — on the file's
   // attempt for a shared file, so its edit history is one history.
   const record = useEventRecorder(fileAttemptId ? { attemptId: fileAttemptId } : null)
@@ -331,12 +348,26 @@ export function ProblemAttempt() {
           {python.state.status === 'asking' ? (
             <span className="text-sm text-not-yet-ink">Your program is waiting for you to type.</span>
           ) : null}
-          <SaveControl className="ml-auto" state={autosave.state} onSave={autosave.save} />
+          <span className="ml-auto flex items-center gap-2">
+            {linkedTitle ? <span className="text-xs text-muted">in {linkedTitle}</span> : null}
+            <SaveControl state={autosave.state} onSave={onSave} alwaysEnabled={!linkedFile && data.mode !== 'quiz'} />
+          </span>
         </div>
         {autosave.state === 'failed' ? (
           <Notice tone="system-error">
-            Your work is not saving. Tell your teacher — you may need to sign in again.
+            Your work is not saving. Tell your teacher — you may need to sign in again. Your typing is kept on this computer for now — don’t close the tab, and press Save to try again.
           </Notice>
+        ) : null}
+        {autosave.recovered !== null ? (
+          <RecoveredWork
+            onDiscard={autosave.discardRecovered}
+            onRestore={() => {
+              // Into the editor as new text, and sent like typing.
+              const text = autosave.restoreRecovered()
+              if (text !== null) latest.current[codeKey] = text
+              setTick((n) => n + 1)
+            }}
+          />
         ) : null}
         {live.locked ? (
           <Notice tone="info">
@@ -345,7 +376,7 @@ export function ProblemAttempt() {
         ) : null}
         <div className="min-h-64 flex-[2] overflow-hidden rounded-lg ring-1 ring-grape/25">
           <CodeSurface
-            onSave={autosave.save}
+            onSave={onSave}
             // One editor per part: Monaco's undo stack must not carry one part's history
             // into another.
             key={codeKey}
@@ -370,6 +401,34 @@ export function ProblemAttempt() {
           <Console segments={python.output} asking={python.state.status === 'asking'} onAnswer={python.answer} />
         </div>
       </div>
+      <SaveToFiles
+        open={choosingFile}
+        suggestedName={fileNameFor(data.title)}
+        code={code}
+        onClose={() => setChoosingFile(false)}
+        onSaved={async (document) => {
+          autosave.save()
+          const linked = await api.linkAttemptFile(fileAttemptId ?? leaf.attempt.id, document.id)
+          // On a shared file every part's attempt holds the link, as it holds the code.
+          setLeaves((now) =>
+            now.map((l) =>
+              shared || l.attempt.id === linked.id
+                ? { ...l, attempt: { ...l.attempt, document_id: linked.document_id } }
+                : l,
+            ),
+          )
+          void client.invalidateQueries({ queryKey: keys.documents })
+        }}
+        onPutAway={
+          desk.openBeside
+            ? (document) => {
+                const where = new URLSearchParams({ select: document.id })
+                if (document.folder_id) where.set('folder', document.folder_id)
+                desk.openBeside?.('files', `/my-files?${where}`)
+              }
+            : undefined
+        }
+      />
     </div>
   )
 }

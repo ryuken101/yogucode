@@ -127,6 +127,17 @@ test('a child’s own file opens in their editor', async () => {
   await waitFor(() => expect(screen.getByLabelText('address')).toHaveTextContent(`/work?open=${NOTES}`))
 })
 
+test('a file sent with ?select= arrives selected, with how to put it away', async () => {
+  server.use(
+    http.get('/api/me/folders', () => HttpResponse.json([])),
+    http.get('/api/me/documents', () => HttpResponse.json([{ ...files[1]!, folder_id: null }])),
+  )
+  renderFinder('student', `/my-files?select=${NOTES}`)
+  const file = await screen.findByRole('button', { name: 'notes.txt, file' })
+  expect(file).toHaveAttribute('aria-pressed', 'true')
+  expect(screen.getByText(/Drag it onto a folder to put it there/)).toBeInTheDocument()
+})
+
 /* --- organising, as in Finder (17 Oct 2026) ----------------------------------------------- */
 
 type Sent = { method: string; path: string; body: unknown }

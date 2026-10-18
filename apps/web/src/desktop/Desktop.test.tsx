@@ -125,7 +125,7 @@ test('a teacher can make a window of a full-screen app', async () => {
   expect(screen.getByRole('button', { name: 'Full screen' })).toBeInTheDocument()
 })
 
-test('a child’s windows cannot be arranged, and there is nothing to save', async () => {
+test('a child’s windows are not arranged or saved, but switch to a window and back', async () => {
   let saved = 0
   server.use(http.put('/api/me/desktop', () => {
     saved += 1
@@ -137,7 +137,7 @@ test('a child’s windows cannot be arranged, and there is nothing to save', asy
       <Route path="/my-desk" element={null} />
     </>
   )
-  renderScreen(
+  const { user } = renderScreen(
     <Routes>
       <Route element={<RequireStudent pages={pages} />}>{pages}</Route>
     </Routes>,
@@ -145,8 +145,33 @@ test('a child’s windows cannot be arranged, and there is nothing to save', asy
   )
   expect(await screen.findByText('Today page')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Open Lessons' })).toBeInTheDocument()
-  expect(screen.queryByRole('button', { name: 'Make it a window' })).not.toBeInTheDocument()
-  expect(screen.queryByRole('button', { name: 'Full screen' })).not.toBeInTheDocument()
+  // A window opened full screen can become a window and back (18 Oct 2026), but is never
+  // dragged into a saved layout.
+  await user.click(screen.getByRole('button', { name: 'Make it a window' }))
+  await user.click(await screen.findByRole('button', { name: 'Full screen' }))
+  expect(await screen.findByRole('button', { name: 'Make it a window' })).toBeInTheDocument()
   await new Promise((resolve) => setTimeout(resolve, 1000))
   expect(saved).toBe(0)
+})
+
+test('a child in a side-by-side layout can go back to full screen', async () => {
+  const pages = (
+    <>
+      <Route path="/home" element={<p>Today page</p>} />
+      <Route path="/work" element={<p>Code page</p>} />
+      <Route path="/my-desk" element={null} />
+    </>
+  )
+  const { user } = renderScreen(
+    <Routes>
+      <Route element={<RequireStudent pages={pages} />}>{pages}</Route>
+    </Routes>,
+    { route: '/home' },
+  )
+  await screen.findByText('Today page')
+  await user.click(screen.getByRole('button', { name: 'Layouts' }))
+  await user.click(screen.getByRole('menuitem', { name: /Lesson and my code/ }))
+  const fullScreen = await screen.findAllByRole('button', { name: 'Full screen' })
+  await user.click(fullScreen[0]!)
+  await waitFor(() => expect(screen.getAllByRole('button', { name: 'Full screen' })).toHaveLength(1))
 })
