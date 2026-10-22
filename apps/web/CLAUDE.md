@@ -73,10 +73,28 @@ puts its pages on the desktop (below). `/join` is outside both: a child gets `Jo
 with no navigation, no sign-out and no centre name. The join flow must keep working when
 Supabase is unconfigured or unreachable, because it does not use Supabase at all.
 
-**The bare address `/` is the children's front door** (Ken's decision, 8 Oct 2026).
-`Landing.tsx` sends a child who is still signed in to `/home` and a teacher with a session
-to `/desk`, and otherwise shows the sign-in with a "Teacher? Sign in here" link to
-`/sign-in`. `/join` remains as an alias.
+**The bare address `/` is the public landing page** (Ken's decision, 22 Oct 2026,
+replacing 8 Oct's "`/` is the children's sign-in"). `Landing.tsx` still sends a child who
+is signed in to `/home` and a teacher with a session to `/desk`. Everyone else gets
+`landing/LandingPage.tsx`, a lazy-loaded scrolling page with **Student sign in** (→ `/join`)
+and Teacher sign in in its nav. **`/join` is the children's sign-in.** Signing out and an
+ended session go there (`RequireStudent`), not to `/`, so the next child on the laptop gets
+the form straight away.
+
+**Visitors never type code on the landing page** (Ken, 22 Oct 2026). Since 23 Oct 2026 it
+is calm and minimal (after sharyap.com): the top is `landing/HeroDesktop.tsx`, a quiet
+desktop whose icons open small windows (Hello holds the headline). It reuses
+`desktop/windows.ts` (generic over the app id) and `desktop/Window.tsx`. The pitch is "the
+all-in-one platform for coding academies" (`HEADLINE`, `INSIDE` in `copy.ts`). Below the hero
+is a short scroll: what's inside, a short film of a live class (`landing/LiveDemo.tsx`
+over the pure timeline `liveScript.ts`: a child types, the teacher's tiles mirror it, her
+pointer clicks his tile and Help, she types the fix), who it's for, the turtle, and the live
+line with Book a demo. Every claim must be something the product does today. The
+turtle is a JS replay (`landing/cupScript.ts`: each displayed Python line together with its
+turtle commands) that starts in view and cross-fades to the real `CupMark`. The only
+decoration is the scroll-fill cup (`landing/Flair.tsx`). The words are in
+`landing/copy.ts`. The repo is public: no prices, and the only customer named is
+`LIVE_AT`, by name only.
 
 ## The desktop (`src/desktop/`)
 

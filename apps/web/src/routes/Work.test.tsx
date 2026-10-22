@@ -84,7 +84,7 @@ function renderGuarded() {
       <Route element={<RequireStudent />}>
         <Route path="/work" element={<Work />} />
       </Route>
-      <Route path="/" element={<p>Student sign-in</p>} />
+      <Route path="/join" element={<p>Student sign-in</p>} />
     </Routes>,
     { route: '/work' },
   )

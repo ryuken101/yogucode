@@ -535,6 +535,27 @@ Redirect URLs must include `https://yogucode.com/auth/callback` and
 
 Free Resend is 3,000 emails a month, 100 a day.
 
+**Incoming mail to `hello@yogucode.com`, forwarded by ImprovMX.** The landing page's Book a
+demo button writes to it (`DEMO_EMAIL` in `apps/web/src/landing/copy.ts`). Resend only
+sends, so receiving needs this. There is no mailbox: ImprovMX forwards to the owner's own
+inbox.
+
+1. improvmx.com → add `yogucode.com` → alias `hello` (and a catch-all `*`) forwarding to the
+   owner's inbox.
+2. GoDaddy → yogucode.com → DNS: delete GoDaddy's default `MX @` records
+   (`…secureserver.net`). **Keep `MX send`**, which is Resend's. Then add:
+   - `MX @` → `mx1.improvmx.com`, priority 10
+   - `MX @` → `mx2.improvmx.com`, priority 20
+   - `TXT @` → `v=spf1 include:spf.improvmx.com ~all`. A domain has one SPF record: if a
+     `v=spf1` TXT on `@` already exists, add the `include:` to it instead.
+3. Check in ImprovMX until all three are green, then send a test from another account. A
+   sender's mail server may still use the old records for up to an hour.
+4. After any DNS change, confirm a teacher's "Forgot password?" email still arrives.
+
+Replying *as* `hello@` is optional: Gmail → Settings → Accounts → Send mail as, through
+`smtp.resend.com` (port 465, user `resend`) with its own sending-only Resend API key, kept in
+Gmail only.
+
 ## Local development
 
 Requires [uv](https://docs.astral.sh/uv/), Node 22+, and PostgreSQL 16.

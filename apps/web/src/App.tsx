@@ -23,7 +23,7 @@ import { SignUp } from './routes/SignUp'
 export default function App() {
   return (
     <Routes>
-      {/* The bare address is the children's sign-in; /join stays as an alias. */}
+      {/* The bare address is the public landing page (22 Oct 2026); /join is the children's sign-in. */}
       <Route path="/" element={<Landing />} />
       <Route path="/sign-in" element={<SignIn />} />
       <Route path="/sign-up" element={<SignUp />} />

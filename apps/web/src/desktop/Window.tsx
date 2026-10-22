@@ -22,7 +22,7 @@ import { MIN_H, MIN_W, ZONES, zoneAt } from './windows'
 import type { Geom, Win, Zone } from './windows'
 
 interface Props {
-  win: Win
+  win: Win<string>
   title: string
   active: boolean
   /** Teachers may drag, resize and snap; students may not. Everyone toggles full screen. */

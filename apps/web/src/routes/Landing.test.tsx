@@ -1,5 +1,6 @@
 /**
- * The bare address is the children's sign-in, and it knows who is already here.
+ * The bare address is the public landing page, with the sign-ins in its top bar, and it
+ * knows who is already here.
  */
 
 import { screen } from '@testing-library/react'
@@ -41,12 +42,20 @@ function renderAt(route: string) {
   )
 }
 
-test('nobody signed in: the username and PIN form, and a side door for teachers', async () => {
+test('nobody signed in: the landing page, with a door for children and one for teachers', async () => {
   signedOutStudent()
   renderAt('/')
 
+  expect((await screen.findAllByRole('link', { name: 'Student sign in' }))[0]).toHaveAttribute('href', '/join')
+  expect(screen.getAllByRole('link', { name: 'Teacher sign in' })[0]).toHaveAttribute('href', '/sign-in')
+  expect(await screen.findByRole('heading', { level: 1, name: /all-in-one platform for coding academies/ })).toBeInTheDocument()
+})
+
+test('Student sign in leads to the username and PIN form', async () => {
+  signedOutStudent()
+  const { user } = renderAt('/')
+  await user.click((await screen.findAllByRole('link', { name: 'Student sign in' }))[0])
   expect(await screen.findByLabelText('Username')).toBeInTheDocument()
-  expect(screen.getByRole('link', { name: 'Sign in here' })).toHaveAttribute('href', '/sign-in')
 })
 
 test('a child still signed in goes straight to Today', async () => {

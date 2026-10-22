@@ -30,8 +30,12 @@ export interface Geom {
 /** `open` grows out of the dock; `min` and `close` play before the window goes. */
 export type Anim = 'open' | 'min' | 'close' | null
 
-export interface Win extends Geom {
-  app: AppId
+/**
+ * `A` is the app id. The real desktop's is `AppId`; the public landing page
+ * (`landing/LandingDesktop.tsx`) runs the same reducer over its own windows.
+ */
+export interface Win<A extends string = AppId> extends Geom {
+  app: A
   loc: Loc
   /** Filling the desktop. The geometry is kept for when it becomes a window again. */
   max: boolean
@@ -91,8 +95,8 @@ export function sameLoc(a: Loc, b: Loc): boolean {
 }
 
 /** The window the person is working in: on top, and not on its way out. */
-export function frontOf(wins: Win[]): Win | null {
-  let best: Win | null = null
+export function frontOf<A extends string>(wins: Win<A>[]): Win<A> | null {
+  let best: Win<A> | null = null
   for (const w of wins) {
     if (w.min || w.anim === 'min' || w.anim === 'close') continue
     if (!best || w.z > best.z) best = w
@@ -100,30 +104,30 @@ export function frontOf(wins: Win[]): Win | null {
   return best
 }
 
-const topZ = (wins: Win[]) => wins.reduce((m, w) => Math.max(m, w.z), 0)
+const topZ = <A extends string>(wins: Win<A>[]) => wins.reduce((m, w) => Math.max(m, w.z), 0)
 
 function cascade(count: number): Geom {
   const step = 0.03 * (count % 6)
   return { x: 0.1 + step, y: 0.05 + step, w: 0.62, h: 0.8 }
 }
 
-export type Action =
+export type Action<A extends string = AppId> =
   /** The URL now shows `loc`, which belongs to `app`: show it there, in front. */
-  | { type: 'show'; app: AppId; loc: Loc; origin?: { x: number; y: number } | null }
-  | { type: 'focus'; app: AppId }
-  | { type: 'minimise'; app: AppId }
-  | { type: 'close'; app: AppId }
+  | { type: 'show'; app: A; loc: Loc; origin?: { x: number; y: number } | null }
+  | { type: 'focus'; app: A }
+  | { type: 'minimise'; app: A }
+  | { type: 'close'; app: A }
   /** An exit animation finished (or would have): take the window out. */
-  | { type: 'settle'; app: AppId }
-  | { type: 'toggleMax'; app: AppId }
-  | { type: 'place'; app: AppId; geom: Geom; max?: boolean }
+  | { type: 'settle'; app: A }
+  | { type: 'toggleMax'; app: A }
+  | { type: 'place'; app: A; geom: Geom; max?: boolean }
   /** Several windows arranged at once ("Layouts"); the rest are minimised, not closed. */
-  | { type: 'layout'; items: { app: AppId; loc: Loc; geom: Geom | null }[] }
-  | { type: 'restore'; wins: Win[] }
+  | { type: 'layout'; items: { app: A; loc: Loc; geom: Geom | null }[] }
+  | { type: 'restore'; wins: Win<A>[] }
   /** The class switcher moved: point class pages at the new class. */
   | { type: 'retarget'; from: string; to: string }
 
-export function reduce(wins: Win[], action: Action): Win[] {
+export function reduce<A extends string = AppId>(wins: Win<A>[], action: Action<A>): Win<A>[] {
   switch (action.type) {
     case 'show': {
       const z = topZ(wins) + 1
@@ -193,7 +197,7 @@ export function reduce(wins: Win[], action: Action): Win[] {
       const kept = wins
         .filter((w) => !placed.has(w.app))
         .map((w) => (w.min ? w : { ...w, min: true, anim: null }))
-      const arranged: Win[] = action.items.map((item) => {
+      const arranged: Win<A>[] = action.items.map((item) => {
         const existing = wins.find((w) => w.app === item.app)
         return {
           app: item.app,

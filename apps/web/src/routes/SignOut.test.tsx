@@ -10,6 +10,7 @@ import { beforeEach, expect, test, vi } from 'vitest'
 import { renderScreen } from '../test/render'
 import { server } from '../test/server'
 import App from '../App'
+import { Join } from './Join'
 import { Landing } from './Landing'
 import { RequireStudent } from './RequireStudent'
 
@@ -42,6 +43,7 @@ test('signing out lands on the sign-in, ready for the next child', async () => {
   const { user } = renderScreen(
     <Routes>
       <Route path="/" element={<Landing />} />
+      <Route path="/join" element={<Join />} />
       <Route element={<RequireStudent />}>
         <Route path="/home" element={<p>Today page</p>} />
       </Route>

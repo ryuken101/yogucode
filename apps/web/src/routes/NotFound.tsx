@@ -17,7 +17,7 @@ export function NotFound() {
             Go to your desktop
           </Link>{' '}
           or{' '}
-          <Link to="/" className="text-grape-deep underline">
+          <Link to="/join" className="text-grape-deep underline">
             join a class
           </Link>
           .

@@ -56,17 +56,18 @@ function app(route: string) {
   return renderScreen(
     <Routes>
       <Route path="/" element={<Landing />} />
+      <Route path="/join" element={<Join />} />
       <Route element={<RequireStudent pages={today} />}>{today}</Route>
     </Routes>,
     { route },
   )
 }
 
-test('reopening after the tab was closed signs the child out and asks them to sign in', async () => {
+test('reopening after the tab was closed signs the child out and shows the front page', async () => {
   clearStudentTab() // a fresh tab: the old one, and its marker, are gone
   app('/') // the default handler still has a live session cookie
 
-  expect(await screen.findByLabelText('Username')).toBeInTheDocument()
+  expect((await screen.findAllByRole('link', { name: 'Student sign in' }))[0]).toBeInTheDocument()
   expect(screen.queryByText('Today page')).not.toBeInTheDocument()
   await waitFor(() => expect(signedOut).toBe(1), { timeout: 2000 })
 })

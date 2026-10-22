@@ -1,27 +1,28 @@
 /**
- * The site's front page — the address a child types (Ken's decision, 8 Oct 2026).
+ * The site's front page.
  *
- * Children are told one thing: "go to <the site>". So the bare address is the student
- * sign-in, and it is smart about who is already here:
+ * Since 22 Oct 2026 (Ken's decision, replacing 8 Oct's "the bare address is the student
+ * sign-in") a visitor gets the public landing page (`landing/LandingPage.tsx`), with
+ * **Student sign in** (→ `/join`) and Teacher sign in in its nav. Anyone already signed in
+ * never sees it:
  *
  * - a child still signed in goes straight to their Today page;
- * - a teacher with a session goes to their classes;
- * - anyone else gets the class code → name → PIN flow, with a side door for teachers.
+ * - a teacher with a session goes to their desktop.
  *
- * The class code is still typed rather than carried in the link: one address for every
- * class, and no code in the browser history of a shared laptop (see `Join.tsx`).
- *
- * Nothing heavy is imported here. This is the page twelve children open at once on centre
- * wifi, and it must keep working when Supabase is unconfigured or unreachable.
+ * The landing page is lazy-loaded, so a child being redirected never downloads it. It
+ * must keep working when Supabase is unconfigured or unreachable.
  */
 
-import { useEffect, useState } from 'react'
+import { Suspense, lazy, useEffect, useState } from 'react'
 import { Navigate } from 'react-router'
 import { JoinShell } from '../components/AppShell'
 import { Spinner } from '../components/Spinner'
 import { useStudentMe } from '../lib/queries'
 import { currentAccessToken, supabaseConfigured } from '../lib/supabase'
-import { Join } from './Join'
+
+const LandingPage = lazy(() =>
+  import('../landing/LandingPage').then((m) => ({ default: m.LandingPage })),
+)
 
 export function Landing() {
   const student = useStudentMe()
@@ -42,12 +43,15 @@ export function Landing() {
 
   if (student.data) return <Navigate to="/home" replace />
   if (teacher) return <Navigate to="/desk" replace />
-  if (student.isPending || teacher === null) {
-    return (
-      <JoinShell>
-        <Spinner label="Loading" />
-      </JoinShell>
-    )
-  }
-  return <Join />
+  const loading = (
+    <JoinShell>
+      <Spinner label="Loading" />
+    </JoinShell>
+  )
+  if (student.isPending || teacher === null) return loading
+  return (
+    <Suspense fallback={loading}>
+      <LandingPage />
+    </Suspense>
+  )
 }

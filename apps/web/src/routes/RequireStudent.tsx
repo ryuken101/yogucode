@@ -56,7 +56,7 @@ export function RequireStudent({ pages = studentPages }: { pages?: ReactNode }) 
   // Any failure is the same answer: go and sign in. A revoked session, an expired one, an
   // archived student and a stale cookie are indistinguishable to a child and have the
   // same remedy.
-  if (error || !me) return <Navigate to="/" replace />
+  if (error || !me) return <Navigate to="/join" replace />
 
   // While the class sits a quiz, the quiz is the only place a child can be (Ken's decision).
   const quiz = activeQuiz.data
@@ -75,7 +75,7 @@ export function RequireStudent({ pages = studentPages }: { pages?: ReactNode }) 
     // The cached identity has to go, or the guard would wave the next child through as
     // the previous one.
     client.clear()
-    navigate('/', { replace: true })
+    navigate('/join', { replace: true })
   }
 
   return (
