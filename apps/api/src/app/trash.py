@@ -348,6 +348,17 @@ async def restore(session: AsyncSession, principal: Principal, kind: str, row_id
                 )
             ).all()
 
+    if kind == "homework":
+        # Its problems come back with it. One may have followed it into the Trash, which
+        # was allowed only because nothing else used it — but this homework does again.
+        group += (
+            await session.exec(
+                select(Item)
+                .join(SetItem, col(SetItem.item_id) == Item.id)
+                .where(SetItem.set_id == row.set_id, col(Item.deleted_at).is_not(None))
+            )
+        ).all()
+
     for member in group:
         take_out(member)
         session.add(member)
@@ -452,6 +463,12 @@ async def purge(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Type the name exactly to confirm.",
         )
+    if kind == "problem":
+        # Something restored since may use it again; deleting it now would take that
+        # homework's question, and every child's answer to it, with it.
+        where = await _problem_in_use(session, row.id)
+        if where is not None:
+            raise _conflict(f"It’s used again in {where}, so it can’t be deleted for good.")
     erased = await _erase(session, kind, row)
     # A child's name never goes into the record of their deletion (as Delete entirely).
     payload = (
@@ -617,6 +634,23 @@ async def purge_expired(session: AsyncSession, now: datetime | None = None) -> i
                 continue
             name = None if kind == "student" else name_of(kind, row)
             centre_id = row.centre_id
+            if kind == "problem" and await _problem_in_use(session, row.id) is not None:
+                # In use again (a homework restored since): the clock must not take a
+                # live question and its answers. It comes out of the Trash instead.
+                take_out(row)
+                session.add(row)
+                session.add(
+                    AuditLog(
+                        centre_id=centre_id,
+                        actor_type=ActorType.SYSTEM,
+                        action="problem.kept",
+                        target_type=kind,
+                        target_id=row_id,
+                        payload={"name": name, "reason": "in use again"},
+                    )
+                )
+                await session.commit()
+                continue
             try:
                 erased = await _erase(session, kind, row)
                 session.add(

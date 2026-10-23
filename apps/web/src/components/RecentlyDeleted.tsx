@@ -23,17 +23,20 @@ export function RecentlyDeleted({ alwaysOpen = false }: { alwaysOpen?: boolean }
 
   return (
     <section className="mt-3 rounded-2xl bg-cream/60 px-3 py-2 ring-1 ring-line">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-2 text-left text-sm font-medium text-grape"
-      >
-        <Trash2 size={14} aria-hidden="true" />
-        Recently deleted ({entries.length})
-      </button>
+      {/* On its own page the title is already there; this toggle is for under the explorer. */}
+      {alwaysOpen ? null : (
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen(!open)}
+          className="flex w-full items-center gap-2 text-left text-sm font-medium text-grape"
+        >
+          <Trash2 size={14} aria-hidden="true" />
+          Recently deleted ({entries.length})
+        </button>
+      )}
       {open ? (
-        <ul className="mt-2 flex flex-col gap-1.5">
+        <ul className={`flex flex-col gap-1.5 ${alwaysOpen ? '' : 'mt-2'}`}>
           {entries.map((entry) => (
             <li key={`${entry.kind}-${entry.id}`} className="flex items-center gap-2 text-sm">
               <span className="min-w-0 flex-1 break-all text-grape">

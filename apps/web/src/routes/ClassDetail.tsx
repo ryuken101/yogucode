@@ -348,14 +348,14 @@ export function ClassDetail() {
         }}
       />
       <UsernameDialog
-        key={usernameFor?.id ?? 'none'}
+        key={`username-${usernameFor?.id ?? 'none'}`}
         classId={classId}
         student={usernameFor}
         onClose={() => setUsernameFor(null)}
       />
 
       <RemoveDialog
-        key={removing?.id ?? 'none'}
+        key={`remove-${removing?.id ?? 'none'}`}
         open={removing !== null}
         onClose={() => setRemoving(null)}
         title={removing ? `Remove ${removing.name} from this class?` : ''}

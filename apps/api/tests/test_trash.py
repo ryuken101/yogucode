@@ -12,9 +12,9 @@ from datetime import timedelta
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.models import Class, Student, StudentDocument
+from app.models import Assignment, Class, Item, Student, StudentDocument
 from app.models.base import utcnow
-from app.trash import TRASH_DAYS, purge_expired
+from app.trash import TRASH_DAYS, purge_expired, take_out
 from work_builders import homework, today
 
 # --- a child's files ----------------------------------------------------------------------
@@ -211,6 +211,52 @@ async def test_a_unit_takes_its_lessons_and_a_class_forgets_todays_lesson(
         f"/trash/lesson/{tree['lesson']['id']}/restore", headers=aria["headers"]
     )
     assert lesson.status_code == 409, "restore the unit, not the lesson on its own"
+
+
+async def test_restoring_homework_brings_back_its_problem_so_nothing_purges_it(
+    client, session: AsyncSession, signed_in_student
+) -> None:
+    """Homework to the Trash, then its problem; restore only the homework. The problem must
+    not stay in the Trash to be purged from under it with the children's answers
+    (found re-testing, 23 Oct 2026)."""
+    aria = await signed_in_student()
+    work = await homework(client, session, aria)
+    hw, item = work["assignment"]["id"], work["items"][0]["id"]
+    headers = aria["headers"]
+    await client.post(f"/trash/homework/{hw}", headers=headers)
+    await client.post(f"/trash/problem/{item}", headers=headers)
+
+    await client.post(f"/trash/homework/{hw}/restore", headers=headers)
+    trash = (await client.get("/trash", headers=headers)).json()
+    assert trash == [], "the problem came back with the homework"
+    assert (await client.get(f"/items/{item}", headers=headers)).status_code == 200
+
+
+async def test_a_problem_used_again_is_never_purged(
+    client, session: AsyncSession, signed_in_student
+) -> None:
+    aria = await signed_in_student()
+    work = await homework(client, session, aria)
+    hw, item = work["assignment"]["id"], work["items"][0]["id"]
+    headers = aria["headers"]
+    await client.post(f"/trash/homework/{hw}", headers=headers)
+    await client.post(f"/trash/problem/{item}", headers=headers)
+    # The homework comes back by some other route, leaving the problem in the Trash.
+    assignment = await session.get(Assignment, uuid.UUID(hw))
+    take_out(assignment)
+    session.add(assignment)
+    await session.flush()
+
+    refused = await client.post(f"/trash/problem/{item}/purge", json={}, headers=headers)
+    assert refused.status_code == 409
+
+    problem = await session.get(Item, uuid.UUID(item))
+    problem.deleted_at = utcnow() - timedelta(days=TRASH_DAYS + 1)
+    session.add(problem)
+    await session.flush()
+    await purge_expired(session)
+    await session.refresh(problem)
+    assert problem.deleted_at is None, "taken out of the Trash rather than purged"
 
 
 # --- the 30-day clock ------------------------------------------------------------------------
