@@ -56,7 +56,10 @@ a teacher** — sign-up there is open to anyone. Only an address the owner invit
 `TEACHER_EMAIL_ALLOWLIST` provisions a `users` row (`auth/provisioning.py`); after that
 the active `users` row is the per-request gate, so the owner's Remove revokes on the next
 request. Supabase's "Confirm email" must stay on: it is what proves an invitee owns the
-address. **Students** never touch Supabase. They get an
+address. A recreated Supabase account re-links to the active teacher with its email
+(never to a removed one without an invite). **One owner per centre:** the first teacher
+in; the owner hands it on with Make owner on the Teachers page (23 Oct 2026, typed name,
+immediate, the old owner becomes a teacher). **Students** never touch Supabase. They get an
 app-issued opaque session token — `secrets.token_urlsafe(32)`, only its SHA-256 hash
 stored in `student_sessions`, delivered as an httpOnly/Secure/SameSite=Lax cookie
 (a browser-session cookie: no Max-Age).

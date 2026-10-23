@@ -8,6 +8,12 @@ the app holds no Supabase service key, so it cannot create accounts or send mail
 anyone's behalf. Removing a teacher disables their `users` row, which `load_teacher`
 checks on every request — they are out on their next click. Nothing is deleted: their
 classes and marking stay, and inviting the same address again brings them back.
+
+**Make owner** (Ken's decision, 23 Oct 2026) hands the centre to another teacher. There is
+one owner at a time: the new owner gets the role and the old one becomes an ordinary
+teacher, keeping everything they made. It happens at once — confirmed by typing the new
+owner's name, with no accept step — and, since `load_teacher` reads the role on every
+request, both feel it on their next click. Only the new owner can hand it back.
 """
 
 import uuid
@@ -23,6 +29,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.auth.principal import CurrentTeacher, Principal
 from app.auth.provisioning import normalise_email, pending_invite
 from app.db import get_session
+from app.erase import names_match
 from app.live.hub import hub
 from app.models import (
     ActorType,
@@ -70,6 +77,12 @@ class TeachersOut(BaseModel):
     invites: list[InviteOut]
 
 
+class TransferIn(BaseModel):
+    """The new owner's name, typed out, as the confirmation (case and spaces ignored)."""
+
+    confirm_name: str = Field(min_length=1, max_length=200)
+
+
 class InviteIn(BaseModel):
     email: str = Field(min_length=3, max_length=320)
 
@@ -93,6 +106,10 @@ def _invite_out(invite: TeacherInvite) -> InviteOut:
 @router.get("", response_model=TeachersOut)
 async def list_teachers(owner: CurrentOwner, session: SessionDep) -> TeachersOut:
     """Active teachers, then invites nobody has used yet."""
+    return await _teachers_out(session, owner)
+
+
+async def _teachers_out(session: AsyncSession, owner: Principal) -> TeachersOut:
     users = (
         await session.exec(
             select(User)
@@ -207,3 +224,44 @@ async def remove_teacher(user_id: uuid.UUID, owner: CurrentOwner, session: Sessi
     await session.commit()
     # Open Live views check the account only when they connect: close them now.
     await hub.kick_teacher(user.id)
+
+
+@router.post("/{user_id}/make-owner", response_model=TeachersOut)
+async def make_owner(
+    user_id: uuid.UUID, body: TransferIn, owner: CurrentOwner, session: SessionDep
+) -> TeachersOut:
+    """Hand the centre to another teacher; the caller becomes a teacher. See the module
+    docstring. Returns the list as the new owner would see it, for the page to redraw once
+    before the caller (no longer the owner) leaves it."""
+    user = await session.get(User, user_id)
+    # Another centre's teacher, or a removed one, is "not found": ownership can only go to
+    # someone who can sign in here.
+    if user is None or user.centre_id != owner.centre_id or user.status != UserStatus.ACTIVE:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="teacher not found")
+    if user.id == owner.subject_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="You’re already the owner."
+        )
+    if not names_match(body.confirm_name, user.display_name):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Type their name exactly to confirm.",
+        )
+    previous = await session.get(User, owner.subject_id)
+    assert previous is not None  # `CurrentOwner` loaded it this request
+    user.role = UserRole.OWNER
+    previous.role = UserRole.TEACHER
+    session.add_all([user, previous])
+    session.add(
+        _audit(
+            owner,
+            "teacher.ownership_transferred",
+            "user",
+            user.id,
+            to=str(user.id),
+            to_email=user.email,
+            **{"from": str(previous.id)},
+        )
+    )
+    await session.commit()
+    return await _teachers_out(session, owner)

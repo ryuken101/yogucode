@@ -295,3 +295,33 @@ test('a teacher who is not the owner is told so, not shown an error', async () =
   const message = await screen.findByText('Only the centre’s owner can manage teachers.')
   expect(message.className).toContain('not-yet')
 })
+
+test('making someone else the owner needs their name typed, then leaves the page', async () => {
+  let sent: unknown = null
+  server.use(
+    http.get('/api/teachers', () => HttpResponse.json(LISTING)),
+    http.post('/api/teachers/:id/make-owner', async ({ request, params }) => {
+      sent = { id: params.id, body: await request.json() }
+      return HttpResponse.json(LISTING)
+    }),
+  )
+  const { user } = renderScreen(
+    <Routes>
+      <Route path="/teachers" element={<Teachers />} />
+      <Route path="/classes" element={<p>Your classes</p>} />
+    </Routes>,
+    { route: '/teachers' },
+  )
+
+  await user.click(await screen.findByRole('button', { name: 'Make owner' }))
+  expect(screen.getByText('Make Sam Lee the owner?')).toBeInTheDocument()
+  expect(screen.getByText(/You’ll become a teacher/)).toBeInTheDocument()
+  const confirm = screen.getAllByRole('button', { name: 'Make owner' }).at(-1)!
+  expect(confirm).toBeDisabled()
+
+  await user.type(screen.getByLabelText('Type Sam Lee to confirm'), 'sam lee')
+  await user.click(confirm)
+  await waitFor(() => expect(sent).toEqual({ id: 'u2', body: { confirm_name: 'sam lee' } }))
+  // No longer the owner, so no longer on the owner's page.
+  expect(await screen.findByText('Your classes')).toBeInTheDocument()
+})

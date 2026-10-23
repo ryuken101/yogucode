@@ -2380,6 +2380,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/teachers/{user_id}/make-owner": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make Owner
+         * @description Hand the centre to another teacher; the caller becomes a teacher. See the module
+         *     docstring. Returns the list as the new owner would see it, for the page to redraw once
+         *     before the caller (no longer the owner) leaves it.
+         */
+        post: operations["make_owner_teachers__user_id__make_owner_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/teachers/{user_id}/remove": {
         parameters: {
             query?: never;
@@ -4700,6 +4722,14 @@ export interface components {
             kind: "out" | "in";
             /** Text */
             text: string;
+        };
+        /**
+         * TransferIn
+         * @description The new owner's name, typed out, as the confirmation (case and spaces ignored).
+         */
+        TransferIn: {
+            /** Confirm Name */
+            confirm_name: string;
         };
         /** TrashEntryOut */
         TrashEntryOut: {
@@ -9568,6 +9598,43 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    make_owner_teachers__user_id__make_owner_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeachersOut"];
+                };
             };
             /** @description Validation Error */
             422: {

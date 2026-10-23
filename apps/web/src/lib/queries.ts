@@ -307,6 +307,20 @@ export const useInviteTeacher = () => useTeachersMutation(api.inviteTeacher)
 export const useRevokeInvite = () => useTeachersMutation(api.revokeInvite)
 export const useRemoveTeacher = () => useTeachersMutation(api.removeTeacher)
 
+/** Make someone else the owner. `me` is refetched too: the Teachers tab is shown from it. */
+export function useMakeOwner() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ userId, confirmName }: { userId: string; confirmName: string }) =>
+      api.makeOwner(userId, confirmName),
+    onSuccess: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: keys.teachers }),
+        client.invalidateQueries({ queryKey: keys.me }),
+      ]),
+  })
+}
+
 /* --- student: identity and files ---------------------------------------------------- */
 
 /**

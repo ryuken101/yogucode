@@ -233,3 +233,93 @@ async def test_another_centres_invites_and_teachers_are_not_found(
     assert theirs.status == InviteStatus.PENDING
     listing = (await client.get("/teachers", headers=headers)).json()
     assert "other@elsewhere.test" not in str(listing)
+
+
+# --- making someone else the owner (23 Oct 2026) ---------------------------------------
+
+
+async def _sam(client, make_token, headers) -> tuple[dict[str, str], str]:
+    """Sam, invited and signed in: their auth headers and user id."""
+    await invite(client, headers)
+    sam = auth(make_token(email=SAM, full_name="Sam Lee"))
+    me = (await client.post("/auth/teacher/session", headers=sam)).json()
+    return sam, me["id"]
+
+
+async def test_the_owner_hands_the_centre_to_another_teacher(
+    client, make_token, signed_in, session: AsyncSession
+):
+    ken = await owner(signed_in)
+    sam, sam_id = await _sam(client, make_token, ken)
+
+    response = await client.post(
+        f"/teachers/{sam_id}/make-owner", headers=ken, json={"confirm_name": "  sam lee "}
+    )
+    assert response.status_code == 200, response.text
+
+    assert (await client.get("/auth/me", headers=sam)).json()["role"] == "owner"
+    assert (await client.get("/auth/me", headers=ken)).json()["role"] == "teacher"
+    # One owner at a time: Ken is out of the Teachers page on his next click, Sam is in.
+    assert (await client.get("/teachers", headers=ken)).status_code == 403
+    assert (await client.get("/teachers", headers=sam)).status_code == 200
+    audit = (
+        await session.exec(
+            select(AuditLog).where(AuditLog.action == "teacher.ownership_transferred")
+        )
+    ).all()
+    assert len(audit) == 1
+    assert audit[0].payload["to_email"] == SAM
+
+
+async def test_only_the_owner_can_hand_it_over(client, make_token, signed_in):
+    ken = await owner(signed_in)
+    sam, _ = await _sam(client, make_token, ken)
+    ken_id = (await client.get("/auth/me", headers=ken)).json()["id"]
+    response = await client.post(
+        f"/teachers/{ken_id}/make-owner", headers=sam, json={"confirm_name": "Ken Nguyen"}
+    )
+    assert response.status_code == 403
+
+
+async def test_the_name_must_be_typed_and_nothing_changes_until_it_is(
+    client, make_token, signed_in
+):
+    ken = await owner(signed_in)
+    sam, sam_id = await _sam(client, make_token, ken)
+    wrong = await client.post(
+        f"/teachers/{sam_id}/make-owner", headers=ken, json={"confirm_name": "Sam"}
+    )
+    assert wrong.status_code == 422
+    assert (await client.get("/auth/me", headers=sam)).json()["role"] == "teacher"
+    assert (await client.get("/auth/me", headers=ken)).json()["role"] == "owner"
+
+
+async def test_not_to_yourself_a_removed_teacher_or_a_stranger(
+    client, make_token, signed_in, foreign_centre, session: AsyncSession
+):
+    ken = await owner(signed_in)
+    ken_id = (await client.get("/auth/me", headers=ken)).json()["id"]
+    yourself = await client.post(
+        f"/teachers/{ken_id}/make-owner", headers=ken, json={"confirm_name": "Ken Nguyen"}
+    )
+    assert yourself.status_code == 409
+
+    _, sam_id = await _sam(client, make_token, ken)
+    await client.post(f"/teachers/{sam_id}/remove", headers=ken)
+    removed = await client.post(
+        f"/teachers/{sam_id}/make-owner", headers=ken, json={"confirm_name": "Sam Lee"}
+    )
+    assert removed.status_code == 404
+
+    stranger = User(
+        supabase_user_id=uuid.uuid4(),
+        centre_id=foreign_centre["centre"].id,
+        email="other@else.test",
+        display_name="Other Owner",
+    )
+    session.add(stranger)
+    await session.flush()
+    elsewhere = await client.post(
+        f"/teachers/{stranger.id}/make-owner", headers=ken, json={"confirm_name": "Other Owner"}
+    )
+    assert elsewhere.status_code == 404

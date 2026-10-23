@@ -5436,6 +5436,22 @@
         "title": "TranscriptLine",
         "type": "object"
       },
+      "TransferIn": {
+        "description": "The new owner's name, typed out, as the confirmation (case and spaces ignored).",
+        "properties": {
+          "confirm_name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Confirm Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "confirm_name"
+        ],
+        "title": "TransferIn",
+        "type": "object"
+      },
       "TrashEntryOut": {
         "properties": {
           "can_purge": {
@@ -14460,6 +14476,76 @@
           }
         },
         "summary": "Revoke Invite",
+        "tags": [
+          "teachers"
+        ]
+      }
+    },
+    "/teachers/{user_id}/make-owner": {
+      "post": {
+        "description": "Hand the centre to another teacher; the caller becomes a teacher. See the module\ndocstring. Returns the list as the new owner would see it, for the page to redraw once\nbefore the caller (no longer the owner) leaves it.",
+        "operationId": "make_owner_teachers__user_id__make_owner_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeachersOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Make Owner",
         "tags": [
           "teachers"
         ]

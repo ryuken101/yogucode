@@ -112,6 +112,12 @@ export const api = {
     request<Schemas['InviteOut']>('/teachers/invites', { method: 'POST', body: { email } }),
   revokeInvite: (inviteId: string) =>
     request<void>(`/teachers/invites/${inviteId}/revoke`, { method: 'POST' }),
+  /** Hand the centre to another teacher; the caller becomes a teacher (23 Oct 2026). */
+  makeOwner: (userId: string, confirmName: string) =>
+    request<Schemas['TeachersOut']>(`/teachers/${userId}/make-owner`, {
+      method: 'POST',
+      body: { confirm_name: confirmName } satisfies Schemas['TransferIn'],
+    }),
   removeTeacher: (userId: string) =>
     request<void>(`/teachers/${userId}/remove`, { method: 'POST' }),
 

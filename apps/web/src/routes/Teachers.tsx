@@ -12,6 +12,7 @@
  */
 
 import { useState } from 'react'
+import { useNavigate } from 'react-router'
 import { Badge } from '../components/Badge'
 import { Button } from '../components/Button'
 import { Card, PageHeader } from '../components/Card'
@@ -21,7 +22,7 @@ import { Notice } from '../components/Notice'
 import { Spinner } from '../components/Spinner'
 import type { Schemas } from '../lib/api'
 import { ApiError, messageFor } from '../lib/errors'
-import { useInviteTeacher, useRemoveTeacher, useRevokeInvite, useTeachers } from '../lib/queries'
+import { useInviteTeacher, useMakeOwner, useRemoveTeacher, useRevokeInvite, useTeachers } from '../lib/queries'
 
 const signUpLink = () => `${window.location.origin}/sign-up`
 
@@ -50,6 +51,10 @@ export function Teachers() {
   const [email, setEmail] = useState('')
   const [invited, setInvited] = useState<string | null>(null)
   const [removing, setRemoving] = useState<Schemas['TeacherRowOut'] | null>(null)
+  const makeOwner = useMakeOwner()
+  const [promoting, setPromoting] = useState<Schemas['TeacherRowOut'] | null>(null)
+  const [typed, setTyped] = useState('')
+  const navigate = useNavigate()
 
   if (teachers.isPending) return <Spinner label="Loading teachers" />
   if (teachers.error) {
@@ -155,9 +160,21 @@ export function Teachers() {
               {teacher.role === 'owner' ? <Badge variant="active">Owner</Badge> : null}
               {teacher.is_you ? <Badge variant="muted">You</Badge> : null}
               {!teacher.is_you ? (
-                <Button variant="quiet" className="ml-auto" onClick={() => setRemoving(teacher)}>
-                  Remove
-                </Button>
+                <span className="ml-auto flex gap-1">
+                  <Button
+                    variant="quiet"
+                    onClick={() => {
+                      makeOwner.reset()
+                      setTyped('')
+                      setPromoting(teacher)
+                    }}
+                  >
+                    Make owner
+                  </Button>
+                  <Button variant="quiet" onClick={() => setRemoving(teacher)}>
+                    Remove
+                  </Button>
+                </span>
               ) : null}
             </li>
           ))}
@@ -184,6 +201,51 @@ export function Teachers() {
           them back.
         </p>
       </Dialog>
+
+      {/* One owner at a time, handed over at once (Ken's decision, 23 Oct 2026). */}
+      <Dialog
+        open={promoting !== null}
+        title={promoting ? `Make ${promoting.display_name} the owner?` : ''}
+        onClose={() => setPromoting(null)}
+        confirm={{
+          label: 'Make owner',
+          disabled: makeOwner.isPending || !promoting || !sameName(typed, promoting.display_name),
+          onConfirm: () => {
+            if (!promoting) return
+            makeOwner.mutate(
+              { userId: promoting.id, confirmName: typed },
+              // This page is the owner's: once it is someone else's, leave it.
+              { onSuccess: () => navigate('/classes') },
+            )
+          },
+        }}
+      >
+        <p>
+          They’ll be the centre’s owner: this Teachers page, deleting classes and students
+          entirely, and deleting them for good from the Trash.
+        </p>
+        <p className="mt-2">
+          You’ll become a teacher and keep all your classes and work. Only they can hand it
+          back.
+        </p>
+        <div className="mt-4">
+          <TextInput
+            label={`Type ${promoting?.display_name ?? ''} to confirm`}
+            value={typed}
+            autoComplete="off"
+            onChange={(event) => setTyped(event.target.value)}
+          />
+        </div>
+        {makeOwner.error ? (
+          <div className="mt-3">
+            <Notice tone="not-yet">{messageFor(makeOwner.error)}</Notice>
+          </div>
+        ) : null}
+      </Dialog>
     </>
   )
 }
+
+const sameName = (a: string, b: string) =>
+  a.split(/\s+/).join(' ').trim().toLowerCase() === b.split(/\s+/).join(' ').trim().toLowerCase()
+
