@@ -21,8 +21,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.auth.principal import CurrentTeacher, Principal
 from app.db import get_session
-from app.folders import TEACHER, get_folder, live_folder
-from app.models import DocumentStatus, TeacherDocument
+from app.folders import TEACHER, live_folder
+from app.models import TeacherDocument
 from app.models.base import utcnow
 from app.routers.documents import (
     STARTER_CONTENT,
@@ -34,6 +34,7 @@ from app.routers.documents import (
     default_title,
 )
 from app.scoping import get_own_teacher_document, list_own_teacher_documents
+from app.trash import put_in, restore
 
 router = APIRouter(prefix="/teacher/documents", tags=["teacher documents"])
 
@@ -132,10 +133,10 @@ async def save_teacher_document(
 async def archive_teacher_document(
     document_id: uuid.UUID, principal: CurrentTeacher, session: SessionDep
 ) -> DocumentOut:
-    """Close a file's tab. It leaves the list; it stays in the database."""
+    """Delete a file: into the teacher's Trash for 30 days (`app/trash.py`)."""
     record = await get_own_teacher_document(session, principal, document_id)
-    if record.status != DocumentStatus.ARCHIVED:
-        record.status = DocumentStatus.ARCHIVED
+    if record.deleted_at is None:
+        put_in(record, principal.subject_id, utcnow())
         session.add(record)
         await session.commit()
         await session.refresh(record)
@@ -146,20 +147,8 @@ async def archive_teacher_document(
 async def restore_teacher_document(
     document_id: uuid.UUID, principal: CurrentTeacher, session: SessionDep
 ) -> DocumentOut:
+    """Out of the Trash, to its folder if that is still there (`app/trash.py`)."""
     record = await get_own_teacher_document(session, principal, document_id)
-    if record.status != DocumentStatus.ACTIVE:
-        record.status = DocumentStatus.ACTIVE
-        record.updated_at = utcnow()
-        if record.folder_id is not None:
-            # Back to the top level if its folder was deleted meanwhile.
-            folder = await get_folder(session, TEACHER, principal, record.folder_id)
-            if folder.status != DocumentStatus.ACTIVE:
-                record.folder_id = None
-        session.add(record)
-        try:
-            await session.commit()
-        except IntegrityError as exc:
-            await session.rollback()
-            raise _duplicate_title() from exc
-        await session.refresh(record)
+    if record.deleted_at is not None:
+        record = await restore(session, principal, "file", record.id)
     return DocumentOut.build_full(record)

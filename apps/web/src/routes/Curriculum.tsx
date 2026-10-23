@@ -18,6 +18,7 @@ import { Dialog } from '../components/Dialog'
 import { Select, TextInput } from '../components/Field'
 import { Notice } from '../components/Notice'
 import { Spinner } from '../components/Spinner'
+import { TrashDialog } from '../components/TrashDialog'
 import { api, type Schemas } from '../lib/api'
 import { LadderDialog } from '../problems/LadderDialog'
 import { messageFor } from '../lib/errors'
@@ -28,6 +29,7 @@ import {
   useCourseEdit,
   useCourses,
   useCreateCourse,
+  useTrashAction,
 } from '../lib/queries'
 
 /** A one-field form that clears itself on success — "add a unit", "add a lesson". */
@@ -93,8 +95,10 @@ export function Curriculum() {
     await client.invalidateQueries({ queryKey: keys.courses })
     return renamed
   })
-  const archiveUnit = useCourseEdit(id, (unitId: string) => api.archiveUnit(unitId))
-  const archiveLesson = useCourseEdit(id, (lessonId: string) => api.archiveLesson(lessonId))
+  // Delete goes to the Trash (23 Oct 2026): a unit takes its lessons with it, and Restore
+  // brings them back together. It replaced Archive here, which had no way back.
+  const trash = useTrashAction()
+  const [deleting, setDeleting] = useState<{ kind: 'course' | 'unit' | 'lesson'; id: string; title: string } | null>(null)
   const setConcepts = useCourseEdit(id, (input: { lessonId: string; conceptIds: string[] }) =>
     api.setLessonConcepts(input.lessonId, input.conceptIds),
   )
@@ -105,8 +109,6 @@ export function Curriculum() {
     addUnit.error ??
     addLesson.error ??
     rename.error ??
-    archiveUnit.error ??
-    archiveLesson.error ??
     setConcepts.error
 
   if (courses.isPending) return <Spinner label="Loading courses" />
@@ -157,6 +159,14 @@ export function Curriculum() {
             >
               Rename
             </Button>
+            <Button
+              variant="quiet"
+              onClick={() =>
+                setDeleting({ kind: 'course', id: course.data.id, title: course.data.title })
+              }
+            >
+              Delete
+            </Button>
           </div>
 
           {course.data.units.length === 0 ? (
@@ -176,8 +186,11 @@ export function Curriculum() {
                   >
                     Rename
                   </Button>
-                  <Button variant="quiet" onClick={() => archiveUnit.mutate(unit.id)}>
-                    Archive
+                  <Button
+                    variant="quiet"
+                    onClick={() => setDeleting({ kind: 'unit', id: unit.id, title: unit.title })}
+                  >
+                    Delete
                   </Button>
                 </div>
               </div>
@@ -218,8 +231,11 @@ export function Curriculum() {
                       >
                         Rename
                       </Button>
-                      <Button variant="quiet" onClick={() => archiveLesson.mutate(lesson.id)}>
-                        Archive
+                      <Button
+                        variant="quiet"
+                        onClick={() => setDeleting({ kind: 'lesson', id: lesson.id, title: lesson.title })}
+                      >
+                        Delete
                       </Button>
                     </span>
                   </li>
@@ -307,6 +323,29 @@ export function Curriculum() {
           })}
         </div>
       </Dialog>
+
+      <TrashDialog
+        open={deleting !== null}
+        name={deleting ? `“${deleting.title}”` : ''}
+        note={
+          deleting?.kind === 'lesson'
+            ? 'A class taught from it today stops being on it. Its ladder and the children’s work on it are kept.'
+            : 'Everything in it goes with it, and comes back together if you restore it.'
+        }
+        busy={trash.isPending}
+        error={trash.error ? messageFor(trash.error) : null}
+        onClose={() => {
+          trash.reset()
+          setDeleting(null)
+        }}
+        onConfirm={() =>
+          deleting &&
+          trash.mutate(
+            { action: 'trash', kind: deleting.kind, id: deleting.id },
+            { onSuccess: () => setDeleting(null) },
+          )
+        }
+      />
     </>
   )
 }

@@ -107,6 +107,16 @@ test('opens my last file, runs it, and saves through my own files', async () => 
   expect(JSON.stringify(saved.at(-1))).toContain('# demo')
 })
 
+test('Run straight after typing runs what is on screen, not the saved copy', async () => {
+  const { user } = renderScreen(<MyCode />)
+  const box = await editor()
+  await user.clear(box)
+  await user.type(box, 'print(42)')
+  // No pause: the autosave has not landed, which is exactly when this used to go wrong.
+  await user.click(screen.getByRole('button', { name: 'Run' }))
+  expect(python.run).toHaveBeenLastCalledWith('print(42)')
+})
+
 test('a first visit gets a starter file', async () => {
   let created = false
   server.use(

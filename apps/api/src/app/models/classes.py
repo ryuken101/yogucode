@@ -7,7 +7,7 @@ from enum import StrEnum
 from sqlalchemy import CheckConstraint, DateTime, String, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
-from app.models.base import TimestampMixin, new_uuid, utcnow
+from app.models.base import TimestampMixin, TrashMixin, new_uuid, utcnow
 
 
 class ClassStatus(StrEnum):
@@ -25,7 +25,7 @@ class EnrolmentStatus(StrEnum):
     WITHDRAWN = "withdrawn"
 
 
-class Class(TimestampMixin, table=True):
+class Class(TimestampMixin, TrashMixin, table=True):
     __tablename__ = "classes"
     __table_args__ = (CheckConstraint("status IN ('active', 'archived')", name="status"),)
 

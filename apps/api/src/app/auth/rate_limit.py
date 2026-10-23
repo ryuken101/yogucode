@@ -9,8 +9,11 @@ In memory, like the live hub: one machine (fly.toml). A restart forgets the coun
 which costs an attacker nothing they couldn't get by waiting out the window.
 """
 
+import os
 import time
 from collections import deque
+
+from starlette.requests import Request
 
 
 class FailureLimiter:
@@ -35,3 +38,20 @@ class FailureLimiter:
 
 
 pin_failures = FailureLimiter()
+
+
+def client_ip(request: Request) -> str:
+    """The device's address, as a key for the limit — one a client cannot choose.
+
+    In production uvicorn runs with `--proxy-headers --forwarded-allow-ips "*"` (it needs the
+    scheme), which makes `request.client.host` the *leftmost* X-Forwarded-For entry: the one
+    the client writes. Sending a new one each request would make every guess a new device
+    (found 23 Oct 2026). On Fly, the edge sets `Fly-Client-IP` to the address it accepted the
+    connection from, replacing anything the client sent, so that is the key there. Off Fly
+    there is no proxy and the socket's address is the truth.
+    """
+    if os.environ.get("FLY_APP_NAME"):
+        fly = request.headers.get("fly-client-ip")
+        if fly:
+            return fly.strip()
+    return request.client.host if request.client else "unknown"

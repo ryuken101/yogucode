@@ -22,7 +22,7 @@ from enum import StrEnum
 from sqlalchemy import CheckConstraint, DateTime, Index, String, text
 from sqlmodel import Field, SQLModel
 
-from app.models.base import TimestampMixin, new_uuid, utcnow
+from app.models.base import TimestampMixin, TrashMixin, new_uuid, utcnow
 
 
 class StudentStatus(StrEnum):
@@ -30,7 +30,7 @@ class StudentStatus(StrEnum):
     ARCHIVED = "archived"
 
 
-class Student(TimestampMixin, table=True):
+class Student(TimestampMixin, TrashMixin, table=True):
     __tablename__ = "students"
     __table_args__ = (
         CheckConstraint("status IN ('active', 'archived')", name="status"),

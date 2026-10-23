@@ -543,4 +543,26 @@ export const api = {
       method: 'POST',
       anonymous: true,
     }),
+
+  /* --- the Trash (23 Oct 2026) ------------------------------------------------------ */
+
+  listTrash: () => request<Schemas['TrashEntryOut'][]>('/trash'),
+  /** Delete: into the Trash for 30 days. Files and folders go through their own Delete. */
+  trash: (kind: TrashKind, id: string) =>
+    request<void>(`/trash/${kind}/${id}`, { method: 'POST' }),
+  restoreFromTrash: (kind: TrashKind, id: string) =>
+    request<void>(`/trash/${kind}/${id}/restore`, { method: 'POST' }),
+  /** For good, now. A class or a child needs the owner and their name typed. */
+  purgeFromTrash: (kind: TrashKind, id: string, confirmName?: string) =>
+    request<void>(`/trash/${kind}/${id}/purge`, {
+      method: 'POST',
+      body: { confirm_name: confirmName ?? null } satisfies Schemas['PurgeIn'],
+    }),
+  listMyTrash: () => request<Schemas['TrashEntryOut'][]>('/me/trash', { anonymous: true }),
+  restoreMine: (kind: 'file' | 'folder', id: string) =>
+    request<void>(`/me/trash/${kind}/${id}/restore`, { method: 'POST', anonymous: true }),
+  deleteSnippet: (snippetId: string) =>
+    request<void>(`/snippets/${snippetId}/delete`, { method: 'POST' }),
 }
+
+export type TrashKind = Schemas['TrashEntryOut']['kind']

@@ -120,6 +120,19 @@ test('check shows how many pass, in good and not-yet, and reports the result', a
   await waitFor(() => expect(runs).toEqual([{ passed: 1, total: 2 }]))
 })
 
+test('Run and Check straight after typing use what is on screen', async () => {
+  check.mockResolvedValue({ compile_error: null, results: [] })
+  const { user } = renderAttempt()
+  const box = await screen.findByLabelText('Your program')
+  await user.clear(box)
+  await user.type(box, 'print(2 * 4)')
+  await user.click(screen.getByRole('button', { name: 'Run' }))
+  expect(run).toHaveBeenLastCalledWith('print(2 * 4)')
+  await user.click(screen.getByRole('button', { name: 'Check' }))
+  await waitFor(() => expect(check).toHaveBeenCalled())
+  expect(check.mock.calls.at(-1)![0]).toBe('print(2 * 4)')
+})
+
 test('a syntax error is "not yet", with what Python said', async () => {
   check.mockResolvedValue({
     compile_error: "SyntaxError on line 1: '(' was never closed",

@@ -146,8 +146,13 @@ const TEACHER: AppDef[] = [
     hint: 'Everyone’s files',
     icon: FolderOpen,
     tile: 'bg-lemon text-grape',
-    owns: [/^\/files(\/|$)/],
+    owns: [/^\/files(\/|$)/, /^\/trash$/],
     home: () => '/files',
+    // Everything deleted at the centre waits in the Trash for 30 days (23 Oct 2026).
+    tabs: () => [
+      { label: 'Files', to: '/files', active: (p) => p.startsWith('/files') },
+      { label: 'Trash', to: '/trash', active: (p) => p === '/trash' },
+    ],
   },
   {
     id: 'code',

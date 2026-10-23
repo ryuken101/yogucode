@@ -57,3 +57,20 @@ class TimestampMixin(SQLModel):
         nullable=False,
         sa_column_kwargs={"server_default": func.now(), "onupdate": utcnow},
     )
+
+
+class TrashMixin(SQLModel):
+    """In the Trash (Ken's decision, 23 Oct 2026): deleted, restorable for 30 days, then
+    erased for good by the purge job (`app/trash.py`).
+
+    Trashing also sets the row's status to `archived`, so every query that already shows
+    only active rows hides it with no change. `status_before_delete` is what Restore puts
+    back; `deleted_at` is set only while the row is in the Trash, and is what separates it
+    from an ordinary archive (a removed class, an archived problem), which is kept for as
+    long as anyone wants it. `deleted_by` is a teacher's or a child's id — no foreign key,
+    since it can be either.
+    """
+
+    deleted_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True), index=True)
+    deleted_by: uuid.UUID | None = Field(default=None)
+    status_before_delete: str | None = Field(default=None)

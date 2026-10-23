@@ -31,6 +31,7 @@ import {
   LayoutGrid,
   List,
   User,
+  Trash2,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
@@ -58,6 +59,7 @@ import {
   useTeacherDocuments,
 } from '../lib/queries'
 import { setClip, useClip } from './clipboard'
+import { RecentlyDeleted } from '../components/RecentlyDeleted'
 import { ContextMenu, SEPARATOR, type ContextEntry } from './ContextMenu'
 import { useDesk } from './context'
 import { placeKey, storeFor, useFileStore, type FileStore, type Place } from './fileStore'
@@ -80,6 +82,7 @@ export function Finder() {
   const { studentId } = useParams()
   const { pathname } = useLocation()
   const [params] = useSearchParams()
+  if (role === 'student' && params.get('view') === 'trash') return <StudentTrash />
   if (role === 'student') return <StudentFiles recents={params.get('view') === 'recents'} />
   if (studentId) return <ChildFiles studentId={studentId} />
   if (pathname === '/files/mine') return <MyFiles />
@@ -152,6 +155,21 @@ function StudentFiles({ recents }: { recents: boolean }) {
   )
 }
 
+/** A child's Recently deleted (23 Oct 2026): what they deleted, to put back. */
+function StudentTrash() {
+  const navigate = useNavigate()
+  return (
+    <div className="mx-auto w-full max-w-xl px-6 py-8">
+      <button type="button" onClick={() => navigate('/my-files')} className="mb-3 text-sm text-grape-deep">
+        ← My work
+      </button>
+      <h1 className="mb-1 font-display text-2xl font-semibold text-grape">Recently deleted</h1>
+      <p className="mb-4 text-sm text-muted">Deleted files wait here for 30 days. Put one back any time before then.</p>
+      <RecentlyDeleted alwaysOpen />
+    </div>
+  )
+}
+
 /* --- the window: sidebar, toolbar, contents, status bar ------------------------------- */
 
 const DRAG_TYPE = 'application/x-yogucode-finder'
@@ -182,6 +200,7 @@ function Shell({
   store: { place: Place; actions: FileStore } | null
   onOpenFile: (file: FileRow) => void
 }) {
+  const { role } = useDesk()
   const [params, setParams] = useSearchParams()
   const folderId = flat ? null : params.get('folder')
   // `?select=<id>`: a file to show selected, as "Put it away in Files…" sends (18 Oct 2026).
@@ -759,9 +778,10 @@ function Shell({
           },
         }}
       >
-        {deleting?.kind === 'folder'
-          ? 'The folder and everything in it leave this place. They are put away rather than destroyed, so they can be brought back.'
-          : 'It leaves this folder. It is put away rather than destroyed, so it can be brought back.'}
+        {deleting?.kind === 'folder' ? 'The folder and everything in it go' : 'It goes'}{' '}
+        {role === 'student'
+          ? 'to Recently deleted for 30 days, where you can put it back.'
+          : 'to the Trash for 30 days, where it can be restored.'}
       </Dialog>
 
       <Dialog
@@ -861,6 +881,7 @@ function usePlaces(): { title: string; items: SidebarPlace[] }[] {
         items: [
           { key: 'recents', label: 'Recents', icon: Clock, go: () => navigate('/my-files?view=recents') },
           { key: 'mine', label: 'My work', icon: Folder, go: () => navigate('/my-files') },
+          { key: 'trash', label: 'Recently deleted', icon: Trash2, go: () => navigate('/my-files?view=trash') },
         ],
       },
     ]
@@ -879,7 +900,13 @@ function usePlaces(): { title: string; items: SidebarPlace[] }[] {
           },
         ]
       : []),
-    { title: 'Me', items: [{ key: 'mine', label: 'My code', icon: Folder, go: () => navigate('/files/mine') }] },
+    {
+      title: 'Me',
+      items: [
+        { key: 'mine', label: 'My code', icon: Folder, go: () => navigate('/files/mine') },
+        { key: 'trash', label: 'Trash', icon: Trash2, go: () => navigate('/trash') },
+      ],
+    },
   ]
 }
 

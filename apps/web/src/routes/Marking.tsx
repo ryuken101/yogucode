@@ -15,6 +15,7 @@
  */
 
 import { useQueryClient } from '@tanstack/react-query'
+import { X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router'
 import { Badge } from '../components/Badge'
@@ -130,6 +131,9 @@ export function Marking() {
   const [forms, setForms] = useState<Record<string, Form>>({})
   const [notes, setNotes] = useState<Record<string, string>>({})
   const [snippetQuery, setSnippetQuery] = useState('')
+  // Snippets delete for good, with no Trash: one line of wording, nothing attached, and
+  // comments already given keep their text (23 Oct 2026).
+  const [deletingSnippet, setDeletingSnippet] = useState<{ id: string; body: string } | null>(null)
   const [confirmRelease, setConfirmRelease] = useState(false)
   const [released, setReleased] = useState<Schemas['ReleaseOut'] | null>(null)
   const [error, setError] = useState<unknown>(null)
@@ -476,7 +480,7 @@ export function Marking() {
               />
               <ul className="flex flex-col gap-1">
                 {shownSnippets.map((snippet) => (
-                  <li key={snippet.id}>
+                  <li key={snippet.id} className="flex items-start gap-1">
                     <button
                       type="button"
                       onClick={() =>
@@ -488,6 +492,15 @@ export function Marking() {
                       className="w-full rounded-lg bg-surface px-3 py-1.5 text-left text-sm text-grape ring-1 ring-line hover:ring-grape"
                     >
                       {snippet.body}
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Delete the snippet “${snippet.body}”`}
+                      title="Delete snippet"
+                      onClick={() => setDeletingSnippet(snippet)}
+                      className="mt-1 rounded-lg p-1 text-muted hover:bg-grape-pale hover:text-grape"
+                    >
+                      <X size={14} aria-hidden="true" />
                     </button>
                   </li>
                 ))}
@@ -543,6 +556,27 @@ export function Marking() {
       >
         Every child you have marked sees your comments, and their homework becomes read-only.
         Anyone not marked yet is unaffected — you can give theirs back later.
+      </Dialog>
+
+      <Dialog
+        open={deletingSnippet !== null}
+        title="Delete this snippet?"
+        onClose={() => setDeletingSnippet(null)}
+        confirm={{
+          label: 'Delete',
+          onConfirm: () => {
+            const gone = deletingSnippet
+            setDeletingSnippet(null)
+            if (gone) {
+              void api
+                .deleteSnippet(gone.id)
+                .then(() => client.invalidateQueries({ queryKey: keys.snippets }))
+            }
+          },
+        }}
+      >
+        “{deletingSnippet?.body}” leaves the snippet list for everyone at the centre. Comments
+        already given with it keep their words. This can’t be undone.
       </Dialog>
     </>
   )

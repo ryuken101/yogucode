@@ -22,7 +22,7 @@ from enum import StrEnum
 from sqlalchemy import CheckConstraint, String
 from sqlmodel import Field, SQLModel
 
-from app.models.base import TimestampMixin, new_uuid
+from app.models.base import TimestampMixin, TrashMixin, new_uuid
 
 
 class CurriculumStatus(StrEnum):
@@ -30,7 +30,7 @@ class CurriculumStatus(StrEnum):
     ARCHIVED = "archived"
 
 
-class Course(TimestampMixin, table=True):
+class Course(TimestampMixin, TrashMixin, table=True):
     __tablename__ = "courses"
     __table_args__ = (CheckConstraint("status IN ('active', 'archived')", name="status"),)
 
@@ -40,7 +40,7 @@ class Course(TimestampMixin, table=True):
     status: CurriculumStatus = Field(default=CurriculumStatus.ACTIVE, sa_type=String)
 
 
-class Unit(TimestampMixin, table=True):
+class Unit(TimestampMixin, TrashMixin, table=True):
     __tablename__ = "units"
     __table_args__ = (CheckConstraint("status IN ('active', 'archived')", name="status"),)
 
@@ -52,7 +52,7 @@ class Unit(TimestampMixin, table=True):
     status: CurriculumStatus = Field(default=CurriculumStatus.ACTIVE, sa_type=String)
 
 
-class Lesson(TimestampMixin, table=True):
+class Lesson(TimestampMixin, TrashMixin, table=True):
     __tablename__ = "lessons"
     __table_args__ = (CheckConstraint("status IN ('active', 'archived')", name="status"),)
 

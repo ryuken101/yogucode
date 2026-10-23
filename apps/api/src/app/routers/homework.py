@@ -39,6 +39,7 @@ from app.models import (
     Submission,
     SubmissionSource,
 )
+from app.models.base import utcnow
 from app.scoping import get_owned_assignment, get_owned_class
 
 router = APIRouter(tags=["homework"])
@@ -162,6 +163,7 @@ async def create_homework(
 ) -> HomeworkOut:
     """Start a homework as a draft. Nothing is visible to the class until it is set."""
     klass = await get_owned_class(session, principal, class_id)
+    _check_due(body.due_at)
     await check_set_items(session, principal, body.item_ids, already=set(), limit=MAX_HOMEWORK)
     problem_set = ProblemSet(
         centre_id=principal.centre_id, title=body.title.strip(), created_by=principal.subject_id
@@ -237,6 +239,7 @@ async def update_homework(
         assignment.title = body.title.strip()
         changed["title"] = assignment.title
     if "due_at" in fields and body.due_at != assignment.due_at:
+        _check_due(body.due_at)
         assignment.due_at = body.due_at
         changed["due_at"] = body.due_at.isoformat() if body.due_at else None
     if body.hints is not None and body.hints != assignment.settings.get("hints", True):
@@ -272,6 +275,17 @@ async def _move(
     return await _out(session, principal, assignment)
 
 
+def _check_due(due_at: datetime | None) -> None:
+    """A due date being chosen must be in the future (Ken, 23 Oct 2026): a date in the past
+    was accepted and shown without its year, so 1 Jan 2020 looked like next January. One
+    already set and left alone is not re-checked — homework is allowed to fall due."""
+    if due_at is not None and due_at <= utcnow():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Choose a due date in the future",
+        )
+
+
 @router.post("/assignments/{assignment_id}/set", response_model=HomeworkOut)
 async def set_homework(
     assignment_id: uuid.UUID, principal: CurrentTeacher, session: SessionDep
@@ -282,6 +296,8 @@ async def set_homework(
         raise _conflict("Add at least one problem first")
     if assignment.due_at is None:
         raise _conflict("Choose when it is due first")
+    if assignment.due_at <= utcnow():
+        raise _conflict("Its due date has passed. Choose a new one first")
     return await _move(
         session,
         principal,

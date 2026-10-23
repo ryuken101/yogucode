@@ -4,16 +4,24 @@
  * window so a teacher can set work beside the problem library.
  */
 
-import { useNavigate, useParams, useSearchParams } from 'react-router'
+import { useState } from 'react'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import { Badge } from '../components/Badge'
 import { Button } from '../components/Button'
 import { Card } from '../components/Card'
 import { Notice } from '../components/Notice'
 import { Spinner } from '../components/Spinner'
+import { TrashDialog } from '../components/TrashDialog'
 import { api } from '../lib/api'
 import { formatDue } from '../lib/dates'
 import { messageFor } from '../lib/errors'
-import { useClassHomework, useClassQuizzes, useHomeworkMutation, useQuizMutation } from '../lib/queries'
+import {
+  useClassHomework,
+  useClassQuizzes,
+  useHomeworkMutation,
+  useQuizMutation,
+  useTrashAction,
+} from '../lib/queries'
 
 export function ClassWork() {
   const { classId = '' } = useParams()
@@ -30,9 +38,18 @@ export function HomeworkCard({ classId }: { classId: string }) {
   const homework = useClassHomework(classId)
   const close = useHomeworkMutation(classId, (id: string) => api.closeHomework(id))
   const reopen = useHomeworkMutation(classId, (id: string) => api.reopenHomework(id))
+  // "Set — children can see it now", from the homework page that just set it (23 Oct 2026).
+  const notice = (useLocation().state as { notice?: string } | null)?.notice
+  const [deleting, setDeleting] = useState<{ id: string; title: string } | null>(null)
+  const trash = useTrashAction()
 
   return (
     <Card className="mb-6">
+      {notice ? (
+        <div className="mb-3">
+          <Notice tone="good">{notice}</Notice>
+        </div>
+      ) : null}
       <div className="mb-3 flex items-center justify-between">
         <h2 className="font-display font-semibold text-lg text-grape">Homework</h2>
         <Button variant="secondary" onClick={() => navigate(`/classes/${classId}/homework/new`)}>
@@ -78,11 +95,32 @@ export function HomeworkCard({ classId }: { classId: string }) {
                   Reopen
                 </Button>
               ) : null}
+              <Button variant="quiet" onClick={() => setDeleting({ id: hw.id, title: hw.title })}>
+                Delete
+              </Button>
             </span>
           </li>
         ))}
       </ul>
       {homework.error ? <Notice tone="system-error">{messageFor(homework.error)}</Notice> : null}
+      <TrashDialog
+        open={deleting !== null}
+        name={deleting ? `“${deleting.title}”` : ''}
+        note="Children’s answers and marks on it go with it, and come back if you restore it."
+        busy={trash.isPending}
+        error={trash.error ? messageFor(trash.error) : null}
+        onClose={() => {
+          trash.reset()
+          setDeleting(null)
+        }}
+        onConfirm={() =>
+          deleting &&
+          trash.mutate(
+            { action: 'trash', kind: 'homework', id: deleting.id },
+            { onSuccess: () => setDeleting(null) },
+          )
+        }
+      />
     </Card>
   )
 }
@@ -96,6 +134,8 @@ export function QuizzesCard({ classId }: { classId: string }) {
   const quizzes = useClassQuizzes(classId)
   const start = useQuizMutation(classId, (id: string) => api.startQuiz(id))
   const running = (quizzes.data ?? []).some((q) => q.running)
+  const [deleting, setDeleting] = useState<{ id: string; title: string } | null>(null)
+  const trash = useTrashAction()
 
   return (
     <Card className="mb-6">
@@ -144,11 +184,34 @@ export function QuizzesCard({ classId }: { classId: string }) {
                   Mark
                 </Button>
               ) : null}
+              {!quiz.running ? (
+                <Button variant="quiet" onClick={() => setDeleting({ id: quiz.id, title: quiz.title })}>
+                  Delete
+                </Button>
+              ) : null}
             </span>
           </li>
         ))}
       </ul>
       {start.error ? <Notice tone="not-yet">{messageFor(start.error)}</Notice> : null}
+      <TrashDialog
+        open={deleting !== null}
+        name={deleting ? `“${deleting.title}”` : ''}
+        note="Children’s answers and marks on it go with it, and come back if you restore it."
+        busy={trash.isPending}
+        error={trash.error ? messageFor(trash.error) : null}
+        onClose={() => {
+          trash.reset()
+          setDeleting(null)
+        }}
+        onConfirm={() =>
+          deleting &&
+          trash.mutate(
+            { action: 'trash', kind: 'homework', id: deleting.id },
+            { onSuccess: () => setDeleting(null) },
+          )
+        }
+      />
     </Card>
   )
 }

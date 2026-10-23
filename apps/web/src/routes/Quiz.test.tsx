@@ -87,7 +87,7 @@ test('the quiz page counts down and lists the questions', async () => {
   activeQuiz()
   renderStudent(`/quiz/${QUIZ}`)
   expect(await screen.findByLabelText('time left')).toHaveTextContent(/^(10:00|9:5\d)$/)
-  expect(screen.getByRole('link', { name: /Add to the end/ })).toHaveAttribute('href', `/lesson/${QUIZ}/${ITEM}`)
+  expect(screen.getByRole('link', { name: /Add to the end/ })).toHaveAttribute('href', `/quiz/${QUIZ}/${ITEM}`)
 })
 
 test('when time is up the page says the work is in', async () => {

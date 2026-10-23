@@ -1462,10 +1462,11 @@ export interface paths {
         put?: never;
         /**
          * Archive Document
-         * @description Put a file away. It leaves the list; it stays in the database.
+         * @description Delete a file: it goes to the child's Trash ("Recently deleted") for 30 days.
          *
-         *     Archive rather than delete, as everywhere else. A child who tidies up mid-term should
-         *     not be able to destroy a term of their own work with one tap.
+         *     Never straight to gone (Ken, 23 Oct 2026): a child who tidies up mid-term must not be
+         *     able to destroy a term of their own work with one tap, and a child cannot empty their
+         *     Trash themselves (`app/trash.py`).
          */
         post: operations["archive_document_me_documents__document_id__archive_post"];
         delete?: never;
@@ -1485,10 +1486,8 @@ export interface paths {
         put?: never;
         /**
          * Restore Document
-         * @description Bring an archived file back.
-         *
-         *     The partial unique index only covers live files, so a restore can collide with a file
-         *     created since — hence the same 409 as a rename, rather than an IntegrityError.
+         * @description Bring a file back out of the Trash (`app/trash.py`), to its folder if that is still
+         *     there and to the top level if not. A name taken meanwhile is a 409, as for a rename.
          */
         post: operations["restore_document_me_documents__document_id__restore_post"];
         delete?: never;
@@ -1688,6 +1687,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/trash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List My Trash */
+        get: operations["list_my_trash_me_trash_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/trash/{kind}/{item_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore Mine */
+        post: operations["restore_mine_me_trash__kind___item_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/quizzes/{quiz_id}": {
         parameters: {
             query?: never;
@@ -1798,6 +1831,28 @@ export interface paths {
         put?: never;
         /** Archive Snippet */
         post: operations["archive_snippet_snippets__snippet_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/snippets/{snippet_id}/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete Snippet
+         * @description Delete a snippet for good (Ken, 23 Oct 2026). No Trash: it is one line of a
+         *     teacher's own wording with nothing attached — a comment already given keeps its text,
+         *     since marks copy the words rather than pointing at the snippet.
+         */
+        post: operations["delete_snippet_snippets__snippet_id__delete_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2190,7 +2245,7 @@ export interface paths {
         put?: never;
         /**
          * Archive Teacher Document
-         * @description Close a file's tab. It leaves the list; it stays in the database.
+         * @description Delete a file: into the teacher's Trash for 30 days (`app/trash.py`).
          */
         post: operations["archive_teacher_document_teacher_documents__document_id__archive_post"];
         delete?: never;
@@ -2208,7 +2263,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Restore Teacher Document */
+        /**
+         * Restore Teacher Document
+         * @description Out of the Trash, to its folder if that is still there (`app/trash.py`).
+         */
         post: operations["restore_teacher_document_teacher_documents__document_id__restore_post"];
         delete?: never;
         options?: never;
@@ -2333,6 +2391,74 @@ export interface paths {
         put?: never;
         /** Remove Teacher */
         post: operations["remove_teacher_teachers__user_id__remove_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/trash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Trash */
+        get: operations["list_trash_trash_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/trash/{kind}/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Put In Trash */
+        post: operations["put_in_trash_trash__kind___item_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/trash/{kind}/{item_id}/purge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Purge */
+        post: operations["purge_trash__kind___item_id__purge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/trash/{kind}/{item_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore */
+        post: operations["restore_trash__kind___item_id__restore_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3911,6 +4037,11 @@ export interface components {
              */
             verified_updated_at: string;
         };
+        /** PurgeIn */
+        PurgeIn: {
+            /** Confirm Name */
+            confirm_name?: string | null;
+        };
         /** QuestionMarkingOut */
         QuestionMarkingOut: {
             /**
@@ -4569,6 +4700,39 @@ export interface components {
             kind: "out" | "in";
             /** Text */
             text: string;
+        };
+        /** TrashEntryOut */
+        TrashEntryOut: {
+            /** Can Purge */
+            can_purge: boolean;
+            /**
+             * Deleted At
+             * Format: date-time
+             */
+            deleted_at: string;
+            /** Deleted By */
+            deleted_by: string | null;
+            /** Detail */
+            detail: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "class" | "student" | "problem" | "course" | "unit" | "lesson" | "homework" | "file" | "folder";
+            /** Name */
+            name: string;
+            /** Needs Name */
+            needs_name: boolean;
+            /**
+             * Purge After
+             * Format: date-time
+             */
+            purge_after: string;
         };
         /** UnitOut */
         UnitOut: {
@@ -7885,6 +8049,69 @@ export interface operations {
             };
         };
     };
+    list_my_trash_me_trash_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrashEntryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_mine_me_trash__kind___item_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                kind: "file" | "folder";
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     read_quiz_quizzes__quiz_id__get: {
         parameters: {
             query?: never;
@@ -8147,6 +8374,37 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SnippetOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_snippet_snippets__snippet_id__delete_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                snippet_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -9330,6 +9588,137 @@ export interface operations {
             };
             path: {
                 user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_trash_trash_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrashEntryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_in_trash_trash__kind___item_id__post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                kind: "class" | "student" | "problem" | "course" | "unit" | "lesson" | "homework" | "file" | "folder";
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    purge_trash__kind___item_id__purge_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                kind: "class" | "student" | "problem" | "course" | "unit" | "lesson" | "homework" | "file" | "folder";
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PurgeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_trash__kind___item_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                kind: "class" | "student" | "problem" | "course" | "unit" | "lesson" | "homework" | "file" | "folder";
+                item_id: string;
             };
             cookie?: never;
         };

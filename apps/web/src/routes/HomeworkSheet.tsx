@@ -207,7 +207,7 @@ export function HomeworkSheet() {
             {data.leaves.map((leaf) => (
               <li key={leaf.leaf_item_id}>
                 <Link
-                  to={`/lesson/${assignmentId}/${leaf.problem_id}`}
+                  to={`/homework/${assignmentId}/${leaf.problem_id}`}
                   className="flex items-center gap-4 rounded-2xl bg-surface px-5 py-4 ring-1 ring-line hover:ring-grape"
                 >
                   <Dots value={leaf.difficulty} />

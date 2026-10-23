@@ -97,6 +97,74 @@ async def get_or_create_centre(session: AsyncSession, settings: Settings) -> Cen
     return centre
 
 
+async def _relink_by_email(
+    session: AsyncSession, claims: TeacherClaims, settings: Settings
+) -> User | None:
+    """An existing teacher whose Supabase account is new: the same person, signing in again.
+
+    A Supabase account can be deleted and made again (or a project moved), which gives the
+    same address a new Supabase id. Matching only on that id made a second, ordinary
+    teacher with the same email — and stranded the owner on 23 Oct 2026. Supabase's Confirm
+    email (which must stay on, root CLAUDE.md) proves the address, so:
+
+    - an **active** teacher with it is re-linked to the new id;
+    - a **removed** one comes back only with a pending invite, exactly as on their old
+      account. Otherwise they are refused: recreating a Supabase account must not undo
+      Remove, even for an address on the bootstrap allowlist.
+    """
+    centre = (
+        await session.exec(select(Centre).where(Centre.slug == settings.centre_slug))
+    ).one_or_none()
+    if centre is None:
+        return None
+    rows = (
+        await session.exec(
+            select(User)
+            .where(User.centre_id == centre.id, User.email == normalise_email(claims.email))
+            # Oldest first: if a duplicate already exists, the original (the owner, when it
+            # is theirs) is the account to keep.
+            .order_by(User.created_at)  # type: ignore[arg-type]
+        )
+    ).all()
+    if not rows:
+        return None
+    existing = next((u for u in rows if u.status == UserStatus.ACTIVE), None)
+    invite = None
+    if existing is None:
+        invite = await pending_invite(session, centre.id, claims.email)
+        if invite is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    "This account has been removed from the centre. "
+                    "Ask the owner if that’s a mistake."
+                ),
+            )
+        existing = rows[0]
+        existing.status = UserStatus.ACTIVE
+        await _accept(session, invite)
+    previous = existing.supabase_user_id
+    existing.supabase_user_id = claims.supabase_user_id
+    session.add(existing)
+    session.add(
+        AuditLog(
+            centre_id=existing.centre_id,
+            actor_type=ActorType.USER,
+            actor_id=existing.id,
+            action="teacher.relinked" if invite is None else "teacher.reactivated",
+            target_type="user",
+            target_id=existing.id,
+            payload={
+                "email": existing.email,
+                "previous_supabase_user_id": str(previous),
+                **({"invite_id": str(invite.id)} if invite else {}),
+            },
+        )
+    )
+    await session.flush()
+    return existing
+
+
 async def provision_teacher(
     session: AsyncSession,
     claims: TeacherClaims,
@@ -132,6 +200,10 @@ async def provision_teacher(
                 )
                 await session.flush()
         return existing, False
+
+    relinked = await _relink_by_email(session, claims, settings)
+    if relinked is not None:
+        return relinked, False
 
     if not await may_create_account(session, settings, claims.email):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=NOT_INVITED)

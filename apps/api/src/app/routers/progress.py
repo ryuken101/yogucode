@@ -263,6 +263,7 @@ async def student_history(
                 Attempt.student_id == student.id,
                 Assignment.centre_id == principal.centre_id,
                 Assignment.mode == AssignmentMode.HOMEWORK,
+                Assignment.deleted_at.is_(None),  # type: ignore[union-attr]
             )
             .distinct()
             .order_by(col(Assignment.id).desc())

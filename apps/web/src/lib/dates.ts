@@ -13,9 +13,22 @@ const DUE = new Intl.DateTimeFormat('en-AU', {
   minute: '2-digit',
 })
 
-export function formatDue(iso: string | null | undefined): string {
+const DUE_WITH_YEAR = new Intl.DateTimeFormat('en-AU', {
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+})
+
+/** The year is shown only when it isn't this one: 1 Jan 2020 read as next January before
+ * 23 Oct 2026. */
+export function formatDue(iso: string | null | undefined, now = new Date()): string {
   if (!iso) return 'No due date'
-  return DUE.format(new Date(iso)).replace(/\s?(am|pm)$/i, (m) => m.toLowerCase())
+  const date = new Date(iso)
+  const format = date.getFullYear() === now.getFullYear() ? DUE : DUE_WITH_YEAR
+  return format.format(date).replace(/\s?(am|pm)$/i, (m) => m.toLowerCase())
 }
 
 export function isPast(iso: string | null | undefined, now = Date.now()): boolean {
@@ -41,3 +54,9 @@ export function timeLeft(endsAt: string, now = Date.now()): string {
   const seconds = Math.max(0, Math.ceil((new Date(endsAt).getTime() - now) / 1000))
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
 }
+
+/** Whole days until something in the Trash is deleted for good (never below 0). */
+export function daysLeft(purgeAfter: string, now = Date.now()): number {
+  return Math.max(0, Math.ceil((new Date(purgeAfter).getTime() - now) / 86_400_000))
+}
+

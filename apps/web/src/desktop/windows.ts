@@ -125,7 +125,9 @@ export type Action<A extends string = AppId> =
   | { type: 'layout'; items: { app: A; loc: Loc; geom: Geom | null }[] }
   | { type: 'restore'; wins: Win<A>[] }
   /** The class switcher moved: point class pages at the new class. */
-  | { type: 'retarget'; from: string; to: string }
+  /** The class changed. `homes` re-points windows on another class's page whose address
+   *  doesn't say so (a homework being marked, `/assignments/…`): app → where to go. */
+  | { type: 'retarget'; from: string; to: string; homes?: Partial<Record<A, string>> }
 
 export function reduce<A extends string = AppId>(wins: Win<A>[], action: Action<A>): Win<A>[] {
   switch (action.type) {
@@ -217,11 +219,18 @@ export function reduce<A extends string = AppId>(wins: Win<A>[], action: Action<
       return action.wins
     case 'retarget': {
       const prefix = `/classes/${action.from}`
-      return wins.map((w) =>
-        w.loc.pathname === prefix || w.loc.pathname.startsWith(`${prefix}/`)
-          ? { ...w, loc: { ...w.loc, pathname: `/classes/${action.to}${w.loc.pathname.slice(prefix.length)}`, state: undefined } }
-          : w,
-      )
+      return wins.map((w) => {
+        if (w.loc.pathname === prefix || w.loc.pathname.startsWith(`${prefix}/`)) {
+          return { ...w, loc: { ...w.loc, pathname: `/classes/${action.to}${w.loc.pathname.slice(prefix.length)}`, state: undefined } }
+        }
+        // Marking a homework from the class just left (23 Oct 2026: it stayed on screen
+        // under the new class's name).
+        const home = action.homes?.[w.app]
+        if (home && w.loc.pathname.startsWith('/assignments/')) {
+          return { ...w, loc: { pathname: home, search: '', hash: '' } }
+        }
+        return w
+      })
     }
   }
 }

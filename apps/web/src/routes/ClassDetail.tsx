@@ -31,6 +31,7 @@ import {
   useRoster,
   useRosterWithWithdrawn,
   useWithdrawStudent,
+  useTrashAction,
 } from '../lib/queries'
 import { Select } from '../components/Field'
 import { BulkPasteDialog } from './BulkPasteDialog'
@@ -56,6 +57,7 @@ export function ClassDetail() {
   const archive = useArchiveClass()
   const deleteClass = useDeleteClass()
   const deleteStudent = useDeleteStudent(classId)
+  const trashAction = useTrashAction()
   const isOwner = useMe({ retry: false }).data?.role === 'owner'
   const [confirmRemoveClass, setConfirmRemoveClass] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
@@ -116,8 +118,8 @@ export function ClassDetail() {
       {/* Children sign in with their own username and PIN (Ken's decision, 11 Oct 2026):
           no class code any more. */}
       <Notice tone="info">
-        Students go to <span className="font-mono">{window.location.host}</span> and sign in
-        with the username and PIN on their slip.
+        Students go to <span className="font-mono">{window.location.host}/join</span> and sign
+        in with the username and PIN on their slip.
       </Notice>
       <div className="mb-6" />
 
@@ -297,6 +299,18 @@ export function ClassDetail() {
             },
           )
         }
+        trashText="Or delete it: it goes to the Trash (in Files) and its children are signed out. You can restore it for 30 days; after that it and all its work are deleted for good."
+        onTrash={() =>
+          trashAction.mutate(
+            { action: 'trash', kind: 'class', id: classId },
+            {
+              onSuccess: () => {
+                setConfirmRemoveClass(false)
+                navigate('/classes')
+              },
+            },
+          )
+        }
         deleteText="This deletes the class with all its homework, quizzes, handed-in work and marks. The students’ accounts and their own files stay."
         onDelete={(confirmName) =>
           deleteClass.mutate(
@@ -310,7 +324,7 @@ export function ClassDetail() {
           )
         }
         busy={archive.isPending || deleteClass.isPending}
-        error={deleteClass.error ? messageFor(deleteClass.error) : null}
+        error={(deleteClass.error ?? trashAction.error) ? messageFor(deleteClass.error ?? trashAction.error) : null}
       />
 
       <BulkPasteDialog classId={classId} open={pasteOpen} onClose={() => setPasteOpen(false)} />
@@ -353,6 +367,14 @@ export function ClassDetail() {
           if (!removing) return
           withdraw.mutate(removing.id, { onSuccess: () => setRemoving(null) })
         }}
+        trashText="Or delete their account: it goes to the Trash (in Files), out of every class, and they can’t sign in. You can restore it for 30 days; after that it and everything they made are deleted for good."
+        onTrash={() => {
+          if (!removing) return
+          trashAction.mutate(
+            { action: 'trash', kind: 'student', id: removing.id },
+            { onSuccess: () => setRemoving(null) },
+          )
+        }}
         deleteText="This deletes their account and everything they made, in every class: their files, homework, quiz answers, marks and history."
         onDelete={(confirmName) => {
           if (!removing) return
@@ -362,7 +384,7 @@ export function ClassDetail() {
           )
         }}
         busy={withdraw.isPending || deleteStudent.isPending}
-        error={deleteStudent.error ? messageFor(deleteStudent.error) : null}
+        error={(deleteStudent.error ?? trashAction.error) ? messageFor(deleteStudent.error ?? trashAction.error) : null}
       />
 
 

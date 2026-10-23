@@ -309,7 +309,11 @@ test('a problem with no checks can still be checked and published', async () => 
   const { user } = renderEditor()
   await user.click(await screen.findByRole('button', { name: 'Check solution' }))
   await screen.findByText('The solution passes every check.')
-  expect(screen.getByText(/has no checks/)).toBeInTheDocument()
+  expect(screen.getAllByText(/has no checks/)[0]).toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: 'Publish' }))
+  // Asked first, since a child can't tell whether they're right (23 Oct 2026)...
+  expect(published).toBeNull()
+  await user.click(await screen.findByRole('button', { name: 'Publish anyway' }))
+  // ...and allowed, since some problems are open-ended.
   await waitFor(() => expect(published).not.toBeNull())
 })

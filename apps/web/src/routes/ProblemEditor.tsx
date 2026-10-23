@@ -28,13 +28,14 @@ import { Badge } from '../components/Badge'
 import { Button } from '../components/Button'
 import { Card, PageHeader } from '../components/Card'
 import { Dialog } from '../components/Dialog'
+import { TrashDialog } from '../components/TrashDialog'
 import { DotsPicker } from '../components/Dots'
 import { TextInput } from '../components/Field'
 import { Notice } from '../components/Notice'
 import { Spinner } from '../components/Spinner'
 import { api, type Schemas } from '../lib/api'
 import { messageFor } from '../lib/errors'
-import { useConcepts, useProblem, useProblemMutation } from '../lib/queries'
+import { useConcepts, useProblem, useProblemMutation, useTrashAction } from '../lib/queries'
 import {
   emptyPart,
   emptyProblem,
@@ -73,6 +74,9 @@ export function ProblemEditor() {
   const [checking, setChecking] = useState(false)
   const [studentPreview, setStudentPreview] = useState(false)
   const [confirmArchive, setConfirmArchive] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [confirmNoChecks, setConfirmNoChecks] = useState(false)
+  const trash = useTrashAction()
 
   const create = useProblemMutation((body: ProblemDoc) => api.createProblem(body))
   const save = useProblemMutation((body: ProblemDoc) => api.saveProblem(itemId ?? '', body))
@@ -107,6 +111,12 @@ export function ProblemEditor() {
   const exampleRuns = (key: string) => (verified ? verification.examples[key] : undefined)
   const gaps = loaded && !dirty ? loaded.publish_problems : []
   const warnings = loaded && !dirty ? loaded.publish_warnings : []
+  // A code problem with no checks can't tell a child whether they're right. Allowed —
+  // drawing and games are open-ended — but asked about first (Ken, 23 Oct 2026).
+  const noChecks = doc?.kind !== 'mcq' && leaves.some((l) => (l.leaf.tests ?? []).length === 0)
+  function publishNow() {
+    if (loaded) publish.mutate(doc?.kind === 'mcq' || !verification ? { updatedAt: loaded.updated_at } : verification)
+  }
   // A multiple-choice question has nothing to run: publishing needs only a clean save.
   const isMcq = doc?.kind === 'mcq'
 
@@ -242,6 +252,11 @@ export function ProblemEditor() {
               {status === 'archived' ? (
                 <Button variant="secondary" onClick={() => unarchive.mutate(undefined)}>
                   Bring back as a draft
+                </Button>
+              ) : null}
+              {itemId ? (
+                <Button variant="quiet" onClick={() => setConfirmDelete(true)}>
+                  Delete
                 </Button>
               ) : null}
             </div>
@@ -497,9 +512,7 @@ export function ProblemEditor() {
               disabled={
                 (!isMcq && !allPass) || dirty || gaps.length > 0 || publish.isPending || !loaded
               }
-              onClick={() =>
-                loaded && publish.mutate(isMcq || !verification ? { updatedAt: loaded.updated_at } : verification)
-              }
+              onClick={() => (noChecks ? setConfirmNoChecks(true) : publishNow())}
             >
               Publish
             </Button>
@@ -511,6 +524,11 @@ export function ProblemEditor() {
             {loaded ? (
               <Button variant="quiet" onClick={() => setConfirmArchive(true)}>
                 Archive draft
+              </Button>
+            ) : null}
+            {loaded ? (
+              <Button variant="quiet" onClick={() => setConfirmDelete(true)}>
+                Delete
               </Button>
             ) : null}
             <span className="text-sm text-muted">
@@ -573,6 +591,41 @@ export function ProblemEditor() {
         It leaves the bank, so it cannot be added to new sets. Sets that already use it keep
         it, and you can bring it back later.
       </Dialog>
+
+      <Dialog
+        open={confirmNoChecks}
+        title="Publish without checks?"
+        onClose={() => setConfirmNoChecks(false)}
+        confirm={{
+          label: 'Publish anyway',
+          onConfirm: () => {
+            setConfirmNoChecks(false)
+            publishNow()
+          },
+        }}
+      >
+        {leaves.length > 1 ? 'A part of this problem has' : 'This problem has'} no checks, so
+        children can Run it but can’t see whether they’re right. That suits open-ended work
+        like drawings or games.
+      </Dialog>
+
+      <TrashDialog
+        open={confirmDelete}
+        name="this problem"
+        note="A problem still in a lesson, homework or quiz can’t be deleted: take it out of there first, or archive it instead."
+        busy={trash.isPending}
+        error={trash.error ? messageFor(trash.error) : null}
+        onClose={() => {
+          trash.reset()
+          setConfirmDelete(false)
+        }}
+        onConfirm={() =>
+          trash.mutate(
+            { action: 'trash', kind: 'problem', id: itemId ?? '' },
+            { onSuccess: () => navigate('/problems') },
+          )
+        }
+      />
     </>
   )
 }

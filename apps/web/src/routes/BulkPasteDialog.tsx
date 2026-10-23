@@ -161,7 +161,7 @@ export function BulkPasteDialog({
                   key={`${entry.line}-${index}`}
                   className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-cream px-3 py-2"
                 >
-                  <span className="text-sm text-grape">{entry.display_name || entry.raw}</span>
+                  <span className="min-w-0 text-sm break-all text-grape">{entry.display_name || entry.raw}</span>
                   <Badge variant={verdict.tone === 'muted' ? 'muted' : verdict.tone}>
                     {verdict.label}
                   </Badge>

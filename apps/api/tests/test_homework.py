@@ -245,7 +245,12 @@ async def test_late_is_a_flag_not_a_refusal(
     client, session: AsyncSession, signed_in_student
 ) -> None:
     aria = await signed_in_student()
-    hw = await homework(client, session, aria, due_at="2020-01-01T16:00:00+11:00")
+    hw = await homework(client, session, aria)
+    # Set while due in the future, then the date passes.
+    assignment = await session.get(Assignment, uuid.UUID(hw["assignment"]["id"]))
+    assignment.due_at = utcnow() - timedelta(days=1)
+    session.add(assignment)
+    await session.flush()
 
     response = await client.post(f"/me/homework/{hw['assignment']['id']}/hand-in", json={})
     assert response.status_code == 200
@@ -517,3 +522,26 @@ async def test_an_illegal_move_says_what_state_it_is_in(
     )
     assert response.status_code == 409
     assert response.json()["detail"] == "This homework is draft"
+
+
+async def test_a_due_date_in_the_past_is_refused(
+    client, session: AsyncSession, signed_in_student
+) -> None:
+    aria = await signed_in_student()
+    hw = await homework(client, session, aria, set_it=False)
+    past = {"due_at": "2020-01-01T16:00:00+11:00"}
+    response = await client.patch(
+        f"/assignments/{hw['assignment']['id']}", json=past, headers=aria["headers"]
+    )
+    assert response.status_code == 422
+    assert "future" in response.json()["detail"]
+
+    # A draft whose date has passed since must get a new one before it is set.
+    assignment = await session.get(Assignment, uuid.UUID(hw["assignment"]["id"]))
+    assignment.due_at = utcnow() - timedelta(hours=1)
+    session.add(assignment)
+    await session.flush()
+    refused = await client.post(
+        f"/assignments/{hw['assignment']['id']}/set", headers=aria["headers"]
+    )
+    assert refused.status_code == 409

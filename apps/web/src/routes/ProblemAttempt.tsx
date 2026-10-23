@@ -29,6 +29,7 @@ import { McqAttempt } from '../components/McqAttempt'
 import { Dots } from '../components/Dots'
 import { Markdown } from '../components/Markdown'
 import { Notice } from '../components/Notice'
+import { QuizClock } from '../components/QuizClock'
 import { Spinner } from '../components/Spinner'
 import { CodeSurface } from '../editor/CodeSurface'
 import { RecoveredWork } from '../editor/RecoveredWork'
@@ -70,9 +71,13 @@ function BackLink({ mode, assignmentId }: { mode: string; assignmentId: string }
   }
   if (mode === 'quiz') {
     return (
-      <Link to={`/quiz/${assignmentId}`} className="text-sm text-grape-deep">
-        ← Back to the quiz
-      </Link>
+      <span className="flex w-full items-baseline gap-3">
+        <Link to={`/quiz/${assignmentId}`} className="text-sm text-grape-deep">
+          ← Back to the quiz
+        </Link>
+        {/* The clock stays in sight on every question (23 Oct 2026). */}
+        <QuizClock assignmentId={assignmentId} className="ml-auto text-lg" />
+      </span>
     )
   }
   return (
@@ -226,9 +231,13 @@ export function ProblemAttempt() {
     setRuns((current) => ({ ...current, [leaf.item_id]: (current[leaf.item_id] ?? 0) + 1 }))
   }
 
+  // The editor's text now, read when pressed. `code` is from the last render, and typing
+  // doesn't re-render, so using it ran the previous program (found 23 Oct 2026).
+  const currentCode = () => latest.current[codeKey] ?? startingCode
+
   function onRun() {
     autosave.flush()
-    python.run(code)
+    python.run(currentCode())
     record('run')
     studentLive().status({ kind: 'run', target: liveTarget })
     countRun()
@@ -237,7 +246,7 @@ export function ProblemAttempt() {
 
   async function onCheck() {
     autosave.flush()
-    const outcome = await python.check(code, toChecks(leaf.tests))
+    const outcome = await python.check(currentCode(), toChecks(leaf.tests))
     setResults((current) => ({ ...current, [leaf.item_id]: outcome }))
     countRun()
     if (outcome) {

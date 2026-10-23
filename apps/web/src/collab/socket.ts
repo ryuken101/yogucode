@@ -131,6 +131,7 @@ type QuizListener = (message: Message) => void
 class StudentLive {
   private readonly docs = new Map<string, DocListener>()
   private readonly quizListeners = new Set<QuizListener>()
+  private readonly signedOutListeners = new Set<() => void>()
   private focus: Message | null = null
   readonly socket: LiveSocket
 
@@ -144,6 +145,12 @@ class StudentLive {
           listener.help?.(false)
           listener.sendFull()
         }
+      },
+      // The server closes with 4401 the moment the session is revoked — a teacher's Sign
+      // out, a removal, a deletion (23 Oct 2026). Say so, so the page can stop at once
+      // rather than at the next save.
+      onClose: (_final, code) => {
+        if (code === 4401) this.signedOutListeners.forEach((listener) => listener())
       },
       onMessage: (message) => {
         const target = typeof message.target === 'string' ? message.target : null
@@ -164,6 +171,12 @@ class StudentLive {
         }
       },
     })
+  }
+
+  /** Called when the server signs this child out. Returns the function that stops it. */
+  onSignedOut(listener: () => void): () => void {
+    this.signedOutListeners.add(listener)
+    return () => this.signedOutListeners.delete(listener)
   }
 
   /** Register an open editor. Returns the function that unregisters it. */

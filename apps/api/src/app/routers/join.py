@@ -32,7 +32,7 @@ from app.auth.principal import (
     SettingsDep,
     unauthorised,
 )
-from app.auth.rate_limit import pin_failures
+from app.auth.rate_limit import client_ip, pin_failures
 from app.auth.student_session import mint_session, token_hash
 from app.db import get_session
 from app.models import (
@@ -103,7 +103,7 @@ async def student_sign_in(
     user_agent: Annotated[str | None, Header()] = None,
 ) -> StudentMeOut:
     """Username plus PIN, in exchange for a session cookie."""
-    device = request.client.host if request.client else "unknown"
+    device = client_ip(request)
     window = settings.pin_failure_window_minutes * 60
     if pin_failures.blocked(device, settings.pin_failures_per_device, window):
         raise HTTPException(

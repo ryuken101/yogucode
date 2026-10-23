@@ -33,7 +33,7 @@ from sqlalchemy import CheckConstraint, DateTime, Index, String, Text, UniqueCon
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
 
-from app.models.base import TimestampMixin, new_uuid, utcnow
+from app.models.base import TimestampMixin, TrashMixin, new_uuid, utcnow
 
 
 class SetStatus(StrEnum):
@@ -90,7 +90,7 @@ class SetItem(SQLModel, table=True):
     sort_order: int = Field(default=0)
 
 
-class Assignment(TimestampMixin, table=True):
+class Assignment(TimestampMixin, TrashMixin, table=True):
     __tablename__ = "assignments"
     __table_args__ = (
         CheckConstraint("mode IN ('classwork', 'homework', 'quiz')", name="mode"),

@@ -23,7 +23,9 @@ export interface SlipState {
 }
 
 export function SlipSheet() {
-  const host = window.location.host
+  // The children's sign-in, not the bare address: since 22 Oct 2026 that is the public
+  // landing page.
+  const host = `${window.location.host}/join`
   const { classId } = useParams<{ classId: string }>()
   const state = useLocation().state as SlipState | null
 

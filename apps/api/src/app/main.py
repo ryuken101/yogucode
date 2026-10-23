@@ -1,7 +1,9 @@
 """FastAPI application entrypoint."""
 
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 
+from app.limits import BodySizeLimit, validation_error
 from app.routers import (
     auth,
     centres,
@@ -24,9 +26,15 @@ from app.routers import (
     student_work,
     teacher_documents,
     teachers,
+    trash,
 )
+from app.trash import purge_loop
 
-app = FastAPI(title="Yogucode API")
+# The Trash's 30-day purge runs while the API is up. Production serves the API mounted
+# inside `app.server:site`, whose own lifespan starts it there (a mounted app's isn't run).
+app = FastAPI(title="Yogucode API", lifespan=purge_loop)
+app.add_middleware(BodySizeLimit)
+app.add_exception_handler(RequestValidationError, validation_error)
 
 app.include_router(auth.router)
 app.include_router(centres.router)
@@ -51,6 +59,7 @@ app.include_router(folders.student_router)
 app.include_router(folders.teacher_router)
 app.include_router(student_files.router)
 app.include_router(desktop.router)
+app.include_router(trash.router)
 
 
 @app.get("/health")

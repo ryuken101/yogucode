@@ -177,6 +177,44 @@ async def test_a_disabled_account_is_refused(client, make_token, session: AsyncS
     assert (await client.get("/auth/me", headers=auth(token))).status_code == 403
 
 
+async def test_a_recreated_supabase_account_finds_its_teacher_again(
+    client, make_token, session: AsyncSession
+) -> None:
+    """Same address, new Supabase id: the same teacher, not a second one. Before 23 Oct 2026
+    this made a duplicate ordinary teacher and stranded the owner."""
+    await client.post("/auth/teacher/session", headers=auth(make_token(email="ken@example.com")))
+    again = make_token(email="Ken@Example.com", sub=str(uuid.uuid4()))
+    response = await client.post("/auth/teacher/session", headers=auth(again))
+    assert response.status_code in (200, 201)
+
+    users = (await session.exec(select(User))).all()
+    assert len(users) == 1
+    assert users[0].role == UserRole.OWNER
+    assert (await client.get("/auth/me", headers=auth(again))).json()["role"] == "owner"
+    relinked = (
+        await session.exec(select(AuditLog).where(AuditLog.action == "teacher.relinked"))
+    ).all()
+    assert len(relinked) == 1
+
+
+async def test_a_removed_teacher_cannot_return_by_recreating_their_account(
+    client, make_token, session: AsyncSession
+) -> None:
+    await client.post("/auth/teacher/session", headers=auth(make_token(email="ken@example.com")))
+    await client.post("/auth/teacher/session", headers=auth(make_token(email="sam@example.com")))
+    sam = (await session.exec(select(User).where(User.email == "sam@example.com"))).one()
+    sam.status = UserStatus.DISABLED
+    session.add(sam)
+    await session.flush()
+
+    # sam@ is on the test allowlist, so the only thing in the way is the removal itself.
+    fresh = make_token(email="sam@example.com", sub=str(uuid.uuid4()))
+    response = await client.post("/auth/teacher/session", headers=auth(fresh))
+    assert response.status_code == 403
+    assert "removed" in response.json()["detail"]
+    assert (await session.exec(select(func.count()).select_from(User))).one() == 2
+
+
 async def test_an_unsigned_request_is_refused(client) -> None:
     assert (await client.get("/auth/me")).status_code == 401
     assert (await client.post("/auth/teacher/session")).status_code == 401

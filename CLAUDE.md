@@ -89,8 +89,14 @@ All in `apps/api/src/app/models/`. `base.py` explains each; the short version:
 - **Timestamps are set in Python, not `func.now()`.** In Postgres `now()` is transaction
   start time, so a row inserted and updated in one transaction would show an unchanged
   `updated_at`. `server_default` is kept only for rows inserted by hand.
-- **Archive, never delete.** `status` columns throughout, no cascading deletes. A student
-  leaving mid-term must not vaporise a term of history.
+- **Delete goes to the Trash** (Ken, 23 Oct 2026, replacing "archive, never delete").
+  `app/trash.py`: a trashed row keeps `status = archived` plus `deleted_at`/`deleted_by`/
+  `status_before_delete` (`TrashMixin`), is hidden by `app.scoping`, restorable for 30
+  days, then purged hourly (`purge_loop`, started by the app lifespan). Remove (a class at
+  term end, a withdrawn child) and Archive are still kept indefinitely. Purging a class or
+  child is owner-only with the name typed; children can't purge. `app/erase.py` is the only
+  hard-delete path. A new trashable table needs `TrashMixin`, an `_erase` branch and the
+  scoping filter.
 - `metadata.naming_convention` is set in `base.py` before any table is defined. Explicit
   `CheckConstraint(name=...)` values are therefore *short* (`"status"`, not
   `"ck_students_status"`) — the convention adds the prefix.

@@ -731,3 +731,16 @@ async def archive_snippet(
     await session.commit()
     await session.refresh(row)
     return SnippetOut.build(row)
+
+
+@router.post("/snippets/{snippet_id}/delete", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_snippet(
+    snippet_id: uuid.UUID, principal: CurrentTeacher, session: SessionDep
+) -> None:
+    """Delete a snippet for good (Ken, 23 Oct 2026). No Trash: it is one line of a
+    teacher's own wording with nothing attached — a comment already given keeps its text,
+    since marks copy the words rather than pointing at the snippet."""
+    row = await _owned_snippet(session, principal, snippet_id)
+    await session.delete(row)
+    session.add(audit_entry(principal, "snippet.deleted", "snippet", row.id))
+    await session.commit()

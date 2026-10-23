@@ -122,6 +122,8 @@ function createSink(getRunId: () => number): Sink {
 }
 
 let currentRunId = 0
+/** Set when a prompt ended without an answer (Stop, or nobody answered). */
+let stoppedAtPrompt = false
 const sink = createSink(() => currentRunId)
 
 type Job = Extract<ToWorker, { type: 'run' | 'check' | 'example' }>
@@ -164,9 +166,10 @@ async function init(message: Extract<ToWorker, { type: 'init' }>): Promise<void>
   /**
    * The synchronous stdin callback — the reason the page has to be cross-origin isolated.
    *
-   * Returning `null` signals EOF to Pyodide, which raises `EOFError` in Python. That is
-   * what a cancelled prompt should do: the run ends with a Python-level error the console
-   * can show, rather than the worker being killed and the session lost.
+   * Returning `null` signals EOF to Pyodide, which raises `EOFError` in Python, so the run
+   * unwinds normally rather than the worker being killed. `stoppedAtPrompt` remembers why,
+   * so `run` reports it as a stop, not as the child's error: before 23 Oct 2026 Stop at a
+   * prompt showed an EOFError traceback with Pyodide's own file paths in it.
    */
   pyodide.setStdin({
     stdin: () => {
@@ -175,7 +178,9 @@ async function init(message: Extract<ToWorker, { type: 'init' }>): Promise<void>
       // question has already been asked.
       sink.flush()
       post({ type: 'stdin', runId: currentRunId })
-      return awaitStdin(stdinBuffer)
+      const answer = awaitStdin(stdinBuffer)
+      if (answer === null) stoppedAtPrompt = true
+      return answer
     },
   })
 
@@ -214,6 +219,7 @@ async function run(message: Extract<ToWorker, { type: 'run' }>): Promise<void> {
     return
   }
   currentRunId = message.runId
+  stoppedAtPrompt = false
   sink.reset()
   // A Stop pressed before this run started must not kill it.
   clearInterrupt(interruptBuffer)
@@ -225,10 +231,10 @@ async function run(message: Extract<ToWorker, { type: 'run' }>): Promise<void> {
   } catch (error) {
     ok = false
     const text = error instanceof Error ? error.message : String(error)
-    interrupted = text.includes('KeyboardInterrupt')
+    interrupted = text.includes('KeyboardInterrupt') || (stoppedAtPrompt && text.includes('EOFError'))
     // Python's own traceback, which the console shows as not-yet: this is the student's
-    // mistake, not a failure of ours.
-    sink.write('stderr', `${text.trimEnd()}\n`)
+    // mistake, not a failure of ours. A stop is neither, and the page says so itself.
+    if (!interrupted) sink.write('stderr', `${text.trimEnd()}\n`)
   } finally {
     sink.flush()
     clearInterrupt(interruptBuffer)

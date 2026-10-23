@@ -270,6 +270,29 @@ async def test_too_many_wrong_pins_from_one_device_blocks_it(
     assert aria["username"] == "aria.k"
 
 
+async def test_a_forged_forwarded_address_is_still_the_same_device(
+    client, student_on_roster, test_settings, monkeypatch
+) -> None:
+    """Production trusts X-Forwarded-For for the scheme, and uvicorn then takes the
+    leftmost address — the one a client writes. A new one per guess must not make each
+    guess a new device (found 23 Oct 2026). On Fly the key is Fly-Client-IP."""
+    monkeypatch.setenv("FLY_APP_NAME", "magikid-code")
+    test_settings.pin_failures_per_device = 3
+    await student_on_roster()
+    for n in range(3):
+        await client.post(
+            "/auth/student/session",
+            json={"username": "nobody.at.all", "pin": WRONG_PIN},
+            headers={"X-Forwarded-For": f"10.0.0.{n}", "Fly-Client-IP": "203.0.113.7"},
+        )
+    blocked = await client.post(
+        "/auth/student/session",
+        json={"username": "nobody.at.all", "pin": WRONG_PIN},
+        headers={"X-Forwarded-For": "10.9.9.9", "Fly-Client-IP": "203.0.113.7"},
+    )
+    assert blocked.status_code == 429
+
+
 async def test_successful_sign_ins_do_not_count_against_the_device(
     client, student_on_roster, test_settings
 ) -> None:

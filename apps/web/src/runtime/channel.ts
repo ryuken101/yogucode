@@ -85,8 +85,8 @@ function views(buffer: SharedArrayBuffer): Views {
  * Park the worker until the page answers, and return what it said.
  *
  * `null` means the run should end: either the child pressed Stop, or nobody answered.
- * The caller turns that into a KeyboardInterrupt so Python unwinds normally rather than
- * the worker being killed.
+ * The worker hands Python an EOF, so it unwinds normally rather than the worker being
+ * killed, and reports the run as stopped rather than as the child's error.
  */
 export function awaitStdin(buffer: SharedArrayBuffer): string | null {
   const { header, text } = views(buffer)

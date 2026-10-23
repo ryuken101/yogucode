@@ -255,7 +255,13 @@ async def signed_in(client: httpx.AsyncClient, make_token):
     Takes an email so a test can sign in a second teacher at the same centre.
     """
 
+    # One Supabase account per address, as in real life: signing the same teacher in twice
+    # is the same account, not a second one (which would now re-link the teacher, 23 Oct
+    # 2026, and leave the first token pointing at nobody).
+    subs: dict[str, str] = {}
+
     async def _sign_in(email: str = "ken@example.com", **token_kwargs) -> dict[str, str]:
+        token_kwargs.setdefault("sub", subs.setdefault(email, str(uuid.uuid4())))
         token = make_token(email=email, **token_kwargs)
         response = await client.post(
             "/auth/teacher/session", headers={"Authorization": f"Bearer {token}"}

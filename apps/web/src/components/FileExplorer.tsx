@@ -77,7 +77,7 @@ export function FileExplorer({
   onDeleteFile,
   onDeleteFolder,
   busy = false,
-  restoreNote = 'Ask your teacher if you need them back.',
+  restoreNote = 'It goes to Recently deleted for 30 days, where you can put it back.',
 }: Props) {
   const [open, setOpen] = useState<Set<string>>(() => new Set())
   const [selected, setSelected] = useState<string | null>(null)

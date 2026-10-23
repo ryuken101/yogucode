@@ -16,6 +16,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { Button } from '../components/Button'
 import { Console } from '../components/Console'
+import { RecentlyDeleted } from '../components/RecentlyDeleted'
 import { FileExplorer } from '../components/FileExplorer'
 import { FileTabs } from '../components/FileTabs'
 import { Notice } from '../components/Notice'
@@ -56,7 +57,23 @@ export function Work() {
   const { tabs, activeId, open, close } = useOpenTabs(files.data, flush)
   const active = useDocument(activeId)
   const autosave = useAutosave(activeId)
+  // What the editor holds right now. Run must use this, not `code`: that is the saved copy,
+  // and typing doesn't re-render this page, so Run straight after typing ran the old program
+  // (found 23 Oct 2026). Keyed by file, so a switch never runs the previous file's text.
+  const typed = useRef<{ id: string | null; text: string } | null>(null)
+  const autosaveChange = autosave.onChange
+  const onEditorChange = useCallback(
+    (next: string) => {
+      typed.current = { id: activeId, text: next }
+      autosaveChange(next)
+    },
+    [activeId, autosaveChange],
+  )
   const [restored, setRestored] = useState<{ id: string; text: string | null } | null>(null)
+  // Recovered typing replaces what is in the editor, so it also replaces what Run uses.
+  useEffect(() => {
+    typed.current = null
+  }, [restored])
   useEffect(() => {
     flushRef.current = autosave.flush
   })
@@ -147,6 +164,7 @@ export function Work() {
   const code = (restored?.id === activeId ? restored.text : null) ?? active.data?.content ?? ''
   // A file's type is its name, as in VS Code: only .py runs (lib/fileType.ts).
   const python = isPythonFile(active.data?.title)
+  const latestCode = () => (typed.current?.id === activeId ? typed.current.text : code)
 
   if (state.status === 'unsupported') {
     return (
@@ -159,13 +177,16 @@ export function Work() {
   return (
     <div className="flex h-full gap-3 p-3">
       {/* The explorer: folders and files, VS Code style (Ken's decision, 11 Oct 2026). */}
-      <aside className="hidden w-56 shrink-0 sm:block">{explorer}</aside>
+      <aside className="hidden w-56 shrink-0 sm:block">
+        {explorer}
+        <RecentlyDeleted />
+      </aside>
       <div className="flex min-w-0 flex-1 flex-col gap-2">
       <div className="flex shrink-0 flex-wrap items-center gap-2">
         <Button
           variant="primary"
           onClick={() => {
-            run(code)
+            run(latestCode())
             record('run')
             studentLive().status({ kind: 'run' })
           }}
@@ -255,7 +276,7 @@ export function Work() {
             // Locked while the teacher helps (Ken's decision, 11 Oct 2026).
             readOnly={live.locked}
             language={languageOf(active.data?.title)}
-            onChange={autosave.onChange}
+            onChange={onEditorChange}
             onModel={live.bind}
             onCursor={live.onCursor}
             onEdit={(changes) => record(live.isRemote() ? 'teacher_edit' : 'edit', { changes })}

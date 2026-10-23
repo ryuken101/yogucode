@@ -19,14 +19,14 @@ import uuid
 from sqlalchemy import CheckConstraint, Index, String, text
 from sqlmodel import Field
 
-from app.models.base import TimestampMixin, new_uuid
+from app.models.base import TimestampMixin, TrashMixin, new_uuid
 from app.models.documents import DocumentStatus
 
 # The top level, for the per-folder unique-name indexes. Never a real folder id.
 TOP_LEVEL = "00000000-0000-0000-0000-000000000000"
 
 
-class StudentFolder(TimestampMixin, table=True):
+class StudentFolder(TimestampMixin, TrashMixin, table=True):
     __tablename__ = "student_folders"
     __table_args__ = (
         CheckConstraint("status IN ('active', 'archived')", name="status"),
@@ -48,7 +48,7 @@ class StudentFolder(TimestampMixin, table=True):
     status: DocumentStatus = Field(default=DocumentStatus.ACTIVE, sa_type=String)
 
 
-class TeacherFolder(TimestampMixin, table=True):
+class TeacherFolder(TimestampMixin, TrashMixin, table=True):
     __tablename__ = "teacher_folders"
     __table_args__ = (
         CheckConstraint("status IN ('active', 'archived')", name="status"),

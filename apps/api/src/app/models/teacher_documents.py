@@ -16,11 +16,11 @@ import uuid
 from sqlalchemy import CheckConstraint, Index, String, Text, text
 from sqlmodel import Field
 
-from app.models.base import TimestampMixin, new_uuid
+from app.models.base import TimestampMixin, TrashMixin, new_uuid
 from app.models.documents import DocumentStatus
 
 
-class TeacherDocument(TimestampMixin, table=True):
+class TeacherDocument(TimestampMixin, TrashMixin, table=True):
     """One file belonging to one teacher."""
 
     __tablename__ = "teacher_documents"

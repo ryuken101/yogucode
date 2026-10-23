@@ -31,11 +31,12 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.auth.principal import CurrentStudent, Principal
 from app.db import get_session
-from app.folders import STUDENT, get_folder, live_folder
+from app.folders import STUDENT, NoSlashes, live_folder
 from app.models import DocumentStatus, StudentDocument, TeacherDocument
 from app.models.base import utcnow
 from app.quiz import running_quiz_for
 from app.scoping import get_owned_document, list_student_documents
+from app.trash import put_in, restore
 
 router = APIRouter(prefix="/me/documents", tags=["documents"])
 
@@ -57,7 +58,7 @@ STARTER_CONTENT = '# Write your Python here, then press Run.\nprint("Hello!")\n'
 
 
 class DocumentIn(BaseModel):
-    title: str | None = Field(default=None, max_length=MAX_TITLE_LENGTH)
+    title: Annotated[str | None, NoSlashes] = Field(default=None, max_length=MAX_TITLE_LENGTH)
     content: str | None = Field(default=None, max_length=MAX_CONTENT_BYTES)
     # The folder to create it in; absent or null is the top level.
     folder_id: uuid.UUID | None = None
@@ -66,7 +67,9 @@ class DocumentIn(BaseModel):
 class DocumentPatch(BaseModel):
     """Every field optional — an absent field means "leave it alone"."""
 
-    title: str | None = Field(default=None, min_length=1, max_length=MAX_TITLE_LENGTH)
+    title: Annotated[str | None, NoSlashes] = Field(
+        default=None, min_length=1, max_length=MAX_TITLE_LENGTH
+    )
     content: str | None = Field(default=None, max_length=MAX_CONTENT_BYTES)
     # Present means "move it": a folder id, or null for the top level.
     folder_id: uuid.UUID | None = None
@@ -261,17 +264,22 @@ async def change_file(
 async def archive_document(
     document_id: uuid.UUID, principal: CurrentStudent, session: SessionDep
 ) -> DocumentOut:
-    """Put a file away. It leaves the list; it stays in the database.
+    """Delete a file: it goes to the child's Trash ("Recently deleted") for 30 days.
 
-    Archive rather than delete, as everywhere else. A child who tidies up mid-term should
-    not be able to destroy a term of their own work with one tap.
+    Never straight to gone (Ken, 23 Oct 2026): a child who tidies up mid-term must not be
+    able to destroy a term of their own work with one tap, and a child cannot empty their
+    Trash themselves (`app/trash.py`).
     """
-    return await archive_file(session, await get_owned_document(session, principal, document_id))
+    record = await get_owned_document(session, principal, document_id)
+    return await archive_file(session, principal, record)
 
 
-async def archive_file(session: AsyncSession, record: StudentDocument) -> DocumentOut:
-    if record.status != DocumentStatus.ARCHIVED:
-        record.status = DocumentStatus.ARCHIVED
+async def archive_file(
+    session: AsyncSession, principal: Principal, record: StudentDocument
+) -> DocumentOut:
+    """Into the Trash. `principal` is the child, or a teacher acting as them (`as_child`)."""
+    if record.deleted_at is None:
+        put_in(record, principal.subject_id, utcnow())
         session.add(record)
         await session.commit()
         await session.refresh(record)
@@ -282,31 +290,9 @@ async def archive_file(session: AsyncSession, record: StudentDocument) -> Docume
 async def restore_document(
     document_id: uuid.UUID, principal: CurrentStudent, session: SessionDep
 ) -> DocumentOut:
-    """Bring an archived file back.
-
-    The partial unique index only covers live files, so a restore can collide with a file
-    created since — hence the same 409 as a rename, rather than an IntegrityError.
-    """
+    """Bring a file back out of the Trash (`app/trash.py`), to its folder if that is still
+    there and to the top level if not. A name taken meanwhile is a 409, as for a rename."""
     record = await get_owned_document(session, principal, document_id)
-    if record.status != DocumentStatus.ACTIVE:
-        record.status = DocumentStatus.ACTIVE
-        record.updated_at = utcnow()
-        record.folder_id = await _still_live(session, principal, record.folder_id)
-        session.add(record)
-        try:
-            await session.commit()
-        except IntegrityError as exc:
-            await session.rollback()
-            raise _duplicate_title() from exc
-        await session.refresh(record)
+    if record.deleted_at is not None:
+        record = await restore(session, principal, "file", record.id)
     return DocumentOut.build_full(record)
-
-
-async def _still_live(
-    session: AsyncSession, principal: CurrentStudent, folder_id: uuid.UUID | None
-) -> uuid.UUID | None:
-    """The file's folder if it still exists; the top level if it was deleted meanwhile."""
-    if folder_id is None:
-        return None
-    folder = await get_folder(session, STUDENT, principal, folder_id)
-    return folder.id if folder.status == DocumentStatus.ACTIVE else None

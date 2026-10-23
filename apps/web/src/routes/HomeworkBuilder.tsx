@@ -15,7 +15,7 @@ import { TextInput } from '../components/Field'
 import { Notice } from '../components/Notice'
 import { Spinner } from '../components/Spinner'
 import { api, type Schemas } from '../lib/api'
-import { formatDue, fromLocalInput, toLocalInput } from '../lib/dates'
+import { formatDue, fromLocalInput, isPast, toLocalInput } from '../lib/dates'
 import { messageFor } from '../lib/errors'
 import { useClass, useHomework, useHomeworkMutation } from '../lib/queries'
 import { ProblemListEditor, type ProblemRow } from '../problems/ProblemListEditor'
@@ -81,7 +81,11 @@ export function HomeworkBuilder() {
   const fixed = status !== 'draft'
   const update = (patch: Partial<Draft>) => setDraft({ ...draft, ...patch })
   const back = () => navigate(`/classes/${classId}`)
-  const ready = draft.title.trim() && draft.rows.length > 0 && draft.due
+  // A due date being chosen must be in the future; one already set may fall due (the
+  // server's rule too, 23 Oct 2026).
+  const dueChanged = !existing.data || toLocalInput(existing.data.due_at) !== draft.due
+  const pastDue = Boolean(draft.due) && dueChanged && isPast(fromLocalInput(draft.due))
+  const ready = draft.title.trim() && draft.rows.length > 0 && draft.due && !pastDue
 
   async function saveDraft() {
     const saved = await save.mutateAsync(draft!)
@@ -92,7 +96,10 @@ export function HomeworkBuilder() {
   async function saveAndSet() {
     const saved = await save.mutateAsync(draft!)
     await setIt.mutateAsync(saved.id)
-    back()
+    // Stay with the class's work, and say it happened (23 Oct 2026).
+    navigate(`/classes/${classId}/work`, {
+      state: { notice: `“${saved.title}” is set — children can see it now.` },
+    })
   }
 
   const error = save.error ?? setIt.error
@@ -120,7 +127,9 @@ export function HomeworkBuilder() {
             type="datetime-local"
             value={draft.due}
             onChange={(e) => update({ due: e.target.value })}
-            hint={draft.due ? null : 'Choose a day and time'}
+            hint={
+              !draft.due ? 'Choose a day and time' : pastDue ? 'That time has passed. Choose one in the future.' : null
+            }
           />
         </div>
         <label className="mt-4 flex items-center gap-2 text-sm text-grape">

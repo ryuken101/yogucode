@@ -28,9 +28,9 @@ pink-red on a wrong answer is still red.
 That rule is encoded in components rather than left to each screen. `Badge` and `Notice`
 take semantic tones (`not-yet`, `good`, `muted`, `system-error`), and the only way to
 reach the error colour is to type the words `system-error`, which is long enough to make
-you think. `Button` has **no danger variant**: nothing in this product deletes, and the two actions
-that feel destructive — rotating a join code, signing a student out — confirm in a
-`Dialog` with words instead of being coloured red.
+you think. `Button` has **no danger variant**. Delete goes to the Trash (`components/TrashDialog.tsx`)
+and says so in words; deleting for good, rotating a join code and signing a student out
+all confirm in a `Dialog` with words instead of being coloured red.
 
 `src/components/palette.test.tsx` (including "strawberry is never a state") and the colour
 assertions in `src/routes/Join.test.tsx` fail the build if this slips. Deleting them is
@@ -47,7 +47,8 @@ not a way to make a failure go away.
   student cookie) and attaches a teacher bearer token when there is a session, read fresh
   each request because supabase-js rotates it.
 - `src/lib/queries.ts` owns the TanStack Query keys. Mutations invalidate the key they
-  affect and no more.
+  affect and no more. The one exception is the Trash (`useTrashAction`, `useRestoreMine`):
+  a class, a child or a problem can appear on any page, so they refetch everything.
 
 **Closing the tab signs you out** (Ken's decision, 10 Oct 2026). Teachers: supabase-js
 uses `sessionStorage`. Students: `markStudentTab()` on sign-in (`Join.tsx`), and
@@ -238,7 +239,19 @@ and a hint to rename. New files are `untitled.py` (server-side default); existin
 `.py` added by migration `258a4e916260`. Icons follow the type (`FileCode2` / `FileText`).
 
 While a teacher helps, `useLiveDoc().locked` is true and the child's editor is read-only
-with a calm `info` banner (Work, ProblemAttempt).
+with a calm `info` banner (Work, ProblemAttempt). The lock is the browser's only: the
+teacher's edits are saved by the child's own autosave, so the server must not refuse it.
+
+**Run and Check use the editor's text now, never `code`** (23 Oct 2026). Typing doesn't
+re-render the page, so `code` is the saved copy or the last render's: Run within ~2 s of
+typing ran the previous program. `Work.tsx` and `MyCode.tsx` keep a `typed` ref per file;
+`ProblemAttempt.tsx` reads `latest.current` inside the handler.
+
+**Delete is the Trash** (Ken, 23 Oct 2026; the rules are `apps/api/src/app/trash.py`).
+Teachers have a Trash page (`routes/Trash.tsx`, `/trash`, in the Files app) with Restore and
+Delete for good. Children have Recently deleted (`components/RecentlyDeleted.tsx`, under
+the Code app's explorer and in Files) with Put back only. Anything there is deleted for
+good after 30 days.
 
 ## My code (teachers' own files)
 
@@ -305,6 +318,10 @@ a fake model (`monacoBinding.test.ts`), including two people typing at once.
   its full state. A teacher's connection (`useLiveClass`) sends its token first and
   **never queues**: a flushed keystroke that beat the token would be read as a failed
   sign-in.
+- **A revoked session closes the socket** (23 Oct 2026). The server closes a child's
+  socket with 4401 the moment a teacher signs them out, removes or deletes them
+  (`hub.kick_student`), and `RequireStudent` re-asks who they are, which sends the tab to
+  `/join`. 4401/4403/4404 never reconnect. A removed teacher's sockets close with 4403.
 - **An edit that arrives from the teacher is flagged** (`binding.applyingRemote`), and
   recorded as `teacher_edit` rather than as the child's own `edit`.
 - **Yjs, the live view and every page that imports them are lazy-loaded.** `/join` must

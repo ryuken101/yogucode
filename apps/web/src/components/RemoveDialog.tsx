@@ -1,11 +1,12 @@
 /**
- * Remove a student from a class, or remove a class: **Archive** or **Delete entirely**
- * (Ken's decisions, 11 Oct 2026).
+ * Remove a student from a class, or remove a class: **Archive**, **Delete** (to the Trash,
+ * 23 Oct 2026) or **Delete entirely** (Ken's decisions, 11 and 23 Oct 2026).
  *
- * Archive is the everyday choice and can be undone. Delete entirely cannot, so it is shown
- * only to the centre's owner (the server enforces the same) and asks for the name to be
- * typed. Per the palette rule there is no red anywhere: the words carry the warning, and
- * the button is the ordinary primary style.
+ * Archive is the everyday choice, kept for as long as anyone wants it. Delete puts it in
+ * the Trash: restorable for 30 days, then gone. Delete entirely cannot be undone, so it is
+ * shown only to the centre's owner (the server enforces the same) and asks for the name to
+ * be typed. Per the palette rule there is no red anywhere: the words carry the warning,
+ * and the button is the ordinary primary style.
  */
 
 import { useState } from 'react'
@@ -29,6 +30,9 @@ interface Props {
   /** What deleting entirely removes, and what it keeps. */
   deleteText: string
   onDelete: (confirmName: string) => void
+  /** What going to the Trash means for this one; with `onTrash`, offers Delete to anyone. */
+  trashText?: string
+  onTrash?: () => void
   busy?: boolean
   error?: string | null
 }
@@ -47,6 +51,8 @@ export function RemoveDialog({
   onArchive,
   deleteText,
   onDelete,
+  trashText,
+  onTrash,
   busy = false,
   error = null,
 }: Props) {
@@ -98,6 +104,16 @@ export function RemoveDialog({
       confirm={{ label: archiveLabel, disabled: busy, onConfirm: onArchive }}
     >
       <p>{archiveText}</p>
+      {onTrash ? (
+        <div className="mt-4 rounded-2xl bg-cream px-4 py-3 ring-1 ring-line">
+          <p className="text-sm">{trashText}</p>
+          <div className="mt-2">
+            <Button variant="secondary" disabled={busy} onClick={onTrash}>
+              Delete (to the Trash)
+            </Button>
+          </div>
+        </div>
+      ) : null}
       {isOwner ? (
         <div className="mt-4 rounded-2xl bg-cream px-4 py-3 ring-1 ring-line">
           <p className="text-sm">

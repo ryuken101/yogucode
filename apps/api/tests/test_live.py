@@ -185,7 +185,14 @@ async def test_a_late_teacher_rebuilds_the_document_from_the_log(
         await next_of(child, "ready")
         for update, full in [("OLD", True), ("X", False), ("NEW", True), ("Y", False)]:
             await child.send_json({"type": "doc", "target": target, "update": update, "full": full})
-        await child.send_json({"type": "status", "status": {"kind": "check", "passed": 1}})
+        check = {
+            "kind": "check",
+            "target": target,
+            "passed": 1,
+            "total": 2,
+            "compile_error": None,
+        }
+        await child.send_json({"type": "status", "status": check})
         await asyncio.sleep(0.1)
 
         async with aconnect_ws("http://test/live/teacher", ws_client) as teacher:
@@ -201,7 +208,7 @@ async def test_a_late_teacher_rebuilds_the_document_from_the_log(
         assert snapshot["docs"] == [
             {"target": target, "student_id": aria["student_id"], "updates": ["NEW", "Y"]}
         ]
-        assert snapshot["students"][0]["recent"] == [{"kind": "check", "passed": 1}]
+        assert snapshot["students"][0]["recent"] == [check]
 
 
 async def test_a_teacher_types_into_a_childs_open_editor(
@@ -321,6 +328,71 @@ async def test_help_locks_the_childs_editor_and_leaving_unlocks_it(
         assert (unlocked["target"], unlocked["on"]) == (target, False)
 
 
+async def test_signing_a_child_out_closes_their_live_connection(
+    client, session, signed_in_student
+) -> None:
+    """Sockets check the session only when they open. Before 23 Oct 2026 a child signed out
+    by their teacher kept streaming to the Live view and could still be helped."""
+    aria = await signed_in_student()
+    async with (
+        sockets(client) as ws_client,
+        aconnect_ws("http://test/live/teacher", ws_client) as teacher,
+    ):
+        await teacher.send_json(
+            {"type": "auth", "token": token_of(aria["headers"]), "class_id": aria["class_id"]}
+        )
+        await next_of(teacher, "snapshot")
+        async with aconnect_ws("http://test/live/student", ws_client) as child:
+            await next_of(child, "ready")
+            await next_of(teacher, "joined")
+
+            await client.post(
+                f"/students/{aria['student_id']}/sessions/revoke", headers=aria["headers"]
+            )
+            assert await closed_with(child) == 4401
+            assert (await next_of(teacher, "left"))["student_id"] == aria["student_id"]
+
+
+async def test_a_child_cannot_put_made_up_things_on_the_teachers_screen() -> None:
+    from app.routers.live import clean_status
+
+    mine = {"attempt:a1"}
+    assert clean_status({"kind": "run", "evil": "x" * 9000}, mine) == {"kind": "run"}
+    assert clean_status({"kind": "check", "target": "attempt:a1", "passed": 3, "total": 3}, mine)
+    # A result for an editor this connection never proved it owns is dropped...
+    assert (
+        clean_status({"kind": "check", "target": "attempt:zz", "passed": 3, "total": 3}, mine)
+        is None
+    )
+    # ...as is nonsense, and anything that is not a known kind.
+    assert (
+        clean_status({"kind": "check", "target": "attempt:a1", "passed": 9, "total": 3}, mine)
+        is None
+    )
+    assert (
+        clean_status({"kind": "check", "target": "attempt:a1", "passed": "3", "total": 3}, mine)
+        is None
+    )
+    assert clean_status({"kind": "html", "text": "<b>"}, mine) is None
+    assert clean_status("run", mine) is None
+
+
+async def test_removing_a_teacher_closes_their_live_views_and_unlocks_help() -> None:
+    import uuid
+
+    local, class_id, _, child = await _room_with_child()
+    removed, other = uuid.uuid4(), uuid.uuid4()
+    theirs, colleague = ClosableSocket(), ClosableSocket()
+    await local.join_teacher(class_id, theirs, removed)
+    await local.join_teacher(class_id, colleague, other)
+    await local.help(class_id, theirs, "document:d1", on=True)
+
+    await local.kick_teacher(removed)
+    assert theirs.closed == 4403
+    assert colleague.closed is None
+    assert child.helps() == [("document:d1", True), ("document:d1", False)]
+
+
 class FakeSocket:
     def __init__(self) -> None:
         self.sent: list[dict] = []
@@ -330,6 +402,15 @@ class FakeSocket:
 
     def helps(self) -> list[tuple[str, bool]]:
         return [(m["target"], m["on"]) for m in self.sent if m["type"] == "help"]
+
+
+class ClosableSocket(FakeSocket):
+    def __init__(self) -> None:
+        super().__init__()
+        self.closed: int | None = None
+
+    async def close(self, code: int) -> None:
+        self.closed = code
 
 
 async def _room_with_child():

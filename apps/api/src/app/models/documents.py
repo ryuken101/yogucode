@@ -23,7 +23,7 @@ from enum import StrEnum
 from sqlalchemy import CheckConstraint, Index, String, Text, text
 from sqlmodel import Field
 
-from app.models.base import TimestampMixin, new_uuid
+from app.models.base import TimestampMixin, TrashMixin, new_uuid
 
 
 class DocumentStatus(StrEnum):
@@ -31,7 +31,7 @@ class DocumentStatus(StrEnum):
     ARCHIVED = "archived"
 
 
-class StudentDocument(TimestampMixin, table=True):
+class StudentDocument(TimestampMixin, TrashMixin, table=True):
     """One file belonging to one student."""
 
     __tablename__ = "student_documents"

@@ -15,6 +15,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from fastapi import HTTPException, status
+from pydantic import AfterValidator
+from pydantic_core import PydanticCustomError
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -27,9 +29,20 @@ from app.models import (
     TeacherDocument,
     TeacherFolder,
 )
-from app.models.base import utcnow
 
 MAX_FOLDER_NAME = 80
+
+
+def _no_slashes(value: str | None) -> str | None:
+    """A file or folder name is one name, never a path. Nothing builds a path from it today,
+    but `../../etc/passwd` was accepted as a file name (23 Oct 2026), and an export or a
+    download one day should not have to remember that."""
+    if value is not None and ("/" in value or "\\" in value):
+        raise PydanticCustomError("name_slash", "A name can’t contain / or \\")
+    return value
+
+
+NoSlashes = AfterValidator(_no_slashes)
 
 
 @dataclass(frozen=True)
@@ -181,33 +194,28 @@ async def update_folder(
 async def delete_folder(
     session: AsyncSession, owner: Owner, principal: Principal, folder_id: uuid.UUID
 ) -> int:
-    """Archive a folder, everything inside it, and every file in them. Returns files moved.
+    """Put a folder in the Trash, with everything inside it. Returns how many files went.
 
-    Archive, not delete: a child tidying up must never destroy their work, and the files
-    can be brought back.
+    Since 23 Oct 2026 Delete is the Trash (`app/trash.py`): restorable for 30 days, then
+    gone. The caller's principal must be the folder's owner (or a teacher acting as the
+    child, `scoping.as_child`).
     """
+    from app.trash import trash  # app.trash uses this module's tree helpers
+
     record = await get_folder(session, owner, principal, folder_id)
-    ids = subtree(await all_folders(session, owner, principal), record.id)
-    now = utcnow()
-    for folder in await all_folders(session, owner, principal):
-        if folder.id in ids and folder.status == DocumentStatus.ACTIVE:
-            folder.status = DocumentStatus.ARCHIVED
-            folder.updated_at = now
-            session.add(folder)
-    files = (
+    files_before = (
         await session.exec(
             select(owner.document).where(
-                owner.document.folder_id.in_(ids),
+                owner.document.folder_id.in_(  # type: ignore[union-attr]
+                    subtree(await all_folders(session, owner, principal), record.id)
+                ),
                 owner.document.status == DocumentStatus.ACTIVE,
                 *_mine(owner, owner.document, principal),
             )
         )
     ).all()
-    for file in files:
-        file.status = DocumentStatus.ARCHIVED
-        session.add(file)
-    await session.commit()
-    return len(files)
+    await trash(session, principal, "folder", record.id)
+    return len(files_before)
 
 
 async def _commit(session: AsyncSession, on_clash) -> None:

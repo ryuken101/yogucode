@@ -75,6 +75,7 @@ const MarkingHome = lazy(() => import('./MarkingHome').then((m) => ({ default: m
 const MyWork = lazy(() => import('./MyWork').then((m) => ({ default: m.MyWork })))
 const Finder = lazy(() => import('../desktop/Finder').then((m) => ({ default: m.Finder })))
 const ChildFile = lazy(() => import('./ChildFile').then((m) => ({ default: m.ChildFile })))
+const Trash = lazy(() => import('./Trash').then((m) => ({ default: m.Trash })))
 
 export const studentPages = (
   <>
@@ -86,6 +87,13 @@ export const studentPages = (
       path="/lesson/:assignmentId/:itemId"
       element={<Loading><ProblemAttempt /></Loading>}
     />
+    {/* The same page for a homework or quiz question, so it opens in the Work window it was
+        chosen from rather than in Lessons (23 Oct 2026). */}
+    <Route
+      path="/homework/:assignmentId/:itemId"
+      element={<Loading><ProblemAttempt /></Loading>}
+    />
+    <Route path="/quiz/:assignmentId/:itemId" element={<Loading><ProblemAttempt /></Loading>} />
     <Route path="/my-work" element={<Loading><MyWork /></Loading>} />
     <Route path="/my-files" element={<Loading><Finder /></Loading>} />
     <Route path="/my-desk" element={null} />
@@ -118,6 +126,7 @@ export const teacherPages = (
     <Route path="/curriculum" element={<Loading><Curriculum /></Loading>} />
     <Route path="/teachers" element={<Loading><Teachers /></Loading>} />
     <Route path="/my-code" element={<Loading><MyCode /></Loading>} />
+    <Route path="/trash" element={<Loading><Trash /></Loading>} />
     <Route path="/problems" element={<Loading><ProblemBank /></Loading>} />
     {/* One key for both: saving a new problem navigates from /new to /:itemId, and a
         remount there would drop the solution check that was running. */}

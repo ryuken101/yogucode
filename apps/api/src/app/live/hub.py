@@ -44,6 +44,10 @@ class Socket(Protocol):
     async def send_json(self, data: Any) -> None: ...
 
 
+# Close codes, as in `routers/live.py`.
+SIGNED_OUT, REMOVED = 4401, 4403
+
+
 @dataclass
 class StudentPresence:
     socket: Socket
@@ -66,6 +70,8 @@ class Room:
     class_id: uuid.UUID
     students: dict[uuid.UUID, StudentPresence] = field(default_factory=dict)
     teachers: set[Socket] = field(default_factory=set)
+    # Whose each teacher socket is, so removing a teacher can close what they have open.
+    teacher_users: dict[Socket, uuid.UUID] = field(default_factory=dict)
     docs: dict[str, DocLog] = field(default_factory=dict)
     # Which teachers are helping in which child's editor. While a target has anyone in its
     # set, the child's editor is locked (Ken's decision, 11 Oct 2026): they watch rather
@@ -77,6 +83,14 @@ async def _send(socket: Socket, message: dict[str, Any]) -> None:
     """Send, and shrug off a socket that has just gone — its own handler will clean up."""
     with contextlib.suppress(Exception):
         await socket.send_json(message)
+
+
+async def _close(socket: Socket, code: int) -> None:
+    """Close from the server side. The socket's own handler then sees the disconnect."""
+    close = getattr(socket, "close", None)
+    if close is not None:
+        with contextlib.suppress(Exception):
+            await close(code)
 
 
 class Hub:
@@ -110,6 +124,27 @@ class Hub:
             return  # a newer tab already replaced this one
         del room.students[student_id]
         await self._to_teachers(room, {"type": "left", "student_id": str(student_id)})
+
+    async def kick_student(self, student_id: uuid.UUID) -> None:
+        """A child's sessions were revoked (signed out by a teacher, removed, archived,
+        trashed or erased): close their live connection now, not when they next reconnect.
+
+        Sockets check the session only when they open, so without this a signed-out child
+        kept streaming to the Live view and receiving Help (found 23 Oct 2026).
+        """
+        for room in list(self.rooms.values()):
+            presence = room.students.pop(student_id, None)
+            if presence is None:
+                continue
+            for target in [t for t, log in room.docs.items() if log.student_id == student_id]:
+                del room.docs[target]
+                room.helping.pop(target, None)
+            await self._to_teachers(room, {"type": "left", "student_id": str(student_id)})
+            await _close(presence.socket, SIGNED_OUT)
+
+    def is_helped(self, target: str) -> bool:
+        """Whether a teacher is helping in this editor, so the child's own saves must wait."""
+        return any(room.helping.get(target) for room in self.rooms.values())
 
     async def focus(self, class_id: uuid.UUID, student_id: uuid.UUID, focus: dict[str, Any]):
         room = self.room(class_id)
@@ -184,10 +219,14 @@ class Hub:
 
     # --- teachers -------------------------------------------------------------------
 
-    async def join_teacher(self, class_id: uuid.UUID, socket: Socket) -> None:
+    async def join_teacher(
+        self, class_id: uuid.UUID, socket: Socket, user_id: uuid.UUID | None = None
+    ) -> None:
         """Watch a class: receive everyone's presence, recent activity and documents."""
         room = self.room(class_id)
         room.teachers.add(socket)
+        if user_id is not None:
+            room.teacher_users[socket] = user_id
         await _send(
             socket,
             {
@@ -212,8 +251,17 @@ class Hub:
         if room is None:
             return
         room.teachers.discard(socket)
+        room.teacher_users.pop(socket, None)
         for target in [t for t, helpers in room.helping.items() if socket in helpers]:
             await self.help(class_id, socket, target, on=False)
+
+    async def kick_teacher(self, user_id: uuid.UUID) -> None:
+        """The owner removed this teacher: close every class they are watching. Leaving
+        unlocks any editor they were helping in, exactly as if their tab had closed."""
+        for room in list(self.rooms.values()):
+            for socket in [s for s, uid in room.teacher_users.items() if uid == user_id]:
+                await self.leave_teacher(room.class_id, socket)
+                await _close(socket, REMOVED)
 
     async def help(self, class_id: uuid.UUID, socket: Socket, target: str, *, on: bool) -> bool:
         """A teacher starts or stops helping in a child's editor. False if no such editor.

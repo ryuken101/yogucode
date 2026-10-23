@@ -184,6 +184,8 @@ export function usePython({ onRunFinished }: { onRunFinished?: (run: RunFinished
           break
         case 'done':
           setState({ status: 'idle' })
+          // A stop is said in the console's own voice, not as a Python traceback.
+          if (message.interrupted) append({ stream: 'system', text: '\n── stopped ──\n' })
           finished.current?.({
             ok: message.ok,
             interrupted: message.interrupted,

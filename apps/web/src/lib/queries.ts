@@ -17,7 +17,7 @@ import {
   type UseQueryOptions,
 } from '@tanstack/react-query'
 import { afterSaves } from '../editor/inflight'
-import { api, type FolderScope, type ProblemFilters, type Schemas } from './api'
+import { api, type TrashKind, type FolderScope, type ProblemFilters, type Schemas } from './api'
 import { ApiError } from './errors'
 import { isStudentTab } from './tabSession'
 
@@ -62,6 +62,8 @@ export const keys = {
   todayGrid: (classId: string) => ['today-grid', classId] as const,
   history: (studentId: string) => ['history', studentId] as const,
   childFolders: (studentId: string) => ['child-folders', studentId] as const,
+  trash: ['trash'] as const,
+  myTrash: ['my-trash'] as const,
   childDocuments: (studentId: string) => ['child-documents', studentId] as const,
   childDocument: (studentId: string, documentId: string) =>
     ['child-document', studentId, documentId] as const,
@@ -806,3 +808,41 @@ export function useActiveQuiz() {
     staleTime: 0,
   })
 }
+
+/* --- the Trash (23 Oct 2026) ----------------------------------------------------------- */
+
+export function useTrash() {
+  return useQuery({ queryKey: keys.trash, queryFn: api.listTrash, staleTime: 0 })
+}
+
+export function useMyTrash() {
+  return useQuery({ queryKey: keys.myTrash, queryFn: api.listMyTrash, staleTime: 0 })
+}
+
+type TrashAction =
+  | { action: 'trash' | 'restore'; kind: TrashKind; id: string }
+  | { action: 'purge'; kind: TrashKind; id: string; confirmName?: string }
+
+/**
+ * Delete, Restore or Delete for good. Anything can be on any page (a class, a problem, a
+ * child), so everything is refetched afterwards rather than guessing which keys it touched.
+ */
+export function useTrashAction() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (a: TrashAction) => {
+      if (a.action === 'purge') return api.purgeFromTrash(a.kind, a.id, a.confirmName)
+      return a.action === 'trash' ? api.trash(a.kind, a.id) : api.restoreFromTrash(a.kind, a.id)
+    },
+    onSuccess: () => client.invalidateQueries(),
+  })
+}
+
+export function useRestoreMine() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ kind, id }: { kind: 'file' | 'folder'; id: string }) => api.restoreMine(kind, id),
+    onSuccess: () => client.invalidateQueries(),
+  })
+}
+

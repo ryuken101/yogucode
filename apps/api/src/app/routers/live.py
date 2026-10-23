@@ -54,7 +54,6 @@ AUTH_TIMEOUT_SECONDS = 10
 # A Yjs update for a child-sized program. The full state of a 64 KB file, base64-encoded,
 # fits comfortably; anything larger is not a keystroke.
 MAX_UPDATE_CHARS = 200_000
-MAX_STATUS_CHARS = 4_000
 
 
 class LockedSocket:
@@ -73,6 +72,9 @@ class LockedSocket:
         async with self._lock:
             await self.websocket.send_json(data)
 
+    async def close(self, code: int) -> None:
+        await self.websocket.close(code=code)
+
 
 def parse_target(target: object) -> tuple[str, uuid.UUID] | None:
     """`attempt:<uuid>` or `document:<uuid>` — the two kinds of editor there are."""
@@ -85,6 +87,50 @@ def parse_target(target: object) -> tuple[str, uuid.UUID] | None:
         return kind, uuid.UUID(raw)
     except ValueError:
         return None
+
+
+# What a child's page may report, field by field. Anything else is dropped rather than
+# relayed: a child's browser is not trusted to put arbitrary things on a teacher's screen
+# (found 23 Oct 2026). A child can still report a check result their own browser computed —
+# checks run there by design (spec §4) — but only for an editor this connection has proven
+# it owns.
+_STATUS_INTS = ("chars", "level", "passed", "total")
+_STATUS_KINDS = {
+    "run": (),
+    "error": ("text",),
+    "paste": ("chars",),
+    "choice": (),
+    "hint": ("level",),
+    "check": ("passed", "total", "compile_error"),
+}
+
+
+def clean_status(raw: object, targets: set[str]) -> dict[str, Any] | None:
+    """The status with only known fields of the right type, or None to drop it."""
+    if not isinstance(raw, dict) or raw.get("kind") not in _STATUS_KINDS:
+        return None
+    kind = raw["kind"]
+    clean: dict[str, Any] = {"kind": kind}
+    for name in _STATUS_KINDS[kind]:
+        value = raw.get(name)
+        if name in _STATUS_INTS:
+            if not isinstance(value, int) or isinstance(value, bool) or not 0 <= value <= 100_000:
+                return None
+            clean[name] = value
+        elif name == "compile_error":
+            if value is not None and not isinstance(value, str):
+                return None
+            clean[name] = value[:500] if isinstance(value, str) else None
+        else:  # text
+            clean[name] = value[:500] if isinstance(value, str) else ""
+    if kind == "check" and clean["passed"] > clean["total"]:
+        return None
+    target = raw.get("target")
+    if isinstance(target, str) and target in targets:
+        clean["target"] = target
+    elif kind == "check":
+        return None  # a result is only worth showing against an editor they own
+    return clean
 
 
 async def _close(websocket: WebSocket, code: int) -> None:
@@ -139,8 +185,8 @@ async def student_socket(websocket: WebSocket, session: SessionDep, settings: Se
                 if focus is None or (isinstance(focus, dict) and len(str(focus)) < 1_000):
                     await hub.focus(klass.id, student.id, focus)
             elif kind == "status":
-                status = message.get("status")
-                if isinstance(status, dict) and len(str(status)) < MAX_STATUS_CHARS:
+                status = clean_status(message.get("status"), presence.targets)
+                if status is not None:
                     await hub.status(klass.id, student.id, status)
             elif kind == "cursor":
                 target, offset = message.get("target"), message.get("offset")
@@ -195,7 +241,7 @@ async def teacher_socket(
     await session.commit()
 
     socket = LockedSocket(websocket)
-    await hub.join_teacher(klass.id, socket)
+    await hub.join_teacher(klass.id, socket, user.id)
     try:
         while True:
             message = await websocket.receive_json()

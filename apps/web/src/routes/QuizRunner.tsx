@@ -8,14 +8,14 @@
  */
 
 import { useQueryClient } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Link, useParams } from 'react-router'
 import { Badge } from '../components/Badge'
 import { Dots } from '../components/Dots'
 import { Notice } from '../components/Notice'
+import { QuizClock } from '../components/QuizClock'
 import { Spinner } from '../components/Spinner'
 import { studentLive } from '../collab/socket'
-import { timeLeft } from '../lib/dates'
 import { messageFor } from '../lib/errors'
 import { keys, useActiveQuiz, useSheet } from '../lib/queries'
 import { Returned } from './HomeworkSheet'
@@ -25,12 +25,6 @@ export function QuizRunner() {
   const client = useQueryClient()
   const sheet = useSheet(assignmentId)
   const active = useActiveQuiz()
-  const [now, setNow] = useState(() => Date.now())
-
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1_000)
-    return () => clearInterval(timer)
-  }, [])
 
   // The end arrives as a push; refresh what the page knows when it does.
   useEffect(
@@ -60,11 +54,7 @@ export function QuizRunner() {
       <div className="flex flex-wrap items-baseline gap-3">
         <h1 className="font-display font-semibold text-2xl text-grape">{data.title}</h1>
         <Badge variant="muted">Quiz</Badge>
-        {running ? (
-          <span className="ml-auto font-mono text-2xl text-grape" aria-label="time left">
-            {timeLeft(running.ends_at, now)}
-          </span>
-        ) : null}
+        <QuizClock assignmentId={assignmentId} className="ml-auto text-2xl" />
       </div>
 
       {data.returned ? (
@@ -78,7 +68,7 @@ export function QuizRunner() {
             {problems.map((leaf, index) => (
               <li key={leaf.problem_id}>
                 <Link
-                  to={`/lesson/${assignmentId}/${leaf.problem_id}`}
+                  to={`/quiz/${assignmentId}/${leaf.problem_id}`}
                   className="flex items-center gap-4 rounded-2xl bg-surface px-5 py-4 ring-1 ring-line hover:ring-grape"
                 >
                   <span className="w-6 text-muted">{index + 1}.</span>

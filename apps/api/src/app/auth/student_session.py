@@ -33,6 +33,7 @@ from sqlmodel import select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.config import Settings
+from app.live.hub import hub
 from app.models import Student, StudentSession, StudentStatus
 from app.models.base import utcnow
 
@@ -58,9 +59,9 @@ async def revoke_live_sessions(
 ) -> int:
     """Revoke every unrevoked session for a student. Returns how many.
 
-    Used by three callers with the same meaning — the teacher's kick, archiving a student,
-    and signing in somewhere new — which is why it is here rather than inline in any of
-    them.
+    Used by every caller with the same meaning — the teacher's Sign out, withdrawing,
+    archiving or erasing a student or class, and signing in somewhere new — which is why it
+    is here rather than inline in any of them. It also closes the child's live connection.
     """
     when = now or utcnow()
     live = (
@@ -80,6 +81,8 @@ async def revoke_live_sessions(
             )
             .values(revoked_at=when)
         )
+    # A live socket checks the session only when it opens; close any that are open now.
+    await hub.kick_student(student_id)
     return len(live)
 
 

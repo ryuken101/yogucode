@@ -116,11 +116,12 @@ async def test_deleting_one_child_leaves_another_childs_work_alone(
 ):
     aria = await child_with_work(client, session, signed_in_student)
     bella = await child_with_work(client, session, signed_in_student, name="Bella N")
-    await client.post(
+    deleted = await client.post(
         f"/students/{aria['student_id']}/delete",
         json={"confirm_name": "Aria K"},
         headers=aria["headers"],
     )
+    assert deleted.status_code == 204, deleted.text
     bid = uuid.UUID(bella["student_id"])
     assert await count(session, Student, Student.id == bid) == 1
     assert await count(session, Attempt, Attempt.student_id == bid) == 1

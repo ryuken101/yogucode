@@ -334,7 +334,9 @@ def _chosen_pin(raw: str | None) -> str:
     if is_weak(pin):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="That PIN is too easy to guess — try another, or press Random",
+            detail=(
+                "That PIN is too easy to guess — try another, or leave it blank for a random one"
+            ),
         )
     return pin
 

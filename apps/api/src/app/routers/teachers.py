@@ -23,6 +23,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.auth.principal import CurrentTeacher, Principal
 from app.auth.provisioning import normalise_email, pending_invite
 from app.db import get_session
+from app.live.hub import hub
 from app.models import (
     ActorType,
     AuditLog,
@@ -204,3 +205,5 @@ async def remove_teacher(user_id: uuid.UUID, owner: CurrentOwner, session: Sessi
     session.add(user)
     session.add(_audit(owner, "teacher.removed", "user", user.id, email=user.email))
     await session.commit()
+    # Open Live views check the account only when they connect: close them now.
+    await hub.kick_teacher(user.id)

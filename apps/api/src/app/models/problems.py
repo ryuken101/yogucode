@@ -49,7 +49,7 @@ from sqlalchemy import CheckConstraint, Index, String, Text, UniqueConstraint, t
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
 
-from app.models.base import TimestampMixin, new_uuid
+from app.models.base import TimestampMixin, TrashMixin, new_uuid
 
 
 class ItemKind(StrEnum):
@@ -73,7 +73,7 @@ class TestKind(StrEnum):
     COMPARE = "compare"
 
 
-class Item(TimestampMixin, table=True):
+class Item(TimestampMixin, TrashMixin, table=True):
     __tablename__ = "items"
     __table_args__ = (
         CheckConstraint("kind IN ('code', 'mcq')", name="kind"),

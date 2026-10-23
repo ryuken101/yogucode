@@ -39,10 +39,19 @@ export function RequireStudent({ pages = studentPages }: { pages?: ReactNode }) 
   // ending reaches this child at once, not just at the next 15-second check.
   useEffect(() => {
     if (!me) return
-    return studentLive().onQuiz(() => {
+    const live = studentLive()
+    const stopQuiz = live.onQuiz(() => {
       void client.invalidateQueries({ queryKey: keys.activeQuiz })
       void client.invalidateQueries({ queryKey: keys.home })
     })
+    // Signed out by a teacher: ask again who this is, which sends them to /join now.
+    const stopSignedOut = live.onSignedOut(() => {
+      void client.invalidateQueries({ queryKey: keys.studentMe })
+    })
+    return () => {
+      stopQuiz()
+      stopSignedOut()
+    }
   }, [me, client])
 
   if (isPending) {
@@ -63,6 +72,7 @@ export function RequireStudent({ pages = studentPages }: { pages?: ReactNode }) 
   if (quiz) {
     const allowed =
       location.pathname === `/quiz/${quiz.assignment_id}` ||
+      location.pathname.startsWith(`/quiz/${quiz.assignment_id}/`) ||
       location.pathname.startsWith(`/lesson/${quiz.assignment_id}/`)
     if (!allowed) return <Navigate to={`/quiz/${quiz.assignment_id}`} replace />
   }

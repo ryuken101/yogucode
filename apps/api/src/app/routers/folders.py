@@ -19,6 +19,7 @@ from app.folders import (
     MAX_FOLDER_NAME,
     STUDENT,
     TEACHER,
+    NoSlashes,
     Owner,
     create_folder,
     delete_folder,
@@ -31,14 +32,16 @@ SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
 class FolderIn(BaseModel):
-    name: str = Field(min_length=1, max_length=MAX_FOLDER_NAME)
+    name: Annotated[str, NoSlashes] = Field(min_length=1, max_length=MAX_FOLDER_NAME)
     parent_id: uuid.UUID | None = None
 
 
 class FolderPatch(BaseModel):
     """Rename and/or move. An absent field is left alone; `parent_id: null` is the top."""
 
-    name: str | None = Field(default=None, min_length=1, max_length=MAX_FOLDER_NAME)
+    name: Annotated[str | None, NoSlashes] = Field(
+        default=None, min_length=1, max_length=MAX_FOLDER_NAME
+    )
     parent_id: uuid.UUID | None = None
 
 

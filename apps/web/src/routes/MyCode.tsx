@@ -61,7 +61,23 @@ export function MyCode() {
   const autosave = useAutosave(activeId, (id, content) =>
     save.mutateAsync({ documentId: id, content }),
   )
+  // What the editor holds right now. Run must use this, not `code`: that is the saved copy,
+  // and typing doesn't re-render this page, so Run straight after typing ran the old program
+  // (found 23 Oct 2026). Keyed by file, so a switch never runs the previous file's text.
+  const typed = useRef<{ id: string | null; text: string } | null>(null)
+  const autosaveChange = autosave.onChange
+  const onEditorChange = useCallback(
+    (next: string) => {
+      typed.current = { id: activeId, text: next }
+      autosaveChange(next)
+    },
+    [activeId, autosaveChange],
+  )
   const [restored, setRestored] = useState<{ id: string; text: string | null } | null>(null)
+  // Recovered typing replaces what is in the editor, so it also replaces what Run uses.
+  useEffect(() => {
+    typed.current = null
+  }, [restored])
   useEffect(() => {
     flushRef.current = autosave.flush
   })
@@ -133,6 +149,7 @@ export function MyCode() {
   // Recovered typing, shown in place of the saved copy until it is saved (17 Oct 2026).
   const code = (restored?.id === activeId ? restored.text : null) ?? active.data?.content ?? ''
   const python = isPythonFile(active.data?.title)
+  const latestCode = () => (typed.current?.id === activeId ? typed.current.text : code)
 
   if (state.status === 'unsupported') {
     return <Notice tone="system-error">{state.reason}</Notice>
@@ -142,7 +159,7 @@ export function MyCode() {
     <>
       <Button
         variant="primary"
-        onClick={() => run(code)}
+        onClick={() => run(latestCode())}
         disabled={busy || loading || !python}
         title={python ? undefined : 'Only .py files can run'}
       >
@@ -175,7 +192,7 @@ export function MyCode() {
       onDeleteFile={(id) => archive.mutate(id)}
       onDeleteFolder={(folderId) => folderActions.remove.mutate(folderId)}
       busy={create.isPending}
-      restoreNote=""
+      restoreNote="It goes to the Trash (in Files) for 30 days, where you can restore it."
     />
   )
 
@@ -270,7 +287,7 @@ export function MyCode() {
             onSave={autosave.save}
             key={activeId ?? 'none'}
             value={code}
-            onChange={autosave.onChange}
+            onChange={onEditorChange}
             fontSize={presenting ? PRESENT_FONT_SIZE : 15}
             language={languageOf(active.data?.title)}
           />

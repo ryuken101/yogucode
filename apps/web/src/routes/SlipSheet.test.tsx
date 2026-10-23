@@ -60,5 +60,5 @@ test('the warning is not-yet, because reissuing is a fix and not a fault', () =>
 test('a slip tells the child which address to type', () => {
   renderAt(state)
   expect(screen.getAllByText('Go to')).toHaveLength(2)
-  expect(screen.getAllByText(window.location.host)).toHaveLength(2)
+  expect(screen.getAllByText(`${window.location.host}/join`)).toHaveLength(2)
 })

@@ -83,6 +83,8 @@ async def get_owned_class(
             select(Class).where(
                 Class.id == class_id,
                 Class.centre_id == principal.centre_id,
+                # In the Trash is gone, as far as everything but the Trash is concerned.
+                Class.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
     ).one_or_none()
@@ -104,7 +106,10 @@ async def list_owned_classes(
     separate sort column, and no tie-break problem when two classes are created in the
     same transaction.
     """
-    statement = select(Class).where(Class.centre_id == principal.centre_id)
+    statement = select(Class).where(
+        Class.centre_id == principal.centre_id,
+        Class.deleted_at.is_(None),  # type: ignore[union-attr]
+    )
     if not include_archived:
         statement = statement.where(Class.status == ClassStatus.ACTIVE)
     statement = statement.order_by(Class.id.desc())  # type: ignore[attr-defined]
@@ -124,6 +129,7 @@ async def get_owned_student(
             select(Student).where(
                 Student.id == student_id,
                 Student.centre_id == principal.centre_id,
+                Student.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
     ).one_or_none()
@@ -144,7 +150,10 @@ async def list_owned_students(
     Students in no class at all are included — a child can exist at the centre between
     terms, and a list that hid them would make them unreachable to re-enrol.
     """
-    statement = select(Student).where(Student.centre_id == principal.centre_id)
+    statement = select(Student).where(
+        Student.centre_id == principal.centre_id,
+        Student.deleted_at.is_(None),  # type: ignore[union-attr]
+    )
     if not include_archived:
         statement = statement.where(Student.status == StudentStatus.ACTIVE)
     statement = statement.order_by(func.lower(Student.display_name))
@@ -175,6 +184,7 @@ async def list_class_roster(
             Enrolment.class_id == class_id,
             Class.centre_id == principal.centre_id,
             Student.centre_id == principal.centre_id,
+            Student.deleted_at.is_(None),  # type: ignore[union-attr]
         )
     )
     if not include_withdrawn:
@@ -417,7 +427,11 @@ async def get_owned_course(
 ) -> Course:
     found = (
         await session.exec(
-            select(Course).where(Course.id == course_id, Course.centre_id == principal.centre_id)
+            select(Course).where(
+                Course.id == course_id,
+                Course.centre_id == principal.centre_id,
+                Course.deleted_at.is_(None),  # type: ignore[union-attr]
+            )
         )
     ).one_or_none()
     if found is None:
@@ -429,7 +443,10 @@ async def list_owned_courses(
     session: AsyncSession, principal: Principal, include_archived: bool = False
 ) -> Sequence[Course]:
     """Every course at the principal's centre, newest first — by id, as classes are."""
-    statement = select(Course).where(Course.centre_id == principal.centre_id)
+    statement = select(Course).where(
+        Course.centre_id == principal.centre_id,
+        Course.deleted_at.is_(None),  # type: ignore[union-attr]
+    )
     if not include_archived:
         statement = statement.where(Course.status == CurriculumStatus.ACTIVE)
     statement = statement.order_by(Course.id.desc())  # type: ignore[attr-defined]
@@ -439,7 +456,11 @@ async def list_owned_courses(
 async def get_owned_unit(session: AsyncSession, principal: Principal, unit_id: uuid.UUID) -> Unit:
     found = (
         await session.exec(
-            select(Unit).where(Unit.id == unit_id, Unit.centre_id == principal.centre_id)
+            select(Unit).where(
+                Unit.id == unit_id,
+                Unit.centre_id == principal.centre_id,
+                Unit.deleted_at.is_(None),  # type: ignore[union-attr]
+            )
         )
     ).one_or_none()
     if found is None:
@@ -452,7 +473,11 @@ async def get_owned_lesson(
 ) -> Lesson:
     found = (
         await session.exec(
-            select(Lesson).where(Lesson.id == lesson_id, Lesson.centre_id == principal.centre_id)
+            select(Lesson).where(
+                Lesson.id == lesson_id,
+                Lesson.centre_id == principal.centre_id,
+                Lesson.deleted_at.is_(None),  # type: ignore[union-attr]
+            )
         )
     ).one_or_none()
     if found is None:
@@ -473,7 +498,9 @@ async def list_course_outline(
     left out with it, since a lesson in a unit nobody can see is not reachable to edit.
     """
     unit_statement = select(Unit).where(
-        Unit.course_id == course_id, Unit.centre_id == principal.centre_id
+        Unit.course_id == course_id,
+        Unit.centre_id == principal.centre_id,
+        Unit.deleted_at.is_(None),  # type: ignore[union-attr]
     )
     if not include_archived:
         unit_statement = unit_statement.where(Unit.status == CurriculumStatus.ACTIVE)
@@ -487,6 +514,7 @@ async def list_course_outline(
     lesson_statement = select(Lesson).where(
         Lesson.unit_id.in_(unit_ids),  # type: ignore[attr-defined]
         Lesson.centre_id == principal.centre_id,
+        Lesson.deleted_at.is_(None),  # type: ignore[union-attr]
     )
     if not include_archived:
         lesson_statement = lesson_statement.where(Lesson.status == CurriculumStatus.ACTIVE)
@@ -544,6 +572,7 @@ async def get_owned_item(session: AsyncSession, principal: Principal, item_id: u
                 Item.id == item_id,
                 Item.centre_id == principal.centre_id,
                 Item.parent_id.is_(None),  # type: ignore[union-attr]
+                Item.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
     ).one_or_none()
@@ -570,6 +599,7 @@ async def list_owned_items(
         Item.centre_id == principal.centre_id,
         Item.parent_id.is_(None),  # type: ignore[union-attr]
         Item.status.in_(list(statuses)),  # type: ignore[attr-defined]
+        Item.deleted_at.is_(None),  # type: ignore[union-attr]
     )
     if difficulty is not None:
         statement = statement.where(Item.difficulty == difficulty)
@@ -694,6 +724,7 @@ async def get_owned_assignment(
             select(Assignment).where(
                 Assignment.id == assignment_id,
                 Assignment.centre_id == principal.centre_id,
+                Assignment.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
     ).one_or_none()

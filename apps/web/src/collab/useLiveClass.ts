@@ -135,6 +135,9 @@ export function useLiveClass(classId: string) {
             displayName: String(message.display_name),
             online: true,
             focus: (message.focus as LiveFocus | null) ?? null,
+            // A new connection starts with no history on the server, so none here either:
+            // an old "all passing" must not outlive the connection that reported it.
+            recent: [],
           })
           break
         case 'left':

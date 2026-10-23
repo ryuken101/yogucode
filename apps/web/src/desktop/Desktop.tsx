@@ -259,7 +259,15 @@ function DesktopCore({ role, pages, name, subtitle, isOwner, classes, saved, loc
     if (next === classId) return
     const prev = classId
     setClassIdState(next)
-    if (prev) act({ type: 'retarget', from: prev, to: next })
+    if (!prev) return
+    // A window marking the old class's homework goes to the new class's Marking.
+    const marking = appDef(role, 'marking')
+    act({
+      type: 'retarget',
+      from: prev,
+      to: next,
+      homes: marking ? { marking: marking.home({ ...ctx, classId: next }) } : {},
+    })
   }
 
   function layout(items: [AppId, string, Geom | null][]) {

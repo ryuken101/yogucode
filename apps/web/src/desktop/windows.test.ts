@@ -90,6 +90,18 @@ describe('arranging', () => {
     wins = reduce(wins, { type: 'retarget', from: 'c1', to: 'c2' })
     expect(wins.map((w) => w.loc.pathname)).toEqual(['/classes/c2/live', '/my-code'])
   })
+
+  test('changing class takes a homework being marked to the new class’s Marking', () => {
+    let wins = show([], 'marking', '/assignments/a1/mark/p1')
+    wins = show(wins, 'library', '/problems/p1')
+    wins = reduce(wins, {
+      type: 'retarget',
+      from: 'c1',
+      to: 'c2',
+      homes: { marking: '/classes/c2/marking' },
+    })
+    expect(wins.map((w) => w.loc.pathname)).toEqual(['/classes/c2/marking', '/problems/p1'])
+  })
 })
 
 describe('snap zones', () => {

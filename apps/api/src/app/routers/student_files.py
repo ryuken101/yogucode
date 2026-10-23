@@ -31,8 +31,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.audit import audit_entry
 from app.auth.principal import CurrentTeacher, Principal
 from app.db import get_session
-from app.folders import STUDENT, create_folder, delete_folder, update_folder
-from app.models import DocumentStatus, Student
+from app.folders import STUDENT, NoSlashes, create_folder, delete_folder, update_folder
+from app.models import Student
 from app.routers.documents import (
     MAX_TITLE_LENGTH,
     DocumentIn,
@@ -90,7 +90,9 @@ async def read_a_childs_document(
 class ChildDocumentPatch(BaseModel):
     """Rename and/or move a child's file. Never its content — see the module docstring."""
 
-    title: str | None = Field(default=None, min_length=1, max_length=MAX_TITLE_LENGTH)
+    title: Annotated[str | None, NoSlashes] = Field(
+        default=None, min_length=1, max_length=MAX_TITLE_LENGTH
+    )
     # Present means "move it": a folder id, or null for the top level.
     folder_id: uuid.UUID | None = None
 
@@ -172,10 +174,11 @@ async def change_a_childs_document(
 async def archive_a_childs_document(
     student_id: uuid.UUID, document_id: uuid.UUID, principal: CurrentTeacher, session: SessionDep
 ) -> DocumentOut:
-    student, _ = await _child(session, principal, student_id)
+    student, child = await _child(session, principal, student_id)
     record = await get_child_document(session, principal, student_id, document_id)
-    if record.status != DocumentStatus.ARCHIVED:
+    if record.deleted_at is None:
         session.add(
             _audit(principal, student, "deleted", document_id=str(document_id), title=record.title)
         )
-    return await archive_file(session, record)
+    # Into the child's own Trash, as if they had deleted it: they can restore it.
+    return await archive_file(session, child, record)

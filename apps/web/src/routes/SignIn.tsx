@@ -169,9 +169,9 @@ export function SignIn() {
       </p>
       <p className="mt-2 text-center text-sm text-muted">
         Students don’t sign in here —{' '}
-        <a href="/" className="text-grape-deep underline">
-          go to the front page
-        </a>
+        <Link to="/join" className="text-grape-deep underline">
+          student sign-in
+        </Link>
       </p>
     </JoinShell>
   )

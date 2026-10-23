@@ -35,6 +35,7 @@ from starlette.datastructures import Headers
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.main import app as api
+from app.trash import purge_loop
 
 # Not every slim image's mimetypes table knows these, and a .wasm served as
 # application/octet-stream fails Pyodide's streaming compile.
@@ -135,7 +136,7 @@ def create_site(
     if redirect_hosts is None:
         redirect_hosts = os.getenv("REDIRECT_HOSTS", "")
     canonical, redirects = canonical_host.strip().lower(), host_list(redirect_hosts)
-    site = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+    site = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=purge_loop)
     site.mount("/api", api)
 
     # HEAD as well as GET: uptime monitors and some link checkers only ask for headers.

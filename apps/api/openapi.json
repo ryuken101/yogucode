@@ -3770,6 +3770,24 @@
         "title": "PublishIn",
         "type": "object"
       },
+      "PurgeIn": {
+        "properties": {
+          "confirm_name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirm Name"
+          }
+        },
+        "title": "PurgeIn",
+        "type": "object"
+      },
       "QuestionMarkingOut": {
         "properties": {
           "assignment_id": {
@@ -5416,6 +5434,87 @@
           "text"
         ],
         "title": "TranscriptLine",
+        "type": "object"
+      },
+      "TrashEntryOut": {
+        "properties": {
+          "can_purge": {
+            "title": "Can Purge",
+            "type": "boolean"
+          },
+          "deleted_at": {
+            "format": "date-time",
+            "title": "Deleted At",
+            "type": "string"
+          },
+          "deleted_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted By"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "class",
+              "student",
+              "problem",
+              "course",
+              "unit",
+              "lesson",
+              "homework",
+              "file",
+              "folder"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "needs_name": {
+            "title": "Needs Name",
+            "type": "boolean"
+          },
+          "purge_after": {
+            "format": "date-time",
+            "title": "Purge After",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "name",
+          "detail",
+          "deleted_at",
+          "deleted_by",
+          "purge_after",
+          "can_purge",
+          "needs_name"
+        ],
+        "title": "TrashEntryOut",
         "type": "object"
       },
       "UnitOut": {
@@ -10806,7 +10905,7 @@
     },
     "/me/documents/{document_id}/archive": {
       "post": {
-        "description": "Put a file away. It leaves the list; it stays in the database.\n\nArchive rather than delete, as everywhere else. A child who tidies up mid-term should\nnot be able to destroy a term of their own work with one tap.",
+        "description": "Delete a file: it goes to the child's Trash (\"Recently deleted\") for 30 days.\n\nNever straight to gone (Ken, 23 Oct 2026): a child who tidies up mid-term must not be\nable to destroy a term of their own work with one tap, and a child cannot empty their\nTrash themselves (`app/trash.py`).",
         "operationId": "archive_document_me_documents__document_id__archive_post",
         "parameters": [
           {
@@ -10866,7 +10965,7 @@
     },
     "/me/documents/{document_id}/restore": {
       "post": {
-        "description": "Bring an archived file back.\n\nThe partial unique index only covers live files, so a restore can collide with a file\ncreated since \u2014 hence the same 409 as a rename, rather than an IntegrityError.",
+        "description": "Bring a file back out of the Trash (`app/trash.py`), to its folder if that is still\nthere and to the top level if not. A name taken meanwhile is a 409, as for a rename.",
         "operationId": "restore_document_me_documents__document_id__restore_post",
         "parameters": [
           {
@@ -11562,6 +11661,124 @@
         ]
       }
     },
+    "/me/trash": {
+      "get": {
+        "operationId": "list_my_trash_me_trash_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TrashEntryOut"
+                  },
+                  "title": "Response List My Trash Me Trash Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List My Trash",
+        "tags": [
+          "trash"
+        ]
+      }
+    },
+    "/me/trash/{kind}/{item_id}/restore": {
+      "post": {
+        "operationId": "restore_mine_me_trash__kind___item_id__restore_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "enum": [
+                "file",
+                "folder"
+              ],
+              "title": "Kind",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Restore Mine",
+        "tags": [
+          "trash"
+        ]
+      }
+    },
     "/quizzes/{quiz_id}": {
       "get": {
         "operationId": "read_quiz_quizzes__quiz_id__get",
@@ -12060,6 +12277,59 @@
           }
         },
         "summary": "Archive Snippet",
+        "tags": [
+          "marking"
+        ]
+      }
+    },
+    "/snippets/{snippet_id}/delete": {
+      "post": {
+        "description": "Delete a snippet for good (Ken, 23 Oct 2026). No Trash: it is one line of a\nteacher's own wording with nothing attached \u2014 a comment already given keeps its text,\nsince marks copy the words rather than pointing at the snippet.",
+        "operationId": "delete_snippet_snippets__snippet_id__delete_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "snippet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Snippet Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Snippet",
         "tags": [
           "marking"
         ]
@@ -13678,7 +13948,7 @@
     },
     "/teacher/documents/{document_id}/archive": {
       "post": {
-        "description": "Close a file's tab. It leaves the list; it stays in the database.",
+        "description": "Delete a file: into the teacher's Trash for 30 days (`app/trash.py`).",
         "operationId": "archive_teacher_document_teacher_documents__document_id__archive_post",
         "parameters": [
           {
@@ -13738,6 +14008,7 @@
     },
     "/teacher/documents/{document_id}/restore": {
       "post": {
+        "description": "Out of the Trash, to its folder if that is still there (`app/trash.py`).",
         "operationId": "restore_teacher_document_teacher_documents__document_id__restore_post",
         "parameters": [
           {
@@ -14243,6 +14514,285 @@
         "summary": "Remove Teacher",
         "tags": [
           "teachers"
+        ]
+      }
+    },
+    "/trash": {
+      "get": {
+        "operationId": "list_trash_trash_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TrashEntryOut"
+                  },
+                  "title": "Response List Trash Trash Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Trash",
+        "tags": [
+          "trash"
+        ]
+      }
+    },
+    "/trash/{kind}/{item_id}": {
+      "post": {
+        "operationId": "put_in_trash_trash__kind___item_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "enum": [
+                "class",
+                "student",
+                "problem",
+                "course",
+                "unit",
+                "lesson",
+                "homework",
+                "file",
+                "folder"
+              ],
+              "title": "Kind",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put In Trash",
+        "tags": [
+          "trash"
+        ]
+      }
+    },
+    "/trash/{kind}/{item_id}/purge": {
+      "post": {
+        "operationId": "purge_trash__kind___item_id__purge_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "enum": [
+                "class",
+                "student",
+                "problem",
+                "course",
+                "unit",
+                "lesson",
+                "homework",
+                "file",
+                "folder"
+              ],
+              "title": "Kind",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PurgeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Purge",
+        "tags": [
+          "trash"
+        ]
+      }
+    },
+    "/trash/{kind}/{item_id}/restore": {
+      "post": {
+        "operationId": "restore_trash__kind___item_id__restore_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "enum": [
+                "class",
+                "student",
+                "problem",
+                "course",
+                "unit",
+                "lesson",
+                "homework",
+                "file",
+                "folder"
+              ],
+              "title": "Kind",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Restore",
+        "tags": [
+          "trash"
         ]
       }
     },
