@@ -261,9 +261,16 @@ export function appFor(role: Role, pathname: string): AppId | null {
   return null
 }
 
-/** Pages that are an editor or a canvas fill the window; documents keep the reading column. */
+/**
+ * Pages that are an editor or a canvas fill the window; documents keep the reading column.
+ * A homework or quiz question is the lesson problem page, so it fills too — in the column
+ * its terminal sat below the window's edge and Run looked like it did nothing (24 Oct 2026).
+ * The sheets themselves (`/homework/a1`, `/quiz/q1`) stay documents.
+ */
 export function fillsWindow(pathname: string): boolean {
-  return /^\/(my-code|work|files|my-files|code\/|lesson\/)/.test(pathname)
+  return /^\/(my-code|work|files|my-files|code\/|lesson\/|(homework|quiz)\/[^/]+\/[^/]+)/.test(
+    pathname,
+  )
 }
 
 /** The class a page is about, if it is about one. */

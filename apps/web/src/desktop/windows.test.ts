@@ -4,7 +4,7 @@
  */
 
 import { describe, expect, test } from 'vitest'
-import { appFor, deskPath } from './apps'
+import { appFor, deskPath, fillsWindow } from './apps'
 import { ZONES, frontOf, reduce, zoneAt } from './windows'
 import type { Loc, Win } from './windows'
 
@@ -139,5 +139,19 @@ describe('which app owns a page', () => {
     expect(appFor('student', '/my-files')).toBe('files')
     expect(appFor('student', '/files')).toBeNull()
     expect(appFor('student', deskPath('student'))).toBeNull()
+  })
+})
+
+describe('which pages fill their window', () => {
+  test('every problem page fills, wherever it was opened from', () => {
+    expect(fillsWindow('/lesson/a1/i1')).toBe(true)
+    expect(fillsWindow('/homework/a1/i1')).toBe(true)
+    expect(fillsWindow('/quiz/q1/i1')).toBe(true)
+  })
+
+  test('the homework and quiz sheets stay documents', () => {
+    expect(fillsWindow('/homework/a1')).toBe(false)
+    expect(fillsWindow('/quiz/q1')).toBe(false)
+    expect(fillsWindow('/my-work')).toBe(false)
   })
 })
