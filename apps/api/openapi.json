@@ -13,6 +13,10 @@
             "title": "Ends At",
             "type": "string"
           },
+          "finished": {
+            "title": "Finished",
+            "type": "boolean"
+          },
           "title": {
             "title": "Title",
             "type": "string"
@@ -21,9 +25,28 @@
         "required": [
           "assignment_id",
           "title",
-          "ends_at"
+          "ends_at",
+          "finished"
         ],
         "title": "ActiveQuizOut",
+        "type": "object"
+      },
+      "AnswerOptionOut": {
+        "properties": {
+          "correct": {
+            "title": "Correct",
+            "type": "boolean"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "correct"
+        ],
+        "title": "AnswerOptionOut",
         "type": "object"
       },
       "AssignmentMode": {
@@ -154,6 +177,19 @@
           "marked"
         ],
         "title": "AutoMarkOut",
+        "type": "object"
+      },
+      "AwayIn": {
+        "properties": {
+          "away": {
+            "title": "Away",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "away"
+        ],
+        "title": "AwayIn",
         "type": "object"
       },
       "BulkEnrolIn": {
@@ -2887,6 +2923,9 @@
             ],
             "title": "Due At"
           },
+          "mode": {
+            "$ref": "#/components/schemas/AssignmentMode"
+          },
           "questions": {
             "items": {
               "$ref": "#/components/schemas/QuestionOut"
@@ -2921,6 +2960,7 @@
         "required": [
           "assignment_id",
           "title",
+          "mode",
           "due_at",
           "released_at",
           "questions",
@@ -3907,6 +3947,86 @@
         "title": "QuestionOut",
         "type": "object"
       },
+      "QuizAnswerOut": {
+        "description": "What a child has saved for one question, for their teacher's eyes only. It carries the\nanswer key, so it must never be served from a `/me` route.",
+        "properties": {
+          "answered": {
+            "title": "Answered",
+            "type": "boolean"
+          },
+          "attempt_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "choice": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Choice"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ItemKind"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/AnswerOptionOut"
+            },
+            "title": "Options",
+            "type": "array"
+          },
+          "problem_id": {
+            "format": "uuid",
+            "title": "Problem Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "problem_id",
+          "title",
+          "kind",
+          "attempt_id",
+          "code",
+          "choice",
+          "options",
+          "answered"
+        ],
+        "title": "QuizAnswerOut",
+        "type": "object"
+      },
       "QuizIn": {
         "properties": {
           "checks": {
@@ -4107,6 +4227,22 @@
           "kind": {
             "$ref": "#/components/schemas/ItemKind"
           },
+          "newer_version_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Newer Version Id"
+          },
+          "superseded": {
+            "title": "Superseded",
+            "type": "boolean"
+          },
           "title": {
             "title": "Title",
             "type": "string"
@@ -4116,7 +4252,9 @@
           "id",
           "title",
           "kind",
-          "difficulty"
+          "difficulty",
+          "newer_version_id",
+          "superseded"
         ],
         "title": "QuizQuestionOut",
         "type": "object"
@@ -4321,6 +4459,43 @@
         "title": "RunIn",
         "type": "object"
       },
+      "RunningQuizOut": {
+        "description": "For the top bar: a quiz running anywhere at the centre, with what it takes to act.",
+        "properties": {
+          "class_id": {
+            "format": "uuid",
+            "title": "Class Id",
+            "type": "string"
+          },
+          "class_name": {
+            "title": "Class Name",
+            "type": "string"
+          },
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "class_id",
+          "class_name",
+          "title",
+          "ends_at"
+        ],
+        "title": "RunningQuizOut",
+        "type": "object"
+      },
       "ScriptTest": {
         "description": "The teacher's own Python check (17 Oct 2026), for what a fixed expected value cannot\nsay \u2014 a check that depends on values the child chose.\n\n`code` gets `run(*inputs)`, which runs the child's program and returns `(output,\nvariables)`, and `check(condition, message)`. See `runtime/grader.py`.",
         "properties": {
@@ -4376,6 +4551,10 @@
       },
       "SheetLeafOut": {
         "properties": {
+          "answered": {
+            "title": "Answered",
+            "type": "boolean"
+          },
           "attempt_id": {
             "anyOf": [
               {
@@ -4420,6 +4599,10 @@
             "title": "Problem Id",
             "type": "string"
           },
+          "problem_title": {
+            "title": "Problem Title",
+            "type": "string"
+          },
           "progress": {
             "enum": [
               "not_started",
@@ -4438,9 +4621,11 @@
           "problem_id",
           "leaf_item_id",
           "title",
+          "problem_title",
           "difficulty",
           "attempt_id",
           "progress",
+          "answered",
           "handed_in",
           "changed_since_hand_in",
           "feedback"
@@ -4539,6 +4724,49 @@
           "allowed"
         ],
         "title": "SignupAllowedOut",
+        "type": "object"
+      },
+      "SittingOut": {
+        "description": "One child's sitting, for the teacher: finished, and how much they left the page.",
+        "properties": {
+          "away_count": {
+            "title": "Away Count",
+            "type": "integer"
+          },
+          "away_now": {
+            "title": "Away Now",
+            "type": "boolean"
+          },
+          "away_seconds": {
+            "title": "Away Seconds",
+            "type": "integer"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "finished_at",
+          "away_count",
+          "away_seconds",
+          "away_now"
+        ],
+        "title": "SittingOut",
         "type": "object"
       },
       "SnippetIn": {
@@ -5410,6 +5638,27 @@
           "problems"
         ],
         "title": "TodayOut",
+        "type": "object"
+      },
+      "TodaysWorkOut": {
+        "properties": {
+          "assignment_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignment Id"
+          }
+        },
+        "required": [
+          "assignment_id"
+        ],
+        "title": "TodaysWorkOut",
         "type": "object"
       },
       "TranscriptLine": {
@@ -8562,6 +8811,66 @@
         ]
       }
     },
+    "/classes/{class_id}/todays-work": {
+      "get": {
+        "description": "The classwork this class is on: the live view notes a child with something else open.",
+        "operationId": "todays_work_classes__class_id__todays_work_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "class_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Class Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TodaysWorkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Todays Work",
+        "tags": [
+          "classes"
+        ]
+      }
+    },
     "/classes/{class_id}/unarchive": {
       "post": {
         "description": "Undo an archive.\n\nRevoked join codes stay revoked \u2014 reviving a code nobody expects to work again is a\nworse surprise than issuing a fresh one.",
@@ -11677,6 +11986,189 @@
         ]
       }
     },
+    "/me/quiz/{quiz_id}/away": {
+      "post": {
+        "description": "This child's page went out of sight, or came back: the record marking shows.",
+        "operationId": "report_away_me_quiz__quiz_id__away_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quiz_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Quiz Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AwayIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Report Away",
+        "tags": [
+          "quiz"
+        ]
+      }
+    },
+    "/me/quiz/{quiz_id}/finish": {
+      "post": {
+        "description": "\"I'm finished\" (Ken, 6 Nov 2026). The teacher sees it. Nothing is handed in, and the\nrest of their account stays closed until the quiz ends.",
+        "operationId": "finish_quiz_me_quiz__quiz_id__finish_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quiz_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Quiz Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActiveQuizOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Finish Quiz",
+        "tags": [
+          "quiz"
+        ]
+      }
+    },
+    "/me/quiz/{quiz_id}/resume": {
+      "post": {
+        "description": "\"Go back and edit\": no longer finished, until they say so again.",
+        "operationId": "resume_quiz_me_quiz__quiz_id__resume_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quiz_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Quiz Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActiveQuizOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resume Quiz",
+        "tags": [
+          "quiz"
+        ]
+      }
+    },
     "/me/trash": {
       "get": {
         "operationId": "list_my_trash_me_trash_get",
@@ -11792,6 +12284,60 @@
         "summary": "Restore Mine",
         "tags": [
           "trash"
+        ]
+      }
+    },
+    "/quizzes/running": {
+      "get": {
+        "description": "Every quiz running at this centre, for every teacher and the owner: a class is\nanyone's to cover, so a quiz in any of them is worth knowing about. Before\n`/quizzes/{quiz_id}`, which would otherwise read \"running\" as an id.",
+        "operationId": "running_quizzes_quizzes_running_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RunningQuizOut"
+                  },
+                  "title": "Response Running Quizzes Quizzes Running Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Running Quizzes",
+        "tags": [
+          "quiz"
         ]
       }
     },
@@ -11922,6 +12468,70 @@
         ]
       }
     },
+    "/quizzes/{quiz_id}/sittings": {
+      "get": {
+        "description": "Who has finished and who left the page: for Live now, and for marking afterwards.",
+        "operationId": "quiz_sittings_quizzes__quiz_id__sittings_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quiz_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Quiz Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SittingOut"
+                  },
+                  "title": "Response Quiz Sittings Quizzes  Quiz Id  Sittings Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Quiz Sittings",
+        "tags": [
+          "quiz"
+        ]
+      }
+    },
     "/quizzes/{quiz_id}/start": {
       "post": {
         "description": "Start the clock. Every child in the class is switched to the quiz at once.",
@@ -11984,7 +12594,7 @@
     },
     "/quizzes/{quiz_id}/stop": {
       "post": {
-        "description": "End the quiz for everyone \u2014 after a few seconds' grace, so last keystrokes save.",
+        "description": "Stop the clock for everyone. Their work is handed in a few seconds later.",
         "operationId": "stop_quiz_quizzes__quiz_id__stop_post",
         "parameters": [
           {
@@ -12037,6 +12647,80 @@
           }
         },
         "summary": "Stop Quiz",
+        "tags": [
+          "quiz"
+        ]
+      }
+    },
+    "/quizzes/{quiz_id}/students/{student_id}/answers": {
+      "get": {
+        "description": "What one child has saved so far, question by question, for the live view to go through.\nThe saved copy: the question they have open is also streamed live.",
+        "operationId": "quiz_answers_quizzes__quiz_id__students__student_id__answers_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quiz_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Quiz Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/QuizAnswerOut"
+                  },
+                  "title": "Response Quiz Answers Quizzes  Quiz Id  Students  Student Id  Answers Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Quiz Answers",
         "tags": [
           "quiz"
         ]

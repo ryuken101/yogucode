@@ -12,6 +12,7 @@ from app.models.assignments import (
     Attempt,
     AttemptStatus,
     ProblemSet,
+    QuizSitting,
     SetItem,
     SetStatus,
 )
@@ -88,6 +89,7 @@ __all__ = [
     "LessonConcept",
     "Mark",
     "ProblemSet",
+    "QuizSitting",
     "SetItem",
     "SetStatus",
     "SnippetStatus",

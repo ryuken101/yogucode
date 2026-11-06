@@ -236,6 +236,11 @@ export function MyCode() {
             </Button>
           </div>
 
+          {autosave.state === 'offline' ? (
+            <Notice tone="info">
+              Can’t reach the server right now. Keep going — your work is kept on this computer and saves itself when the connection is back.
+            </Notice>
+          ) : null}
           {autosave.state === 'failed' ? (
             <Notice tone="system-error">
               Your code isn’t saving. Check your connection, or sign in again. Your typing is kept on this computer for now — don’t close the tab, and press Save to try again.

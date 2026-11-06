@@ -46,7 +46,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.auth.principal import CurrentStudent
 from app.classwork import get_ladder, ladder_items, open_attempt
 from app.db import get_session
-from app.homework import hand_in, is_returned, latest_submissions, set_leaves
+from app.homework import hand_in, is_answered, is_returned, latest_submissions, set_leaves
 from app.models import (
     Assignment,
     AssignmentMode,
@@ -648,9 +648,12 @@ class SheetLeafOut(BaseModel):
     problem_id: uuid.UUID
     leaf_item_id: uuid.UUID
     title: str
+    # The problem's own title, without a part's label: a quiz lists problems, not parts.
+    problem_title: str
     difficulty: int
     attempt_id: uuid.UUID | None
     progress: Literal["not_started", "started", "passing"]
+    answered: bool
     handed_in: bool
     changed_since_hand_in: bool
     feedback: FeedbackOut | None
@@ -758,9 +761,11 @@ async def _sheet(
                 problem_id=leaf.problem.id,
                 leaf_item_id=leaf.leaf.id,
                 title=leaf.label,
+                problem_title=leaf.problem.title,
                 difficulty=leaf.leaf.difficulty,
                 attempt_id=attempt.id if attempt else None,
                 progress="passing" if passing else "started" if attempt else "not_started",
+                answered=is_answered(leaf, attempt),
                 handed_in=handed,
                 changed_since_hand_in=bool(handed and attempt and attempt.code != submission.code),
                 feedback=FeedbackOut(
@@ -855,10 +860,9 @@ async def home(principal: CurrentStudent, session: SessionDep) -> HomeOut:
         ).all()
         for assignment in rows:
             sheet = await _sheet(session, principal, assignment)
-            if sheet.closed and not sheet.returned:
+            if assignment.mode != AssignmentMode.QUIZ and sheet.closed and not sheet.returned:
                 continue  # a closed sheet with nothing to give back is not news
-            if assignment.mode == AssignmentMode.QUIZ and not sheet.returned:
-                continue  # a quiz appears here only once it has been given back
+            # A sat quiz stays here, handed in, so a child can see it was (6 Nov 2026).
             cards.append(
                 HomeworkCardOut(
                     assignment_id=assignment.id,

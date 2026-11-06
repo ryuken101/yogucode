@@ -71,7 +71,7 @@ export function Returned({ sheet }: { sheet: Schemas['SheetOut'] }) {
             ) : null}
             {leaf.feedback?.answer ? (
               <p className="text-sm text-grape">
-                Your answer: <span className="font-mono">{leaf.feedback.answer}</span>
+                Your answer: <span className="whitespace-pre-wrap break-words font-mono">{leaf.feedback.answer}</span>
               </p>
             ) : leaf.feedback ? (
               <pre className="overflow-x-auto rounded-lg bg-night p-3 font-mono text-sm text-cream">

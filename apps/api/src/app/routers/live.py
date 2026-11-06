@@ -184,6 +184,9 @@ async def student_socket(websocket: WebSocket, session: SessionDep, settings: Se
                 focus = message.get("focus")
                 if focus is None or (isinstance(focus, dict) and len(str(focus)) < 1_000):
                     await hub.focus(klass.id, student.id, focus)
+            elif kind == "attention":
+                if isinstance(message.get("away"), bool):
+                    await hub.attention(klass.id, student.id, away=message["away"])
             elif kind == "status":
                 status = clean_status(message.get("status"), presence.targets)
                 if status is not None:

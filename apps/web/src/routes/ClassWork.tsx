@@ -10,9 +10,10 @@ import { Badge } from '../components/Badge'
 import { Button } from '../components/Button'
 import { Card } from '../components/Card'
 import { Notice } from '../components/Notice'
+import { StartQuizDialog, StopQuizButton } from '../components/QuizControls'
 import { Spinner } from '../components/Spinner'
 import { TrashDialog } from '../components/TrashDialog'
-import { api } from '../lib/api'
+import { api, type Schemas } from '../lib/api'
 import { formatDue } from '../lib/dates'
 import { messageFor } from '../lib/errors'
 import {
@@ -135,6 +136,7 @@ export function QuizzesCard({ classId }: { classId: string }) {
   const start = useQuizMutation(classId, (id: string) => api.startQuiz(id))
   const running = (quizzes.data ?? []).some((q) => q.running)
   const [deleting, setDeleting] = useState<{ id: string; title: string } | null>(null)
+  const [starting, setStarting] = useState<Schemas['QuizOut'] | null>(null)
   const trash = useTrashAction()
 
   return (
@@ -167,9 +169,7 @@ export function QuizzesCard({ classId }: { classId: string }) {
                 <Button
                   variant="primary"
                   disabled={running || start.isPending || quiz.questions.length === 0}
-                  onClick={() =>
-                    start.mutate(quiz.id, { onSuccess: () => navigate(`/classes/${classId}/live`) })
-                  }
+                  onClick={() => setStarting(quiz)}
                 >
                   Start
                 </Button>
@@ -179,6 +179,7 @@ export function QuizzesCard({ classId }: { classId: string }) {
                   Watch
                 </Button>
               ) : null}
+              {quiz.running ? <StopQuizButton quiz={quiz} /> : null}
               {quiz.status === 'closed' ? (
                 <Button variant="primary" onClick={() => navigate(`/assignments/${quiz.id}/mark`)}>
                   Mark
@@ -194,6 +195,20 @@ export function QuizzesCard({ classId }: { classId: string }) {
         ))}
       </ul>
       {start.error ? <Notice tone="not-yet">{messageFor(start.error)}</Notice> : null}
+      <StartQuizDialog
+        open={starting !== null}
+        title={starting?.title ?? ''}
+        minutes={starting?.duration_minutes ?? 0}
+        busy={start.isPending}
+        onClose={() => setStarting(null)}
+        onStart={() => {
+          if (!starting) return
+          start.mutate(starting.id, {
+            onSuccess: () => navigate(`/classes/${classId}/live`),
+            onSettled: () => setStarting(null),
+          })
+        }}
+      />
       <TrashDialog
         open={deleting !== null}
         name={deleting ? `“${deleting.title}”` : ''}

@@ -40,7 +40,7 @@ export function McqAttempt({ options, initial, onChoose, disabled = false }: Pro
                 setFailed(true)
               })
             }}
-            className={`rounded-2xl px-4 py-3 text-left font-mono text-base ring-1 transition disabled:cursor-not-allowed ${
+            className={`whitespace-pre-wrap break-words rounded-2xl px-4 py-3 text-left font-mono text-base ring-1 transition disabled:cursor-not-allowed ${
               chosen === index ? 'bg-grape-pale ring-2 ring-grape' : 'bg-surface ring-grape/20 hover:ring-grape'
             }`}
           >

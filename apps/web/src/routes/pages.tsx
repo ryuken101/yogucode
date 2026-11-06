@@ -32,6 +32,9 @@ const ProblemEditor = lazy(() =>
   import('./ProblemEditor').then((m) => ({ default: m.ProblemEditor })),
 )
 
+const QuizQuestion = lazy(() =>
+  import('./ProblemAttempt').then((m) => ({ default: m.QuizQuestion })),
+)
 const ProblemAttempt = lazy(() =>
   import('./ProblemAttempt').then((m) => ({ default: m.ProblemAttempt })),
 )
@@ -93,7 +96,7 @@ export const studentPages = (
       path="/homework/:assignmentId/:itemId"
       element={<Loading><ProblemAttempt /></Loading>}
     />
-    <Route path="/quiz/:assignmentId/:itemId" element={<Loading><ProblemAttempt /></Loading>} />
+    <Route path="/quiz/:assignmentId/:itemId" element={<Loading><QuizQuestion /></Loading>} />
     <Route path="/my-work" element={<Loading><MyWork /></Loading>} />
     <Route path="/my-files" element={<Loading><Finder /></Loading>} />
     <Route path="/my-desk" element={null} />

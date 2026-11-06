@@ -204,6 +204,11 @@ export const handlers = [
 
   // No quiz running unless a test says so.
   http.get('/api/me/quiz', () => HttpResponse.json(null)),
+  http.get('/api/quizzes/running', () => HttpResponse.json([])),
+  http.get('/api/classes/:classId/quizzes', () => HttpResponse.json([])),
+  http.get('/api/classes/:classId/todays-work', () => HttpResponse.json({ assignment_id: null })),
+  http.get('/api/quizzes/:quizId/sittings', () => HttpResponse.json([])),
+  http.get('/api/quizzes/:quizId/students/:studentId/answers', () => HttpResponse.json([])),
 
   http.get('/api/me/documents', () => HttpResponse.json(summaries())),
   // Folders (11 Oct 2026): none by default; tests about folders add their own.

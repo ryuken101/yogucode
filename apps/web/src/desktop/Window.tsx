@@ -28,6 +28,8 @@ interface Props {
   /** Teachers may drag, resize and snap; students may not. Everyone toggles full screen. */
   arrange: boolean
   tabs: (Tab & { on: boolean })[]
+  /** A quiz is running: this window can't be left, so it offers no way to. */
+  locked?: boolean
   desk: RefObject<HTMLElement | null>
   onFocus: () => void
   onMinimise: () => void
@@ -49,6 +51,7 @@ export function Window({
   active,
   arrange,
   tabs,
+  locked = false,
   desk,
   onFocus,
   onMinimise,
@@ -182,18 +185,22 @@ export function Window({
             onDoubleClick={onToggleMax}
           >
             <h2 className="min-w-0 flex-1 truncate font-display text-sm font-semibold">{title}</h2>
-            <TitleButton label={`Minimise ${title}`} onClick={onMinimise}>
-              <Minus size={16} aria-hidden="true" />
-            </TitleButton>
+            {locked ? null : (
+              <TitleButton label={`Minimise ${title}`} onClick={onMinimise}>
+                <Minus size={16} aria-hidden="true" />
+              </TitleButton>
+            )}
             <TitleButton label={floating ? 'Full screen' : 'Make it a window'} onClick={onToggleMax}>
               {floating ? <Maximize2 size={15} aria-hidden="true" /> : <Minimize2 size={15} aria-hidden="true" />}
             </TitleButton>
-            <TitleButton label={`Close ${title}`} onClick={onClose}>
-              <X size={16} aria-hidden="true" />
-            </TitleButton>
+            {locked ? null : (
+              <TitleButton label={`Close ${title}`} onClick={onClose}>
+                <X size={16} aria-hidden="true" />
+              </TitleButton>
+            )}
           </div>
 
-          {tabs.length > 1 ? (
+          {tabs.length > 1 && !locked ? (
             <nav aria-label={`${title} sections`} className="flex shrink-0 gap-1 border-b border-line bg-surface px-3 py-2">
               {tabs.map((tab) => (
                 <Link

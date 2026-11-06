@@ -10,6 +10,8 @@
  * server's log is rebuilt after a restart or a dropped connection.
  */
 
+import { markRemovedFromClass } from '../lib/tabSession'
+
 export type Message = { type: string } & Record<string, unknown>
 
 const TERMINAL_CODES = new Set([4401, 4403, 4404])
@@ -133,12 +135,14 @@ class StudentLive {
   private readonly quizListeners = new Set<QuizListener>()
   private readonly signedOutListeners = new Set<() => void>()
   private focus: Message | null = null
+  private away = false
   readonly socket: LiveSocket
 
   constructor() {
     this.socket = new LiveSocket('/live/student', {
       onOpen: (socket) => {
         if (this.focus) socket.send(this.focus)
+        if (this.away) socket.send({ type: 'attention', away: true })
         for (const listener of this.docs.values()) {
           // Unlock first: a lock that ended while the connection was down would otherwise
           // never be lifted. The server re-sends "help on" for any still in force.
@@ -162,6 +166,8 @@ class StudentLive {
           this.docs.get(target)?.help?.(message.on === true)
         } else if (message.type === 'resync' && target) {
           this.docs.get(target)?.sendFull()
+        } else if (message.type === 'removed') {
+          markRemovedFromClass()
         } else if (
           message.type === 'quiz_started' ||
           message.type === 'quiz_ending' ||
@@ -201,6 +207,12 @@ class StudentLive {
   setFocus(focus: Record<string, unknown> | null): void {
     this.focus = { type: 'focus', focus }
     this.socket.send(this.focus)
+  }
+
+  /** Their Yogucode page went out of sight, or came back: for the teacher's tile. */
+  setAway(away: boolean): void {
+    this.away = away
+    this.socket.send({ type: 'attention', away })
   }
 
   /** Something that happened — a run, a check, an error, a paste — for the stuck signals. */

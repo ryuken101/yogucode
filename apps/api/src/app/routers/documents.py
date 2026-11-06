@@ -147,6 +147,14 @@ async def list_documents(
     return [DocumentSummaryOut.build(record) for record in records]
 
 
+async def _refuse_during_quiz(session: AsyncSession, principal: Principal) -> None:
+    """The quiz is the only thing a child can change while it runs (Ken's decision)."""
+    if await running_quiz_for(session, principal) is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="A quiz is running — finish it first"
+        )
+
+
 @router.post("", response_model=DocumentOut, status_code=status.HTTP_201_CREATED)
 async def create_document(
     body: DocumentIn, principal: CurrentStudent, session: SessionDep
@@ -158,6 +166,7 @@ async def create_document(
     unique index would refuse a second "untitled.py", and a 409 in response to pressing a
     plus button is not an error a ten-year-old can act on.
     """
+    await _refuse_during_quiz(session, principal)
     return await create_file(session, principal, body)
 
 
@@ -218,12 +227,7 @@ async def save_document(
     is only reading. The same reasoning as the no-op PATCH on classes and students.
     """
     record = await get_owned_document(session, principal, document_id)
-    if await running_quiz_for(session, principal) is not None:
-        # The quiz is the only thing a child can change while it runs (Ken's decision).
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="A quiz is running — finish it first"
-        )
-
+    await _refuse_during_quiz(session, principal)
     return await change_file(session, principal, record, body)
 
 
@@ -271,6 +275,7 @@ async def archive_document(
     Trash themselves (`app/trash.py`).
     """
     record = await get_owned_document(session, principal, document_id)
+    await _refuse_during_quiz(session, principal)
     return await archive_file(session, principal, record)
 
 
@@ -293,6 +298,7 @@ async def restore_document(
     """Bring a file back out of the Trash (`app/trash.py`), to its folder if that is still
     there and to the top level if not. A name taken meanwhile is a 409, as for a rename."""
     record = await get_owned_document(session, principal, document_id)
+    await _refuse_during_quiz(session, principal)
     if record.deleted_at is not None:
         record = await restore(session, principal, "file", record.id)
     return DocumentOut.build_full(record)

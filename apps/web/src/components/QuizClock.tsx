@@ -1,7 +1,7 @@
 /**
- * The class's one quiz clock, wherever a child is in the quiz: the question list and each
- * question (23 Oct 2026 — inside a question it used to vanish). Nothing when the quiz is
- * not running.
+ * The class's one quiz clock, in the child's top bar for as long as the quiz runs (6 Nov
+ * 2026; it used to live on the pages, and a page without one had no clock). Nothing when the
+ * quiz is not running.
  */
 
 import { useEffect, useState } from 'react'

@@ -120,9 +120,12 @@ class Assignment(TimestampMixin, TrashMixin, table=True):
     settings: dict[str, Any] = Field(default_factory=dict, sa_type=JSONB)
     released_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))
     # A quiz's one clock for the class (Ken's decision): set when the teacher presses
-    # Start; `ends_at` is when everyone's work is handed in, or earlier on Stop.
+    # Start. `ends_at` is what the clock counts down to, or the moment of Stop;
+    # `hand_in_at` is a few seconds later, when everyone's work is handed in, so the last
+    # keystrokes reach the server first (`app/quiz.py`).
     started_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))
     ends_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))
+    hand_in_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))
     created_by: uuid.UUID | None = Field(default=None, foreign_key="users.id")
 
 
@@ -153,3 +156,26 @@ class Attempt(TimestampMixin, table=True):
     # Oct 2026): the first Save asks where, and every save after keeps it up to date. The
     # attempt stays the record that is checked and marked; the file is the child's copy.
     document_id: uuid.UUID | None = Field(default=None, foreign_key="student_documents.id")
+
+
+class QuizSitting(TimestampMixin, table=True):
+    """One child's sitting of one quiz: whether they have pressed "I'm finished", and how
+    often and how long they left the page (Ken, 6 Nov 2026). Created the first time either
+    happens, so no row means neither has. Lessons keep no such record: leaving a quiz is
+    worth reviewing later, leaving a lesson is only worth a teacher's glance now.
+    """
+
+    __tablename__ = "quiz_sittings"
+    __table_args__ = (
+        UniqueConstraint("assignment_id", "student_id", name="uq_quiz_sittings_assignment_student"),
+    )
+
+    id: uuid.UUID = Field(default_factory=new_uuid, primary_key=True)
+    centre_id: uuid.UUID = Field(foreign_key="centres.id", index=True)
+    assignment_id: uuid.UUID = Field(foreign_key="assignments.id", index=True)
+    student_id: uuid.UUID = Field(foreign_key="students.id", index=True)
+    finished_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))
+    away_count: int = Field(default=0)
+    away_seconds: int = Field(default=0)
+    # Set while they are away; the time joins `away_seconds` when they come back.
+    left_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))

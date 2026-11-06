@@ -27,9 +27,9 @@ import { Markdown } from '../components/Markdown'
 import { Notice } from '../components/Notice'
 import { Spinner } from '../components/Spinner'
 import { api, type Schemas } from '../lib/api'
-import { formatDue } from '../lib/dates'
+import { awayDuration, formatDue } from '../lib/dates'
 import { messageFor } from '../lib/errors'
-import { keys, useMarkingOverview, useMarkingQuestion, useSnippets } from '../lib/queries'
+import { keys, useMarkingOverview, useMarkingQuestion, useQuizSittings, useSnippets } from '../lib/queries'
 import { toChecks } from '../problems/doc'
 import { correctFrom, runsFrom } from '../problems/rubric'
 import { TestResultLine } from '../problems/TestResults'
@@ -44,6 +44,19 @@ interface Form {
   approach: number | null
   comment: string
   snippetIds: string[]
+}
+
+/** What is kept of a child leaving the page during a quiz (`quiz_sittings`). */
+function AwayRecord({ quizId, studentId, name }: { quizId: string; studentId: string; name: string }) {
+  const sittings = useQuizSittings(quizId)
+  const mine = sittings.data?.find((s) => s.student_id === studentId)
+  return (
+    <p className="mb-4 text-sm text-muted">
+      {mine && mine.away_count > 0
+        ? `${name} left the quiz page ${mine.away_count} time${mine.away_count === 1 ? '' : 's'}, ${awayDuration(mine.away_seconds)} away.`
+        : `No record of ${name} leaving the quiz page.`}
+    </p>
+  )
 }
 
 function formFor(
@@ -245,14 +258,17 @@ export function Marking() {
     .sort((a, b) => Number(b.concept_id !== null && conceptIds.has(b.concept_id)) - Number(a.concept_id !== null && conceptIds.has(a.concept_id)))
     .slice(0, 6)
 
+  const isQuiz = overview.data.mode === 'quiz'
+
   return (
     <>
       <PageHeader title={overview.data.title}>
-        <span className="text-sm text-muted">due {formatDue(overview.data.due_at)}</span>
+        {isQuiz ? null : <span className="text-sm text-muted">due {formatDue(overview.data.due_at)}</span>}
         <Button variant="primary" onClick={() => setConfirmRelease(true)}>
           Give back marked work
         </Button>
       </PageHeader>
+      {isQuiz ? <AwayRecord quizId={assignmentId} studentId={entry.student_id} name={entry.display_name} /> : null}
 
       {released ? (
         <div className="mb-4">
@@ -344,7 +360,7 @@ export function Marking() {
               <p className="text-muted">No answer chosen.</p>
             ) : (
               <div className="flex flex-col gap-1">
-                <p className="font-mono text-base text-grape">{data.options[entry.choice]?.text}</p>
+                <p className="whitespace-pre-wrap break-words font-mono text-base text-grape">{data.options[entry.choice]?.text}</p>
                 <p className="text-sm text-muted">
                   {entry.choice === rightChoice
                     ? 'The right answer.'
@@ -370,7 +386,7 @@ export function Marking() {
               {data.options.map((option, i) => (
                 <li key={i} className="flex items-baseline gap-2">
                   <span className="w-6 text-right font-medium text-grape">{option.chosen_by}</span>
-                  <span className="font-mono text-grape">{option.text}</span>
+                  <span className="whitespace-pre-wrap break-words font-mono text-grape">{option.text}</span>
                   {option.correct ? <Badge variant="good">right</Badge> : null}
                   {!option.correct && option.misconception ? (
                     <span className="text-muted">— {option.misconception}</span>
@@ -513,7 +529,7 @@ export function Marking() {
 
           <div className="mt-4">
             <Textarea
-              label={`Overall note to ${entry.display_name} on this homework (optional)`}
+              label={`Overall note to ${entry.display_name} on this ${isQuiz ? 'quiz' : 'homework'} (optional)`}
               rows={2}
               value={note}
               onChange={(event) => setNotes((current) => ({ ...current, [entry.student_id]: event.target.value }))}
@@ -554,7 +570,7 @@ export function Marking() {
           },
         }}
       >
-        Every child you have marked sees your comments, and their homework becomes read-only.
+        Every child you have marked sees your comments, and their {isQuiz ? 'quiz' : 'homework'} becomes read-only.
         Anyone not marked yet is unaffected — you can give theirs back later.
       </Dialog>
 

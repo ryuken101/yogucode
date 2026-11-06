@@ -54,6 +54,7 @@ from app.models import (
     LessonConcept,
     Mark,
     ProblemSet,
+    QuizSitting,
     SetItem,
     Student,
     StudentCredential,
@@ -115,6 +116,7 @@ async def erase_student(session: AsyncSession, student_id: uuid.UUID) -> Erased:
     await _erase_attempts(session, counts, attempt_ids)
     for name, model in [
         ("assignment_notes", AssignmentNote),
+        ("quiz_sittings", QuizSitting),
         ("student_documents", StudentDocument),
         # After the files that sat in them; all at once, so parent links resolve together.
         ("student_folders", StudentFolder),
@@ -150,6 +152,12 @@ async def erase_class(session: AsyncSession, class_id: uuid.UUID) -> Erased:
         delete(AssignmentNote).where(AssignmentNote.assignment_id.in_(assignment_ids)),  # type: ignore[attr-defined]
     )
     await _delete(
+        session,
+        counts,
+        "quiz_sittings",
+        delete(QuizSitting).where(QuizSitting.assignment_id.in_(assignment_ids)),  # type: ignore[attr-defined]
+    )
+    await _delete(
         session, counts, "assignments", delete(Assignment).where(Assignment.class_id == class_id)
     )
     for name, model in [
@@ -180,6 +188,12 @@ async def erase_assignment(session: AsyncSession, assignment_id: uuid.UUID) -> E
         counts,
         "assignment_notes",
         delete(AssignmentNote).where(AssignmentNote.assignment_id == assignment_id),  # type: ignore[arg-type]
+    )
+    await _delete(
+        session,
+        counts,
+        "quiz_sittings",
+        delete(QuizSitting).where(QuizSitting.assignment_id == assignment_id),  # type: ignore[arg-type]
     )
     await _delete(
         session, counts, "assignments", delete(Assignment).where(Assignment.id == assignment_id)

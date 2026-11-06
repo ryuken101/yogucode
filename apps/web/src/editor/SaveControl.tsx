@@ -17,6 +17,7 @@ const LABEL: Record<SaveState, string> = {
   pending: 'Unsaved changes',
   saving: 'Saving…',
   failed: 'Not saved',
+  offline: 'Reconnecting…',
 }
 
 export function SaveControl({

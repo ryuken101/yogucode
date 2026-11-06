@@ -73,6 +73,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
+ * A rejected field as a sentence. Most of Pydantic's messages read well enough; these two
+ * don't: our own validators come prefixed, and a wrong kind of number names a type.
+ */
+function sentenceFor(issue: ValidationIssue): string {
+  if (issue.type === 'value_error') return issue.msg.replace(/^Value error, /, '')
+  if (issue.type.startsWith('int_')) return 'Please use a whole number.'
+  return issue.msg
+}
+
+/**
  * Build an ApiError from a failed response body.
  *
  * `body` is whatever `response.json()` produced, or undefined when the body was not JSON
@@ -88,8 +98,7 @@ export function toApiError(status: number, body: unknown, fallback: string): Api
 
   if (Array.isArray(detail)) {
     const issues = detail as ValidationIssue[]
-    const first = issues[0]?.msg
-    return new ApiError(status, first ?? fallback, { issues })
+    return new ApiError(status, issues[0] ? sentenceFor(issues[0]) : fallback, { issues })
   }
 
   if (isRecord(detail)) {

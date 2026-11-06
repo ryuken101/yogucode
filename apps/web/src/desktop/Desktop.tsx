@@ -38,6 +38,7 @@ import { appDef, appFor, appsFor, classOf, deskPath, fillsWindow } from './apps'
 import type { AppId, Ctx, Role } from './apps'
 import { DeskContext } from './context'
 import { Menu } from './Menu'
+import { RunningQuizzes } from './RunningQuizzes'
 import type { MenuItem } from './Menu'
 import { SearchPalette } from './Search'
 import { Window } from './Window'
@@ -78,12 +79,19 @@ export function TeacherDesktop({ isOwner, ...shared }: Shared & { isOwner: boole
       classes={(classes.data ?? []).filter((c) => c.status === 'active')}
       saved={saved.data?.saved ? saved.data : null}
       locked={false}
+      status={<RunningQuizzes />}
     />
   )
 }
 
-export function StudentDesktop({ locked, ...shared }: Shared & { locked: boolean }) {
-  return <DesktopCore {...shared} role="student" isOwner={false} classes={[]} saved={null} locked={locked} />
+export function StudentDesktop({
+  locked,
+  status,
+  ...shared
+}: Shared & { locked: boolean; status?: ReactNode }) {
+  return (
+    <DesktopCore {...shared} role="student" isOwner={false} classes={[]} saved={null} locked={locked} status={status} />
+  )
 }
 
 /* --- the desktop itself ----------------------------------------------------------------- */
@@ -95,6 +103,8 @@ interface CoreProps extends Shared {
   saved: Schemas['DesktopOut'] | null
   /** A quiz is running: the quiz is the only window, with no dock and no menus. */
   locked: boolean
+  /** In the top bar, beside the account: a child's quiz clock, a teacher's running quizzes. */
+  status?: ReactNode
 }
 
 const href = (l: Loc) => `${l.pathname}${l.search}${l.hash}`
@@ -112,7 +122,7 @@ function firstClass(classes: Schemas['ClassOut'][], saved: string | null | undef
   return (classes.find((c) => c.is_mine) ?? classes[0])?.id ?? null
 }
 
-function DesktopCore({ role, pages, name, subtitle, isOwner, classes, saved, locked, onSignOut }: CoreProps) {
+function DesktopCore({ role, pages, name, subtitle, isOwner, classes, saved, locked, status, onSignOut }: CoreProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const teacher = role === 'teacher'
@@ -390,6 +400,7 @@ function DesktopCore({ role, pages, name, subtitle, isOwner, classes, saved, loc
             </Menu>
           ) : null}
           <span className="flex-1" />
+          {status}
           {!locked ? (
             <button
               type="button"
@@ -429,6 +440,7 @@ function DesktopCore({ role, pages, name, subtitle, isOwner, classes, saved, loc
                 title={titleOf(w)}
                 active={front?.app === w.app}
                 arrange={teacher}
+                locked={locked}
                 tabs={(appDef(role, w.app)!.tabs?.(ctx) ?? []).map((tab) => ({
                   ...tab,
                   on: tab.active(w.loc.pathname, w.loc.search),

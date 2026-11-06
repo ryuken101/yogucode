@@ -99,7 +99,7 @@ function student(recent: object[], extra: object = {}) {
   return {
     studentId: ARIA, displayName: 'Aria K', online: true,
     focus: { target: TARGET, kind: 'problem' as const, title: 'Q1' },
-    recent: recent as never[], lastEditAt: null, ...extra,
+    recent: recent as never[], lastEditAt: null, awaySince: null, awayCount: 0, awayTotal: 0, ...extra,
   }
 }
 

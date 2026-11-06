@@ -22,14 +22,14 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Link, useNavigate, useParams } from 'react-router'
+import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router'
 import { Button } from '../components/Button'
 import { Console } from '../components/Console'
 import { McqAttempt } from '../components/McqAttempt'
 import { Dots } from '../components/Dots'
 import { Markdown } from '../components/Markdown'
 import { Notice } from '../components/Notice'
-import { QuizClock } from '../components/QuizClock'
+import { useQuizTimeUp } from '../components/useQuizTimeUp'
 import { Spinner } from '../components/Spinner'
 import { CodeSurface } from '../editor/CodeSurface'
 import { RecoveredWork } from '../editor/RecoveredWork'
@@ -40,7 +40,7 @@ import { useAutosave } from '../editor/useAutosave'
 import { api, type Schemas } from '../lib/api'
 import { messageFor } from '../lib/errors'
 import { fileNameFor } from '../lib/fileType'
-import { keys, useDocuments, useStudentProblem } from '../lib/queries'
+import { keys, useActiveQuiz, useDocuments, useSheet, useStudentProblem } from '../lib/queries'
 import { toChecks } from '../problems/doc'
 import { ChecksPanel } from '../problems/ChecksPanel'
 import { ProblemBrief } from '../problems/ProblemBrief'
@@ -60,6 +60,42 @@ function hintProgress(next: NonNullable<Leaf['next_hint']>, runsSinceOpen: numbe
   return `after ${runs} more run${runs === 1 ? '' : 's'}, or in about ${minutes} minute${minutes === 1 ? '' : 's'}`
 }
 
+/** Previous and Next through a quiz's questions, so a child needn't go back to the list. */
+function QuizPager({ assignmentId }: { assignmentId: string }) {
+  const { itemId = '' } = useParams()
+  const sheet = useSheet(assignmentId)
+  const problems = [...new Set((sheet.data?.leaves ?? []).map((leaf) => leaf.problem_id))]
+  const at = problems.indexOf(itemId)
+  if (at < 0) return null
+  const link = 'rounded-full px-2.5 py-0.5 font-medium text-grape-deep ring-1 ring-line hover:ring-grape'
+  return (
+    <span className="ml-auto flex items-center gap-2 text-sm">
+      {at > 0 ? (
+        <Link to={`/quiz/${assignmentId}/${problems[at - 1]}`} className={link}>
+          ← Previous
+        </Link>
+      ) : null}
+      <span className="text-muted">
+        {at + 1} of {problems.length}
+      </span>
+      {at < problems.length - 1 ? (
+        <Link to={`/quiz/${assignmentId}/${problems[at + 1]}`} className={link}>
+          Next →
+        </Link>
+      ) : null}
+    </span>
+  )
+}
+
+/**
+ * A quiz question, fresh for each question: Previous and Next stay on this route, and a
+ * question's editor and attempt must not carry over to the next one.
+ */
+export function QuizQuestion() {
+  const { itemId = '' } = useParams()
+  return <ProblemAttempt key={itemId} />
+}
+
 /** Back to wherever this problem was opened from: the homework, the quiz, or Today. */
 function BackLink({ mode, assignmentId }: { mode: string; assignmentId: string }) {
   if (mode === 'homework') {
@@ -75,8 +111,7 @@ function BackLink({ mode, assignmentId }: { mode: string; assignmentId: string }
         <Link to={`/quiz/${assignmentId}`} className="text-sm text-grape-deep">
           ← Back to the quiz
         </Link>
-        {/* The clock stays in sight on every question (23 Oct 2026). */}
-        <QuizClock assignmentId={assignmentId} className="ml-auto text-lg" />
+        <QuizPager assignmentId={assignmentId} />
       </span>
     )
   }
@@ -89,6 +124,7 @@ function BackLink({ mode, assignmentId }: { mode: string; assignmentId: string }
 
 export function ProblemAttempt() {
   const { assignmentId = '', itemId = '' } = useParams()
+  const { pathname } = useLocation()
   const problem = useStudentProblem(assignmentId, itemId)
 
   const [leaves, setLeaves] = useState<Leaf[]>([])
@@ -153,6 +189,19 @@ export function ProblemAttempt() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [quizMode, assignmentId],
   )
+  // 0:00: lock, and send what is here. The hand-in follows a few seconds later (`app/quiz.py`).
+  // If the push announcing the end never comes, the 15-second check notices instead.
+  const timeUp = useQuizTimeUp(assignmentId)
+  const activeQuiz = useActiveQuiz()
+  useEffect(() => {
+    if (timeUp) autosave.flush()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeUp])
+  const quizGone = quizMode && activeQuiz.data === null
+  useEffect(() => {
+    if (quizGone) navigate(`/quiz/${assignmentId}`)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quizGone, assignmentId])
   // The live classroom: this part's code streams to the teacher, who can type into it.
   const liveTarget = fileAttemptId ? `attempt:${fileAttemptId}` : null
   const live = useLiveDoc(liveTarget, leaf ? (latest.current[codeKey] ?? startingCode) : null)
@@ -168,6 +217,8 @@ export function ProblemAttempt() {
       mode: problem.data.mode,
       assignment_id: problem.data.assignment_id,
     })
+    // Left the question: the teacher's tile shouldn't go on saying they're in it.
+    return () => studentLive().setFocus(null)
   }, [liveTarget, title, problem.data])
 
   useEffect(() => {
@@ -181,6 +232,8 @@ export function ProblemAttempt() {
   }, [fileAttemptId])
 
   if (problem.isPending) return <Spinner label="Opening the problem" />
+  // A quiz that has ended has no questions to open: its own page says what happened to it.
+  if (problem.error && pathname.startsWith('/quiz/')) return <Navigate to={`/quiz/${assignmentId}`} replace />
   if (problem.error) {
     return (
       <div className="mx-auto max-w-2xl px-6 py-10">
@@ -202,12 +255,14 @@ export function ProblemAttempt() {
         <McqAttempt
           options={problem.data.options}
           initial={answer.attempt.choice}
+          disabled={timeUp}
           onChoose={async (choice) => {
             await api.choose(answer.attempt.id, choice)
             record('edit', { choice })
             studentLive().status({ kind: 'choice', target: `attempt:${answer.attempt.id}` })
           }}
         />
+        {timeUp ? <Notice tone="info">Time’s up. Saving your work…</Notice> : null}
       </div>
     )
   }
@@ -362,6 +417,11 @@ export function ProblemAttempt() {
             <SaveControl state={autosave.state} onSave={onSave} alwaysEnabled={!linkedFile && data.mode !== 'quiz'} />
           </span>
         </div>
+        {autosave.state === 'offline' ? (
+          <Notice tone="info">
+            Can’t reach the server right now. Keep going — your work is kept on this computer and saves itself when the connection is back.
+          </Notice>
+        ) : null}
         {autosave.state === 'failed' ? (
           <Notice tone="system-error">
             Your work is not saving. Tell your teacher — you may need to sign in again. Your typing is kept on this computer for now — don’t close the tab, and press Save to try again.
@@ -378,6 +438,7 @@ export function ProblemAttempt() {
             }}
           />
         ) : null}
+        {timeUp ? <Notice tone="info">Time’s up. Saving your work…</Notice> : null}
         {live.locked ? (
           <Notice tone="info">
             Your teacher is helping — watch your code. You can type again when they’re done.
@@ -392,7 +453,7 @@ export function ProblemAttempt() {
             value={code}
             completions={data.completions}
             // Locked while the teacher helps (Ken's decision, 11 Oct 2026).
-            readOnly={live.locked}
+            readOnly={live.locked || timeUp}
             onChange={(next) => {
               latest.current[codeKey] = next
               autosave.onChange(next)

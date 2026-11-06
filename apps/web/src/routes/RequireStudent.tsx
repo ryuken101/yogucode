@@ -25,6 +25,9 @@ import { StudentDesktop } from '../desktop/Desktop'
 import { api } from '../lib/api'
 import { keys, useActiveQuiz, useStudentMe } from '../lib/queries'
 import { clearStudentTab } from '../lib/tabSession'
+import { QuizClock } from '../components/QuizClock'
+import { QuizNotices } from '../components/QuizNotices'
+import { useAttentionReporter } from '../collab/useAttentionReporter'
 import { studentPages } from './pages'
 
 /** `pages` is for tests, which give a guard stand-in pages; the app uses the real list. */
@@ -34,6 +37,7 @@ export function RequireStudent({ pages = studentPages }: { pages?: ReactNode }) 
   const { data: me, isPending, error } = useStudentMe()
   const activeQuiz = useActiveQuiz()
   const location = useLocation()
+  const returned = useAttentionReporter(me ? (activeQuiz.data?.assignment_id ?? null) : null, Boolean(me))
 
   // Keep the live connection open on every student page — it is how a quiz starting or
   // ending reaches this child at once, not just at the next 15-second check.
@@ -94,6 +98,14 @@ export function RequireStudent({ pages = studentPages }: { pages?: ReactNode }) 
       name={me.display_name}
       subtitle={me.class_name}
       locked={Boolean(quiz)}
+      status={
+        quiz ? (
+          <>
+            <QuizClock assignmentId={quiz.assignment_id} className="text-xl" />
+            <QuizNotices endsAt={quiz.ends_at} returned={returned} />
+          </>
+        ) : null
+      }
       onSignOut={() => void signOut()}
     />
   )

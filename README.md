@@ -424,10 +424,15 @@ Ken's choice.**
 - **Quizzes**: built from the bank (code and multiple choice), with a length and a Check
   toggle. **Start** switches every child in the class to the quiz at once; while it runs,
   it is the only work a child can open or change (enforced by the server). Autocomplete
-  and hints are off, and pastes are flagged on the live view. One clock for the class:
-  at the end — or a few seconds after **Stop**, so last keystrokes save — everyone's work
-  is handed in automatically, exactly once (a timer, plus finalise-on-read after a
-  restart). Marking and giving back are the homework screens.
+  and hints are off, and pastes are flagged on the live view. One clock for the class, in
+  the child's top bar. At 0:00, or on **Stop**, their page locks and saves; a few seconds
+  later everyone's work is handed in automatically, exactly once (a timer, plus
+  finalise-on-read after a restart). A child may press **I'm finished** and still go back
+  and edit until it ends. Every teacher and the owner see a running quiz in their top bar,
+  with Watch and Stop, and the live view goes through each child's saved answers. Marking
+  and giving back are the homework screens, once the quiz has finished.
+- **Leaving the page**: the live view flags a child whose page is out of sight, in lessons
+  and quizzes alike. For a quiz it is also kept, and shown when marking.
 - **Deploy consequence:** WebSockets cannot go through a Vercel rewrite, and the child's
   SameSite=Lax cookie must reach the socket. So production needs the web app and the API
   on **one registrable domain** (e.g. `app.<domain>` and `api.<domain>`), and the API on

@@ -55,6 +55,12 @@ export function timeLeft(endsAt: string, now = Date.now()): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
 }
 
+/** "2 min 14 s" — how long a child was away from a page. */
+export function awayDuration(seconds: number): string {
+  const minutes = Math.floor(seconds / 60)
+  return minutes ? `${minutes} min ${seconds % 60} s` : `${seconds} s`
+}
+
 /** Whole days until something in the Trash is deleted for good (never below 0). */
 export function daysLeft(purgeAfter: string, now = Date.now()): number {
   return Math.max(0, Math.ceil((new Date(purgeAfter).getTime() - now) / 86_400_000))

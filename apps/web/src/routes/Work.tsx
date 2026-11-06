@@ -208,6 +208,11 @@ export function Work() {
 
       {/* A failed save is the one thing here that is genuinely our problem rather than
           something the child did, so it is the one thing allowed to be system-error. */}
+      {autosave.state === 'offline' ? (
+        <Notice tone="info">
+          Can’t reach the server right now. Keep going — your work is kept on this computer and saves itself when the connection is back.
+        </Notice>
+      ) : null}
       {autosave.state === 'failed' ? (
         <Notice tone="system-error">
           Your work is not saving. Tell your teacher — you may need to sign in again. Your typing is kept on this computer for now — don’t close the tab, and press Save to try again.

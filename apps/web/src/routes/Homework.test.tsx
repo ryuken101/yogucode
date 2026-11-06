@@ -33,8 +33,8 @@ const test1: Schemas['IoTest'] = { kind: 'io', name: 'prints', hidden: false, st
 
 function leaf(overrides: Partial<Schemas['SheetLeafOut']>): Schemas['SheetLeafOut'] {
   return {
-    problem_id: P1, leaf_item_id: P1, title: 'Add to the end', difficulty: 1, attempt_id: null,
-    progress: 'not_started', handed_in: false, changed_since_hand_in: false, feedback: null,
+    problem_id: P1, leaf_item_id: P1, title: 'Add to the end', problem_title: 'Add to the end', difficulty: 1, attempt_id: null,
+    progress: 'not_started', answered: false, handed_in: false, changed_since_hand_in: false, feedback: null,
     ...overrides,
   }
 }
@@ -154,7 +154,7 @@ test('marking pre-fills Runs and Correct from the re-run and saves when moving o
   server.use(
     http.get(`/api/assignments/${HW}/marking`, () =>
       HttpResponse.json({
-        assignment_id: HW, title: 'Lists practice', due_at: null, released_at: null,
+        assignment_id: HW, title: 'Lists practice', mode: 'homework', due_at: null, released_at: null,
         questions: [{ leaf_item_id: P1, title: 'Add to the end', difficulty: 1, handed_in: 2, marked: 0 }],
         students: [],
       } satisfies Schemas['MarkingOverviewOut']),

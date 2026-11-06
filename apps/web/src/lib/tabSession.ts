@@ -33,3 +33,16 @@ export function isStudentTab(): boolean {
 export function clearStudentTab(): void {
   storage()?.removeItem(KEY)
 }
+
+const REMOVED_KEY = 'yogucode.removed-from-class'
+
+/** A teacher took this child out of their class: the sign-in page says so, once. */
+export function markRemovedFromClass(): void {
+  storage()?.setItem(REMOVED_KEY, '1')
+}
+
+export function takeRemovedFromClass(): boolean {
+  const removed = storage()?.getItem(REMOVED_KEY) === '1'
+  storage()?.removeItem(REMOVED_KEY)
+  return removed
+}

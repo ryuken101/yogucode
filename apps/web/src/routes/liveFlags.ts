@@ -8,7 +8,11 @@
  * - **no run for 5 min** — connected, editing nothing runnable, or not editing at all;
  * - **pasted** — a large paste (Ken's decision: allowed, recorded, shown to the teacher,
  *   never framed as cheating);
- * - **all passing** — every check passes: finished, and ready for the next rung.
+ * - **all passing** — every check passes: finished, and ready for the next rung;
+ * - **left the page** — their Yogucode page is out of sight now, or has been (Ken, 6 Nov
+ *   2026). Worth a look, in plain words: a browser can't say where they went or why;
+ * - **not on today's lesson** — something else open during a lesson. Only information: a
+ *   child opening their Files may be doing just what they were asked to.
  *
  * Tones follow the palette rule: not-yet for "worth a look", good for done, grape for
  * information. Never system-error — a stuck child is not an error.
@@ -25,10 +29,33 @@ export const SAME_ERROR_TIMES = 4
 export const IDLE_MS = 5 * 60_000
 export const BIG_PASTE_CHARS = 80
 
-export function flagsFor(student: LiveStudent, now = Date.now()): Flag[] {
+export function flagsFor(
+  student: LiveStudent,
+  now = Date.now(),
+  context: {
+    /** The classwork the class is on today, if any. */
+    todaysWork?: string | null
+    /** How many times they left, when a record longer than this connection exists: a quiz's. */
+    timesLeft?: number
+  } = {},
+): Flag[] {
   if (!student.online) return []
   const flags: Flag[] = []
   const recent = student.recent
+
+  if (student.awaySince !== null) {
+    flags.push({
+      label: `left the page · ${Math.max(0, Math.round((now - student.awaySince) / 1000))}s`,
+      tone: 'attention',
+    })
+  }
+  const timesLeft = context.timesLeft ?? student.awayCount
+  if (timesLeft > 0) flags.push({ label: `left ${timesLeft}×`, tone: 'attention' })
+
+  const focus = student.focus
+  if (context.todaysWork && focus && focus.mode !== 'quiz' && focus.assignment_id !== context.todaysWork) {
+    flags.push({ label: 'not on today’s lesson', tone: 'info' })
+  }
 
   // Same error, several runs in a row (checks in between do not break the streak).
   const errors = recent.filter((s) => s.kind === 'error' || s.kind === 'run')

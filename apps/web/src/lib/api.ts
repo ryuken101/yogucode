@@ -256,6 +256,11 @@ export const api = {
     request<Schemas['QuizOut']>(`/quizzes/${quizId}/start`, { method: 'POST' }),
   stopQuiz: (quizId: string) =>
     request<Schemas['QuizOut']>(`/quizzes/${quizId}/stop`, { method: 'POST' }),
+  runningQuizzes: () => request<Schemas['RunningQuizOut'][]>('/quizzes/running'),
+  quizSittings: (quizId: string) => request<Schemas['SittingOut'][]>(`/quizzes/${quizId}/sittings`),
+  quizAnswers: (quizId: string, studentId: string) =>
+    request<Schemas['QuizAnswerOut'][]>(`/quizzes/${quizId}/students/${studentId}/answers`),
+  todaysWork: (classId: string) => request<Schemas['TodaysWorkOut']>(`/classes/${classId}/todays-work`),
 
   /* --- teacher: problem bank ----------------------------------------------------- */
 
@@ -492,6 +497,18 @@ export const api = {
   startedProblems: () =>
     request<Schemas['StartedProblemOut'][]>('/me/problems', { anonymous: true }),
   activeQuiz: () => request<Schemas['ActiveQuizOut'] | null>('/me/quiz', { anonymous: true }),
+  finishQuiz: (quizId: string) =>
+    request<Schemas['ActiveQuizOut']>(`/me/quiz/${quizId}/finish`, { method: 'POST', anonymous: true }),
+  resumeQuiz: (quizId: string) =>
+    request<Schemas['ActiveQuizOut']>(`/me/quiz/${quizId}/resume`, { method: 'POST', anonymous: true }),
+  /** `keepalive`: "they left" is often the last thing a page gets to say. */
+  reportAway: (quizId: string, away: boolean) =>
+    request<void>(`/me/quiz/${quizId}/away`, {
+      method: 'POST',
+      anonymous: true,
+      keepalive: true,
+      body: { away } satisfies Schemas['AwayIn'],
+    }),
   sheet: (assignmentId: string) =>
     request<Schemas['SheetOut']>(`/me/homework/${assignmentId}`, { anonymous: true }),
   handIn: (assignmentId: string, results: Schemas['HandInResult'][]) =>

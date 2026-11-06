@@ -51,6 +51,10 @@ export const keys = {
   activeQuiz: ['active-quiz'] as const,
   quizzes: (classId: string) => ['quizzes', classId] as const,
   quiz: (quizId: string) => ['quiz', quizId] as const,
+  runningQuizzes: ['running-quizzes'] as const,
+  quizSittings: (quizId: string) => ['quiz-sittings', quizId] as const,
+  quizAnswers: (quizId: string, studentId: string) => ['quiz-answers', quizId, studentId] as const,
+  todaysWork: (classId: string) => ['todays-work', classId] as const,
   sheet: (assignmentId: string) => ['sheet', assignmentId] as const,
   homework: (classId: string) => ['homework', classId] as const,
   homeworkOne: (assignmentId: string) => ['homework-one', assignmentId] as const,
@@ -805,6 +809,7 @@ export function useQuizMutation<T>(
     mutationFn,
     onSuccess: (quiz) => {
       client.setQueryData(keys.quiz(quiz.id), quiz)
+      void client.invalidateQueries({ queryKey: keys.runningQuizzes })
       return client.invalidateQueries({ queryKey: keys.quizzes(classId) })
     },
   })
@@ -814,13 +819,56 @@ export function useQuizMutation<T>(
  * The quiz this child's class is sitting, or null. Checked every 15 seconds as a safety
  * net; the live connection's push (`quiz_started`, `quiz_ended`) is what makes it prompt.
  */
-export function useActiveQuiz() {
+export function useActiveQuiz(enabled = true) {
   return useQuery({
     queryKey: keys.activeQuiz,
     queryFn: api.activeQuiz,
     refetchInterval: 15_000,
     staleTime: 0,
+    enabled,
   })
+}
+
+/** Every quiz running at the centre: the teacher's top bar, wherever they are. */
+export function useRunningQuizzes() {
+  return useQuery({
+    queryKey: keys.runningQuizzes,
+    queryFn: api.runningQuizzes,
+    refetchInterval: 15_000,
+  })
+}
+
+/** Who has finished and who left the page. Live refreshes it when a child reports. */
+export function useQuizSittings(quizId: string | null) {
+  return useQuery({
+    queryKey: keys.quizSittings(quizId ?? ''),
+    queryFn: () => api.quizSittings(quizId ?? ''),
+    enabled: Boolean(quizId),
+    refetchInterval: 10_000,
+  })
+}
+
+/** What one child has saved so far, for going through their quiz on Live. */
+export function useQuizAnswers(quizId: string | null, studentId: string) {
+  return useQuery({
+    queryKey: keys.quizAnswers(quizId ?? '', studentId),
+    queryFn: () => api.quizAnswers(quizId ?? '', studentId),
+    enabled: Boolean(quizId),
+    refetchInterval: 5_000,
+  })
+}
+
+export function useTodaysWork(classId: string) {
+  return useQuery({
+    queryKey: keys.todaysWork(classId),
+    queryFn: () => api.todaysWork(classId),
+    refetchInterval: 60_000,
+  })
+}
+
+/** Stop a quiz for the whole class. */
+export function useStopQuiz(classId: string) {
+  return useQuizMutation(classId, (quizId: string) => api.stopQuiz(quizId))
 }
 
 /* --- the Trash (23 Oct 2026) ----------------------------------------------------------- */

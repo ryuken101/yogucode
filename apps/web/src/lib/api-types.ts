@@ -849,6 +849,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/classes/{class_id}/todays-work": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Todays Work
+         * @description The classwork this class is on: the live view notes a child with something else open.
+         */
+        get: operations["todays_work_classes__class_id__todays_work_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/classes/{class_id}/unarchive": {
         parameters: {
             query?: never;
@@ -1687,6 +1707,67 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/quiz/{quiz_id}/away": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Report Away
+         * @description This child's page went out of sight, or came back: the record marking shows.
+         */
+        post: operations["report_away_me_quiz__quiz_id__away_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/quiz/{quiz_id}/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Finish Quiz
+         * @description "I'm finished" (Ken, 6 Nov 2026). The teacher sees it. Nothing is handed in, and the
+         *     rest of their account stays closed until the quiz ends.
+         */
+        post: operations["finish_quiz_me_quiz__quiz_id__finish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/quiz/{quiz_id}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resume Quiz
+         * @description "Go back and edit": no longer finished, until they say so again.
+         */
+        post: operations["resume_quiz_me_quiz__quiz_id__resume_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/trash": {
         parameters: {
             query?: never;
@@ -1721,6 +1802,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/quizzes/running": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Running Quizzes
+         * @description Every quiz running at this centre, for every teacher and the owner: a class is
+         *     anyone's to cover, so a quiz in any of them is worth knowing about. Before
+         *     `/quizzes/{quiz_id}`, which would otherwise read "running" as an id.
+         */
+        get: operations["running_quizzes_quizzes_running_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/quizzes/{quiz_id}": {
         parameters: {
             query?: never;
@@ -1740,6 +1843,26 @@ export interface paths {
          * @description Edit a draft. A quiz that has started is not changed under the children sitting it.
          */
         patch: operations["update_quiz_quizzes__quiz_id__patch"];
+        trace?: never;
+    };
+    "/quizzes/{quiz_id}/sittings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Quiz Sittings
+         * @description Who has finished and who left the page: for Live now, and for marking afterwards.
+         */
+        get: operations["quiz_sittings_quizzes__quiz_id__sittings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/quizzes/{quiz_id}/start": {
@@ -1773,9 +1896,30 @@ export interface paths {
         put?: never;
         /**
          * Stop Quiz
-         * @description End the quiz for everyone — after a few seconds' grace, so last keystrokes save.
+         * @description Stop the clock for everyone. Their work is handed in a few seconds later.
          */
         post: operations["stop_quiz_quizzes__quiz_id__stop_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/quizzes/{quiz_id}/students/{student_id}/answers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Quiz Answers
+         * @description What one child has saved so far, question by question, for the live view to go through.
+         *     The saved copy: the question they have open is also streamed live.
+         */
+        get: operations["quiz_answers_quizzes__quiz_id__students__student_id__answers_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2574,8 +2718,17 @@ export interface components {
              * Format: date-time
              */
             ends_at: string;
+            /** Finished */
+            finished: boolean;
             /** Title */
             title: string;
+        };
+        /** AnswerOptionOut */
+        AnswerOptionOut: {
+            /** Correct */
+            correct: boolean;
+            /** Text */
+            text: string;
         };
         /**
          * AssignmentMode
@@ -2622,6 +2775,11 @@ export interface components {
         AutoMarkOut: {
             /** Marked */
             marked: number;
+        };
+        /** AwayIn */
+        AwayIn: {
+            /** Away */
+            away: boolean;
         };
         /** BulkEnrolIn */
         BulkEnrolIn: {
@@ -3699,6 +3857,7 @@ export interface components {
             assignment_id: string;
             /** Due At */
             due_at: string | null;
+            mode: components["schemas"]["AssignmentMode"];
             /** Questions */
             questions: components["schemas"]["QuestionOut"][];
             /** Released At */
@@ -4108,6 +4267,36 @@ export interface components {
             /** Title */
             title: string;
         };
+        /**
+         * QuizAnswerOut
+         * @description What a child has saved for one question, for their teacher's eyes only. It carries the
+         *     answer key, so it must never be served from a `/me` route.
+         */
+        QuizAnswerOut: {
+            /** Answered */
+            answered: boolean;
+            /** Attempt Id */
+            attempt_id: string | null;
+            /** Choice */
+            choice: number | null;
+            /** Code */
+            code: string | null;
+            /**
+             * Item Id
+             * Format: uuid
+             */
+            item_id: string;
+            kind: components["schemas"]["ItemKind"];
+            /** Options */
+            options: components["schemas"]["AnswerOptionOut"][];
+            /**
+             * Problem Id
+             * Format: uuid
+             */
+            problem_id: string;
+            /** Title */
+            title: string;
+        };
         /** QuizIn */
         QuizIn: {
             /**
@@ -4176,6 +4365,10 @@ export interface components {
              */
             id: string;
             kind: components["schemas"]["ItemKind"];
+            /** Newer Version Id */
+            newer_version_id: string | null;
+            /** Superseded */
+            superseded: boolean;
             /** Title */
             title: string;
         };
@@ -4267,6 +4460,31 @@ export interface components {
             total?: number | null;
         };
         /**
+         * RunningQuizOut
+         * @description For the top bar: a quiz running anywhere at the centre, with what it takes to act.
+         */
+        RunningQuizOut: {
+            /**
+             * Class Id
+             * Format: uuid
+             */
+            class_id: string;
+            /** Class Name */
+            class_name: string;
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+        };
+        /**
          * ScriptTest
          * @description The teacher's own Python check (17 Oct 2026), for what a fixed expected value cannot
          *     say — a check that depends on values the child chose.
@@ -4302,6 +4520,8 @@ export interface components {
         };
         /** SheetLeafOut */
         SheetLeafOut: {
+            /** Answered */
+            answered: boolean;
             /** Attempt Id */
             attempt_id: string | null;
             /** Changed Since Hand In */
@@ -4321,6 +4541,8 @@ export interface components {
              * Format: uuid
              */
             problem_id: string;
+            /** Problem Title */
+            problem_title: string;
             /**
              * Progress
              * @enum {string}
@@ -4357,6 +4579,25 @@ export interface components {
         SignupAllowedOut: {
             /** Allowed */
             allowed: boolean;
+        };
+        /**
+         * SittingOut
+         * @description One child's sitting, for the teacher: finished, and how much they left the page.
+         */
+        SittingOut: {
+            /** Away Count */
+            away_count: number;
+            /** Away Now */
+            away_now: boolean;
+            /** Away Seconds */
+            away_seconds: number;
+            /** Finished At */
+            finished_at: string | null;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
         };
         /** SnippetIn */
         SnippetIn: {
@@ -4709,6 +4950,11 @@ export interface components {
             lesson_title: string | null;
             /** Problems */
             problems: components["schemas"]["LadderProblemOut"][];
+        };
+        /** TodaysWorkOut */
+        TodaysWorkOut: {
+            /** Assignment Id */
+            assignment_id: string | null;
         };
         /**
          * TranscriptLine
@@ -6365,6 +6611,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GridOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    todays_work_classes__class_id__todays_work_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                class_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TodaysWorkOut"];
                 };
             };
             /** @description Validation Error */
@@ -8079,6 +8358,107 @@ export interface operations {
             };
         };
     };
+    report_away_me_quiz__quiz_id__away_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                quiz_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AwayIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    finish_quiz_me_quiz__quiz_id__finish_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                quiz_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActiveQuizOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resume_quiz_me_quiz__quiz_id__resume_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                quiz_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActiveQuizOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_my_trash_me_trash_get: {
         parameters: {
             query?: never;
@@ -8130,6 +8510,37 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    running_quizzes_quizzes_running_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunningQuizOut"][];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -8212,6 +8623,39 @@ export interface operations {
             };
         };
     };
+    quiz_sittings_quizzes__quiz_id__sittings_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                quiz_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SittingOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     start_quiz_quizzes__quiz_id__start_post: {
         parameters: {
             query?: never;
@@ -8265,6 +8709,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QuizOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    quiz_answers_quizzes__quiz_id__students__student_id__answers_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                quiz_id: string;
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuizAnswerOut"][];
                 };
             };
             /** @description Validation Error */

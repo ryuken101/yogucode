@@ -20,8 +20,8 @@ export function EmptyState({ title, children }: { title: string; children?: Reac
 
 export function PageHeader({ title, children }: { title: string; children?: ReactNode }) {
   return (
-    <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
-      <h1 className="font-display font-semibold text-2xl text-grape">{title}</h1>
+    <header className="mb-6 flex flex-wrap items-center justify-between gap-3 [overflow-wrap:anywhere]">
+      <h1 className="min-w-0 break-words font-display font-semibold text-2xl text-grape">{title}</h1>
       {children ? <div className="flex items-center gap-2">{children}</div> : null}
     </header>
   )

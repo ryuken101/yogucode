@@ -20,13 +20,24 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { ApiError } from '../lib/errors'
 import { useSaveDocument } from '../lib/queries'
 import { track } from './inflight'
 
 /** Long enough to coalesce a sentence of typing, short enough to lose almost nothing. */
 export const AUTOSAVE_DELAY_MS = 2_000
 
-export type SaveState = 'saved' | 'pending' | 'saving' | 'failed'
+/**
+ * The longest typing waits, however steadily it comes. The delay restarts on each key, so
+ * without this a child who never paused for two seconds saved nothing at all — 25 seconds of
+ * a quiz's end were lost that way (6 Nov 2026).
+ */
+export const AUTOSAVE_MAX_WAIT_MS = 5_000
+
+/** How long before each retry while the server can't be reached; the last one repeats. */
+const RETRY_DELAYS_MS = [2_000, 5_000, 10_000]
+
+export type SaveState = 'saved' | 'pending' | 'saving' | 'failed' | 'offline'
 
 /**
  * What actually writes. Defaults to saving a file; a problem attempt passes its own, so
@@ -50,6 +61,11 @@ function readBackup(id: string): string | null {
   } catch {
     return null
   }
+}
+
+/** Whether this browser still holds typing for this work that never reached the server. */
+export function hasUnsavedBackup(id: string): boolean {
+  return readBackup(id) !== null
 }
 
 function writeBackup(id: string, content: string | null) {
@@ -88,12 +104,21 @@ export function useAutosave(
   const persisted = useRef<string | null>(null)
   const pending = useRef<string | null>(null)
   const activeId = useRef<string | null>(documentId)
+  /** When the oldest typing not yet sent was typed, for `AUTOSAVE_MAX_WAIT_MS`. */
+  const waitingSince = useRef<number | null>(null)
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const retries = useRef(0)
 
   const flush = useCallback(() => {
     if (timer.current !== null) {
       clearTimeout(timer.current)
       timer.current = null
     }
+    if (retryTimer.current !== null) {
+      clearTimeout(retryTimer.current)
+      retryTimer.current = null
+    }
+    waitingSince.current = null
     const id = activeId.current
     const content = pending.current
     if (!id || content === null || content === persisted.current) return
@@ -104,22 +129,44 @@ export function useAutosave(
     track(sent)
     sent.then(
       () => {
+        retries.current = 0
         persisted.current = content
         // Typing since this save went is still waiting: say so, rather than "Saved".
         const waiting = pending.current !== null && pending.current !== content
         setState(waiting ? 'pending' : 'saved')
         if (!waiting) writeBackup(id, null)
       },
-      // Deliberately not retried: the usual cause is a revoked or expired session, and
-      // retrying would hide that behind a spinner while the child keeps typing into
-      // something that cannot be saved. The editor says so instead — and keeps the text
+      // A refusal is deliberately not retried: the usual cause is a revoked or expired
+      // session, and retrying would hide that behind a spinner while the child keeps typing
+      // into something that cannot be saved. The editor says so instead — and keeps the text
       // as unsent, so pressing Save tries again.
-      () => {
+      //
+      // Not reaching the server at all is different: wifi comes back, and the child who has
+      // stopped typing must not have to do anything for their work to save (6 Nov 2026).
+      (error: unknown) => {
         if (pending.current === null) pending.current = content
-        setState('failed')
+        if (!(error instanceof ApiError && error.status === 0)) {
+          setState('failed')
+          return
+        }
+        setState('offline')
+        const delay = RETRY_DELAYS_MS[Math.min(retries.current, RETRY_DELAYS_MS.length - 1)]
+        retries.current += 1
+        retryTimer.current = setTimeout(() => flushRef.current(), delay)
       },
     )
   }, [])
+  // The retry above needs the flush it is part of. `flush` is stable, so this stays true.
+  const flushRef = useRef(flush)
+
+  // The browser says the connection is back: don't wait for the next retry.
+  useEffect(() => {
+    const onOnline = () => {
+      if (pending.current !== null) flush()
+    }
+    window.addEventListener('online', onOnline)
+    return () => window.removeEventListener('online', onOnline)
+  }, [flush])
 
   /** Tell the hook what the server already has, when a file is opened or created. */
   const adopt = useCallback((documentId: string | null, content: string) => {
@@ -132,6 +179,7 @@ export function useAutosave(
     activeId.current = documentId
     persisted.current = content
     pending.current = null
+    waitingSince.current = null
     setState('saved')
     const backup = documentId ? readBackup(documentId) : null
     if (backup !== null && backup === content && documentId) writeBackup(documentId, null)
@@ -150,13 +198,17 @@ export function useAutosave(
       if (content === persisted.current) {
         if (timer.current !== null) clearTimeout(timer.current)
         timer.current = null
+        waitingSince.current = null
         setState((now) => (now === 'pending' ? 'saved' : now))
         return
       }
-      setState((now) => (now === 'saving' ? now : 'pending'))
+      setState((now) => (now === 'saving' || now === 'offline' ? now : 'pending'))
       if (activeId.current) writeBackup(activeId.current, content)
       if (timer.current !== null) clearTimeout(timer.current)
-      timer.current = setTimeout(flush, AUTOSAVE_DELAY_MS)
+      const now = Date.now()
+      waitingSince.current ??= now
+      const left = waitingSince.current + AUTOSAVE_MAX_WAIT_MS - now
+      timer.current = setTimeout(flush, Math.max(0, Math.min(AUTOSAVE_DELAY_MS, left)))
     },
     [flush],
   )
@@ -169,12 +221,13 @@ export function useAutosave(
     return () => {
       window.removeEventListener('pagehide', onHide)
       flush()
+      if (retryTimer.current !== null) clearTimeout(retryTimer.current)
     }
   }, [flush])
 
   // Unsent work and a failed save: closing the tab now would lose it, so the browser asks.
   useEffect(() => {
-    if (state !== 'failed') return
+    if (state !== 'failed' && state !== 'offline') return
     const onLeave = (event: BeforeUnloadEvent) => event.preventDefault()
     window.addEventListener('beforeunload', onLeave)
     return () => window.removeEventListener('beforeunload', onLeave)

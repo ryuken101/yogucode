@@ -39,6 +39,7 @@ from app.auth.student_session import revoke_live_sessions
 from app.config import Settings
 from app.db import get_session
 from app.erase import EraseIn, erase_student, names_match
+from app.live.hub import hub
 from app.models import (
     AuditLog,
     Class,
@@ -49,6 +50,7 @@ from app.models import (
     StudentStatus,
 )
 from app.models.base import new_uuid, utcnow
+from app.quiz import hand_in_for_removed_child
 from app.roster import (
     MAX_ENTRIES,
     MAX_NAME_LENGTH,
@@ -766,6 +768,8 @@ async def withdraw_student(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="enrolment not found")
 
     if enrolment.status == EnrolmentStatus.ACTIVE:
+        await hand_in_for_removed_child(session, principal.centre_id, class_id, student.id)
+        await hub.tell_removed(student.id)
         now = utcnow()
         enrolment.status = EnrolmentStatus.WITHDRAWN
         enrolment.withdrawn_at = now

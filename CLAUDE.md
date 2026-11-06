@@ -134,6 +134,27 @@ inputs only, since writing a run back would make it stale. A child is sent the t
 never the solution. My work's Lessons tab (`GET /me/problems`) lists lesson problems
 already started, because Today shows only the current lesson.
 
+**Quizzes: the clock and the hand-in are two moments** (Ken, 6 Nov 2026; `app/quiz.py`).
+`ends_at` is what the clock counts down to, or the moment of Stop; `hand_in_at` is
+`quiz_hand_in_grace_seconds` later. At 0:00 a child's page locks and sends its last typing;
+saves are accepted until the hand-in, which is what `is_running` means. A hand-in at the
+instant of 0:00 lost children's last typing. Finalising re-reads the locked row with
+`populate_existing`, or a racing caller reads its stale copy and hands everything in twice.
+Marking routes refuse a running quiz. Withdrawing a child mid-quiz hands in what they saved
+(`hand_in_for_removed_child`), since the final hand-in reaches enrolled children only.
+
+**`quiz_sittings`** (one row per quiz and child, made on first need): "I'm finished", and how
+often and how long they left the page. Finished changes nothing else: they can still edit,
+and the rest of their account stays closed until the quiz ends. All finished tells the
+teacher and never ends the quiz. The answer-key route (`/quizzes/{id}/students/{id}/answers`)
+is teacher-only and must never be served from `/me`.
+
+**Leaving the page** (Ken, 6 Nov 2026; `collab/useAttentionReporter.ts`, `hub.attention`):
+shown live for everything, kept only for quizzes, and the child is told. A browser can say
+the page lost sight or focus, not where they went, and knows nothing of a second device.
+Wording stays neutral (`left the page`), never "cheating". Mention it in the privacy notice
+for parents.
+
 **Help locks the child's editor** (`app/live/hub.py`, `Room.helping`): a teacher's
 `{type: "help", on}` locks it; the last helper stopping — or their socket going — unlocks
 it, and a reconnecting child is told the current state.

@@ -31,7 +31,11 @@ export function HomeworkCard({ card }: { card: Schemas['HomeworkCardOut'] }) {
       <span className="font-medium text-grape">{card.title}</span>
       {card.mode === 'quiz' ? <Badge variant="muted">Quiz</Badge> : null}
       <span className="text-sm text-muted">
-        {card.returned ? 'Given back' : `Due ${formatDue(card.due_at)}`}
+        {card.returned
+          ? 'Given back'
+          : card.mode === 'quiz'
+            ? 'Waiting for your teacher'
+            : `Due ${formatDue(card.due_at)}`}
       </span>
       <span className="ml-auto flex items-center gap-2">
         {card.returned ? (

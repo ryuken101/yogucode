@@ -276,8 +276,11 @@ flush. The label is honest: "Unsaved changes" during the wait (the `pending` sta
 
 A failed save is the one thing on that screen allowed to be **`system-error`** — it is
 genuinely our fault, and a child typing into a page that silently discards their work is
-the failure most worth shouting about. Saves are deliberately not retried: the usual cause is a revoked
-session, and retrying hides it behind a spinner.
+the failure most worth shouting about. A save the server refuses is deliberately not retried:
+the usual cause is a revoked session, and retrying hides it behind a spinner. Not reaching the
+server is different (6 Nov 2026): it retries with backoff and on the browser's `online` event,
+shows "Reconnecting…", and is never `system-error`. Typing can't wait longer than
+`AUTOSAVE_MAX_WAIT_MS` however steadily it comes: the delay restarts on every key.
 
 **Rules from the lost-work bugs of 17 Oct 2026.** Break any of these and work goes missing
 again. A Playwright run with eight students and a teacher reproduced every one of them
@@ -328,4 +331,6 @@ a fake model (`monacoBinding.test.ts`), including two people typing at once.
   not carry them.
 - **Quizzes:** `RequireStudent` routes a child to `/quiz/:id` while one runs
   (`useActiveQuiz` plus the `quiz_started` / `quiz_ended` push). The server enforces the
-  same thing, so the routing is for the child's benefit, not the security.
+  same thing, so the routing is for the child's benefit, not the security. The clock lives
+  in the locked top bar; `useQuizTimeUp` is what locks a page at 0:00. `Answered` is `active`,
+  never `good`: mint means correct.

@@ -4,7 +4,8 @@
  *
  * A quiz stays a draft until you **Start** it, in class: every child is switched to it at
  * once and the clock runs (one clock for the class — Ken's decision). Starting from here
- * takes you to the live view, where you watch it and can stop it.
+ * takes you to the live view, where you watch it. While it runs this page offers the same
+ * two things, Watch and Stop, and marking only once it has finished.
  */
 
 import { useState } from 'react'
@@ -14,6 +15,7 @@ import { Button } from '../components/Button'
 import { Card, PageHeader } from '../components/Card'
 import { TextInput } from '../components/Field'
 import { Notice } from '../components/Notice'
+import { StartQuizDialog, StopQuizButton } from '../components/QuizControls'
 import { Spinner } from '../components/Spinner'
 import { api, type Schemas } from '../lib/api'
 import { messageFor } from '../lib/errors'
@@ -23,8 +25,17 @@ import { ProblemListEditor, type ProblemRow } from '../problems/ProblemListEdito
 interface Draft {
   title: string
   rows: ProblemRow[]
-  minutes: number
+  /** As typed: clearing the field to type a new number must not put anything else there. */
+  minutes: string
   checks: boolean
+}
+
+const DEFAULT_MINUTES = 20
+
+/** The length a quiz will have, from what is in the field: whole minutes, 1 to 180. */
+function minutesFrom(typed: string): number {
+  if (typed.trim() === '') return DEFAULT_MINUTES
+  return Math.max(1, Math.min(180, Number.parseInt(typed, 10) || 1))
 }
 
 function fromQuiz(quiz: Schemas['QuizOut']): Draft {
@@ -34,16 +45,20 @@ function fromQuiz(quiz: Schemas['QuizOut']): Draft {
       id: q.id,
       title: q.title,
       difficulty: q.difficulty,
-      newerVersionId: null,
-      superseded: false,
+      newerVersionId: q.newer_version_id,
+      superseded: q.superseded,
     })),
-    minutes: quiz.duration_minutes,
+    minutes: String(quiz.duration_minutes),
     checks: quiz.checks,
   }
 }
 
 export function QuizBuilder() {
-  const { classId = '', quizId } = useParams()
+  const { classId = '', quizId: routeQuizId } = useParams()
+  // Saved but not yet navigated to: a Start refused after the save must not make a second
+  // quiz on the next press.
+  const [savedId, setSavedId] = useState<string | undefined>(undefined)
+  const quizId = routeQuizId ?? savedId
   const navigate = useNavigate()
   const klass = useClass(classId)
   const existing = useQuiz(quizId ?? null)
@@ -54,18 +69,19 @@ export function QuizBuilder() {
       ? fromQuiz(existing.data)
       : quizId
         ? null
-        : { title: '', rows: [], minutes: 20, checks: false })
+        : { title: '', rows: [], minutes: String(DEFAULT_MINUTES), checks: false })
 
   const save = useQuizMutation(classId, async (d: Draft) => {
     const body = {
       title: d.title.trim(),
       item_ids: d.rows.map((r) => r.id),
-      duration_minutes: d.minutes,
+      duration_minutes: minutesFrom(d.minutes),
       checks: d.checks,
     }
     return quizId ? api.updateQuiz(quizId, body) : api.createQuiz(classId, body)
   })
   const start = useQuizMutation(classId, (id: string) => api.startQuiz(id))
+  const [confirming, setConfirming] = useState(false)
 
   if (quizId && existing.isPending) return <Spinner label="Loading quiz" />
   if (existing.error) return <Notice tone="system-error">{messageFor(existing.error)}</Notice>
@@ -77,15 +93,27 @@ export function QuizBuilder() {
   const ready = draft.title.trim() && draft.rows.length > 0
 
   async function saveDraft() {
-    const saved = await save.mutateAsync(draft!)
-    setDraft(null)
-    if (!quizId) navigate(`/classes/${classId}/quizzes/${saved.id}`, { replace: true })
+    try {
+      const saved = await save.mutateAsync(draft!)
+      setSavedId(saved.id)
+      setDraft(null)
+      if (!routeQuizId) navigate(`/classes/${classId}/quizzes/${saved.id}`, { replace: true })
+    } catch {
+      // Shown from `save.error`.
+    }
   }
 
   async function startNow() {
-    const saved = edited || !quizId ? await save.mutateAsync(draft!) : existing.data!
-    await start.mutateAsync(saved.id)
-    navigate(`/classes/${classId}/live`)
+    setConfirming(false)
+    try {
+      const saved = edited || !quizId ? await save.mutateAsync(draft!) : existing.data!
+      setSavedId(saved.id)
+      setDraft(null)
+      await start.mutateAsync(saved.id)
+      navigate(`/classes/${classId}/live`)
+    } catch {
+      // Shown from `save.error` or `start.error`.
+    }
   }
 
   const error = save.error ?? start.error
@@ -111,12 +139,12 @@ export function QuizBuilder() {
           />
           <TextInput
             label="Length (minutes)"
-            type="number"
-            min={1}
-            max={180}
+            inputMode="numeric"
+            maxLength={3}
             value={draft.minutes}
             disabled={locked}
-            onChange={(e) => update({ minutes: Math.max(1, Math.min(180, Number(e.target.value) || 1)) })}
+            onChange={(e) => update({ minutes: e.target.value.replace(/\D/g, '') })}
+            onBlur={() => update({ minutes: String(minutesFrom(draft.minutes)) })}
           />
         </div>
         <label className="mt-4 flex items-center gap-2 text-sm text-grape">
@@ -167,18 +195,35 @@ export function QuizBuilder() {
             <Button
               variant="primary"
               disabled={!ready || save.isPending || start.isPending}
-              onClick={() => void startNow()}
+              onClick={() => setConfirming(true)}
             >
               Start the quiz now
             </Button>
           </>
         )}
-        {existing.data && existing.data.status !== 'draft' ? (
+        {existing.data?.running ? (
+          <>
+            <Button variant="primary" onClick={() => navigate(`/classes/${classId}/live`)}>
+              Watch
+            </Button>
+            <StopQuizButton quiz={existing.data} />
+          </>
+        ) : null}
+        {status === 'closed' && existing.data ? (
           <Button variant="primary" onClick={() => navigate(`/assignments/${existing.data.id}/mark`)}>
             Mark
           </Button>
         ) : null}
       </div>
+
+      <StartQuizDialog
+        open={confirming}
+        title={draft.title.trim()}
+        minutes={minutesFrom(draft.minutes)}
+        busy={save.isPending || start.isPending}
+        onClose={() => setConfirming(false)}
+        onStart={() => void startNow()}
+      />
     </>
   )
 }

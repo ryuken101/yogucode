@@ -51,6 +51,7 @@ from app.problem_bank import (
     read_document,
     with_reference,
 )
+from app.quiz import finalise_if_due, is_running
 from app.scoping import (
     get_centre_attempt,
     get_owned_assignment,
@@ -83,6 +84,7 @@ class MarkingStudentOut(BaseModel):
 class MarkingOverviewOut(BaseModel):
     assignment_id: uuid.UUID
     title: str
+    mode: AssignmentMode
     due_at: datetime | None
     released_at: datetime | None
     questions: list[QuestionOut]
@@ -205,6 +207,13 @@ async def _homework(
     assignment = await get_owned_assignment(session, principal, assignment_id)
     if assignment.mode not in (AssignmentMode.HOMEWORK, AssignmentMode.QUIZ):
         raise _not_found("homework")
+    await finalise_if_due(session, assignment)
+    # Giving work back mid-quiz would turn a child's quiz into their feedback, clock running.
+    if is_running(assignment):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This quiz is still running. Stop it first.",
+        )
     return assignment
 
 
@@ -279,6 +288,7 @@ async def marking_overview(
     return MarkingOverviewOut(
         assignment_id=assignment.id,
         title=assignment.title,
+        mode=assignment.mode,
         due_at=assignment.due_at,
         released_at=assignment.released_at,
         questions=[

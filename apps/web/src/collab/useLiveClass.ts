@@ -12,8 +12,10 @@
  * duplicate their code.
  */
 
+import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useState } from 'react'
 import * as Y from 'yjs'
+import { keys } from '../lib/queries'
 import { currentAccessToken } from '../lib/supabase'
 import { LiveSocket, fromBase64, toBase64, type Message } from './socket'
 
@@ -47,6 +49,11 @@ export interface LiveStudent {
   recent: LiveStatus[]
   /** When this child last typed, by this browser's clock. */
   lastEditAt: number | null
+  /** Since when their page has been out of sight, by this browser's clock; null if in sight. */
+  awaySince: number | null
+  /** How many times they have left, and seconds away before now, since they connected. */
+  awayCount: number
+  awayTotal: number
 }
 
 export interface LiveDoc {
@@ -80,7 +87,17 @@ class Store {
   }
 }
 
+/** The server's `away_for` / `away_count` / `away_total` (`hub._attention`) for a student. */
+function attention(message: Record<string, unknown>): Pick<LiveStudent, 'awaySince' | 'awayCount' | 'awayTotal'> {
+  return {
+    awaySince: typeof message.away_for === 'number' ? Date.now() - message.away_for * 1000 : null,
+    awayCount: Number(message.away_count ?? 0),
+    awayTotal: Number(message.away_total ?? 0),
+  }
+}
+
 export function useLiveClass(classId: string) {
+  const client = useQueryClient()
   const [store] = useState(() => new Store())
   const [version, setVersion] = useState(0)
   const [state, setState] = useState<'connecting' | 'live' | 'reconnecting' | 'refused'>('connecting')
@@ -108,6 +125,9 @@ export function useLiveClass(classId: string) {
         focus: null,
         recent: [],
         lastEditAt: null,
+        awaySince: null,
+        awayCount: 0,
+        awayTotal: 0,
       }
       store.students.set(id, { ...current, ...patch })
     }
@@ -123,6 +143,7 @@ export function useLiveClass(classId: string) {
               online: true,
               focus: (s.focus as LiveFocus | null) ?? null,
               recent: (s.recent as LiveStatus[]) ?? [],
+              ...attention(s),
             })
           }
           for (const d of message.docs as { target: string; student_id: string; updates: string[] }[]) {
@@ -138,7 +159,21 @@ export function useLiveClass(classId: string) {
             // A new connection starts with no history on the server, so none here either:
             // an old "all passing" must not outlive the connection that reported it.
             recent: [],
+            ...attention(message),
           })
+          break
+        case 'attention':
+          upsert(String(message.student_id), attention(message))
+          // A quiz's record of it has just changed too.
+          void client.invalidateQueries({ queryKey: ['quiz-sittings'] })
+          break
+        case 'quiz_started':
+        case 'quiz_ending':
+        case 'quiz_ended':
+        case 'quiz_sitting':
+          void client.invalidateQueries({ queryKey: keys.quizzes(classId) })
+          void client.invalidateQueries({ queryKey: keys.runningQuizzes })
+          void client.invalidateQueries({ queryKey: ['quiz-sittings'] })
           break
         case 'left':
           upsert(String(message.student_id), { online: false })
@@ -191,7 +226,7 @@ export function useLiveClass(classId: string) {
     })
     store.reset(live)
     return () => live.close()
-  }, [classId, bump, newDoc, store])
+  }, [classId, bump, newDoc, store, client])
 
   /** The teacher's cursor in a child's editor, or null to hide it when help ends. */
   const sendCursor = useCallback(

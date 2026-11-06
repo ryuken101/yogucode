@@ -4,7 +4,8 @@
  * Ken's choice of layout (8 Oct 2026): a grid of everyone's code, not a list of who is
  * stuck — the stuck signals sit on the tiles instead (step 4). Clicking a tile opens it
  * full size; **Help** makes that editor yours as well as theirs, both typing at once,
- * merged by Yjs (`src/collab`). Help is never available during a quiz.
+ * merged by Yjs (`src/collab`). Help is never available during a quiz; there, the open tile
+ * goes through everything the child has saved, question by question (Ken, 6 Nov 2026).
  *
  * Children who are not connected still have a tile, greyed, so an empty seat is visible
  * rather than simply missing from the grid.
@@ -16,15 +17,23 @@ import { Badge } from '../components/Badge'
 import { Button } from '../components/Button'
 import { Card, PageHeader } from '../components/Card'
 import { Notice } from '../components/Notice'
+import { StopQuizButton } from '../components/QuizControls'
 import { CodeSurface } from '../editor/CodeSurface'
 import { MonacoYBinding } from '../collab/monacoBinding'
 import { RemoteCaret } from '../collab/remoteCaret'
 import { useLiveClass, type LiveDoc, type LiveStudent } from '../collab/useLiveClass'
 import { useQueryClient } from '@tanstack/react-query'
-import { api } from '../lib/api'
+import type { Schemas } from '../lib/api'
 import { timeLeft } from '../lib/dates'
-import { messageFor } from '../lib/errors'
-import { keys, useClass, useClassQuizzes, useRoster } from '../lib/queries'
+import {
+  keys,
+  useClass,
+  useClassQuizzes,
+  useQuizAnswers,
+  useQuizSittings,
+  useRoster,
+  useTodaysWork,
+} from '../lib/queries'
 import { flagsFor, type Flag } from './liveFlags'
 
 const FLAG_TONE: Record<Flag['tone'], 'not-yet' | 'good' | 'active'> = {
@@ -56,11 +65,18 @@ function Tile({
   name,
   student,
   doc,
+  flags,
+  finished,
+  openable,
   onOpen,
 }: {
   name: string
   student: LiveStudent | undefined
   doc: LiveDoc | undefined
+  flags: Flag[]
+  finished: boolean
+  /** Not signed in, a tile has nothing to show — except what they saved during a quiz. */
+  openable: boolean
   onOpen: () => void
 }) {
   const online = Boolean(student?.online)
@@ -70,9 +86,9 @@ function Tile({
     <button
       type="button"
       onClick={onOpen}
-      disabled={!online}
+      disabled={!openable}
       className={`flex h-56 flex-col rounded-2xl bg-surface p-3 text-left ring-1 transition ${
-        online ? 'ring-line hover:ring-grape' : 'opacity-50 ring-line'
+        online ? 'ring-line hover:ring-grape' : openable ? 'opacity-60 ring-line hover:ring-grape' : 'opacity-50 ring-line'
       }`}
     >
       <span className="flex items-center gap-2">
@@ -90,15 +106,54 @@ function Tile({
       </pre>
       <span className="mt-2 flex min-h-6 flex-wrap items-center gap-2 text-xs text-muted">
         {check ? <span>{check}</span> : null}
-        {student ? <Flags flags={flagsFor(student)} /> : null}
+        {finished ? <Badge variant="good">Finished</Badge> : null}
+        <Flags flags={flags} />
       </span>
     </button>
+  )
+}
+
+/** One question of a quiz as the child last saved it, for a question they don't have open. */
+function SavedAnswer({ answer }: { answer: Schemas['QuizAnswerOut'] }) {
+  if (answer.attempt_id === null) return <p className="p-4 text-sm text-muted">They haven’t opened this one.</p>
+  if (answer.kind === 'mcq') {
+    return (
+      <ul className="flex flex-col gap-2 p-4">
+        {answer.options.map((option, index) => (
+          <li
+            key={index}
+            className={`flex flex-wrap items-center gap-3 rounded-2xl px-4 py-2 text-sm ring-1 ${
+              answer.choice === index ? 'bg-grape-pale ring-2 ring-grape' : 'ring-line'
+            }`}
+          >
+            <span className="min-w-0 whitespace-pre-wrap break-words font-mono text-grape">{option.text}</span>
+            <span className="ml-auto flex gap-1">
+              {answer.choice === index ? <Badge variant="active">Their answer</Badge> : null}
+              {option.correct ? <Badge variant="good">right</Badge> : null}
+              {answer.choice === index && !option.correct ? <Badge variant="not-yet">not yet</Badge> : null}
+            </span>
+          </li>
+        ))}
+        {answer.choice === null ? <li className="text-sm text-muted">They haven’t chosen an answer.</li> : null}
+      </ul>
+    )
+  }
+  return (
+    <CodeSurface
+      key={answer.item_id}
+      value={answer.code ?? ''}
+      onChange={() => undefined}
+      readOnly
+      autoFocus={false}
+    />
   )
 }
 
 function Expanded({
   student,
   doc,
+  flags,
+  quizId,
   canHelp,
   childCursor,
   sendCursor,
@@ -107,6 +162,9 @@ function Expanded({
 }: {
   student: LiveStudent
   doc: LiveDoc | undefined
+  flags: Flag[]
+  /** The quiz running in this class, to go through what this child has saved for it. */
+  quizId: string | null
   canHelp: boolean
   childCursor: number | undefined
   sendCursor: (target: string, offset: number | null) => void
@@ -116,6 +174,15 @@ function Expanded({
   const [helping, setHelping] = useState(false)
   const caret = useRef<RemoteCaret | null>(null)
   const target = student.focus?.target ?? null
+  const answers = useQuizAnswers(quizId, student.studentId)
+  // The question picked here; until one is, whichever the child has open, as it moves.
+  const [picked, setPicked] = useState<string | null>(null)
+  const questions = quizId ? (answers.data ?? []) : []
+  const here = questions.find((a) => a.attempt_id && `attempt:${a.attempt_id}` === target)
+  const shown = questions.find((a) => a.item_id === picked) ?? here ?? questions[0]
+  // The code question they are in is the live editor; the rest are their saved work. A
+  // multiple-choice question has an empty document behind it, and nothing to watch being typed.
+  const showSaved = shown !== undefined && !(shown === here && doc && shown.kind !== 'mcq')
 
   // The child's cursor, drawn in this editor as it moves.
   useEffect(() => {
@@ -141,7 +208,7 @@ function Expanded({
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <h2 className="font-display font-semibold text-xl text-grape">{student.displayName}</h2>
         <span className="text-sm text-muted">{student.focus?.title ?? 'nothing open'}</span>
-        <Flags flags={flagsFor(student)} />
+        <Flags flags={flags} />
         <span className="ml-auto flex gap-2">
           {canHelp && doc ? (
             <Button variant={helping ? 'primary' : 'secondary'} onClick={() => setHelping(!helping)}>
@@ -159,8 +226,33 @@ function Expanded({
           their screen straight away.
         </p>
       ) : null}
-      <div className="h-96 overflow-hidden rounded-lg ring-1 ring-grape/25">
-        {doc ? (
+      {questions.length ? (
+        <div role="tablist" aria-label="Questions" className="mb-3 flex flex-wrap gap-1.5">
+          {questions.map((question, index) => (
+            <button
+              key={question.item_id}
+              type="button"
+              role="tab"
+              aria-selected={question === shown}
+              onClick={() => setPicked(question.item_id)}
+              className={`flex max-w-80 items-center gap-1 rounded-full px-3 py-1 text-sm font-medium ring-1 ${
+                question === shown ? 'bg-grape text-surface ring-grape' : 'text-grape ring-line hover:ring-grape'
+              }`}
+            >
+              <span className="truncate">
+                {index + 1}. {question.title}
+              </span>
+              <span className="shrink-0">
+                {question === here ? '· open now' : question.answered ? '· answered' : ''}
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+      <div className={`h-96 rounded-lg ring-1 ring-grape/25 ${showSaved && shown.kind === 'mcq' ? 'overflow-auto' : 'overflow-hidden'}`}>
+        {showSaved ? (
+          <SavedAnswer answer={shown} />
+        ) : doc ? (
           <CodeSurface
             // A new document (the child reloaded) needs a new editor bound to it.
             key={`${student.focus?.target}-${doc.doc.guid}`}
@@ -190,19 +282,15 @@ function Expanded({
   )
 }
 
-/** The running quiz, if any: how long is left, and Stop. */
-function QuizBar({ classId }: { classId: string }) {
+/** The running quiz: how long is left, whether everyone has finished, and Stop. */
+function QuizBar({ running, classId, allFinished }: { running: Schemas['QuizOut']; classId: string; allFinished: boolean }) {
   const client = useQueryClient()
-  const quizzes = useClassQuizzes(classId)
-  const [stopping, setStopping] = useState(false)
-  const [error, setError] = useState<unknown>(null)
-  const [, setTick] = useState(0)
-  const running = (quizzes.data ?? []).find((q) => q.running)
+  const [now, setNow] = useState(() => Date.now())
+  const over = running.ends_at ? new Date(running.ends_at).getTime() < now : false
 
   useEffect(() => {
-    if (!running) return
     const timer = setInterval(() => {
-      setTick((n) => n + 1)
+      setNow(Date.now())
       // When the clock runs out the server hands everyone in; pick up the new state.
       if (running.ends_at && new Date(running.ends_at).getTime() < Date.now()) {
         void client.invalidateQueries({ queryKey: keys.quizzes(classId) })
@@ -211,30 +299,20 @@ function QuizBar({ classId }: { classId: string }) {
     return () => clearInterval(timer)
   }, [running, classId, client])
 
-  if (!running || !running.ends_at) return null
+  if (!running.ends_at) return null
   return (
     <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl bg-grape-pale/50 px-5 py-3 ring-1 ring-grape/25">
-      <span className="font-display font-semibold text-lg text-grape">Quiz · {running.title}</span>
-      <span className="font-mono text-xl text-grape" aria-label="time left">
-        {timeLeft(running.ends_at)}
+      <span className="min-w-0 break-words font-display font-semibold text-lg text-grape [overflow-wrap:anywhere]">
+        Quiz · {running.title}
       </span>
-      <span className="text-sm text-muted">left · help is off during a quiz</span>
-      <Button
-        variant="secondary"
-        className="ml-auto"
-        disabled={stopping}
-        onClick={() => {
-          setStopping(true)
-          api
-            .stopQuiz(running.id)
-            .then(() => client.invalidateQueries({ queryKey: keys.quizzes(classId) }))
-            .catch(setError)
-            .finally(() => setStopping(false))
-        }}
-      >
-        {stopping ? 'Stopping…' : 'Stop the quiz'}
-      </Button>
-      {error ? <Notice tone="system-error">{messageFor(error)}</Notice> : null}
+      <span className="font-mono text-xl text-grape" aria-label="time left">
+        {timeLeft(running.ends_at, now)}
+      </span>
+      <span className="text-sm text-muted">
+        {over ? 'time’s up · handing in everyone’s work' : 'left · help is off during a quiz'}
+      </span>
+      {allFinished ? <Badge variant="good">All finished</Badge> : null}
+      {over ? null : <StopQuizButton quiz={running} className="ml-auto" />}
     </div>
   )
 }
@@ -244,15 +322,51 @@ export function Live() {
   const klass = useClass(classId)
   const roster = useRoster(classId)
   const live = useLiveClass(classId)
+  const quizzes = useClassQuizzes(classId)
+  const running = (quizzes.data ?? []).find((q) => q.running) ?? null
+  const sittings = useQuizSittings(running?.id ?? null)
+  const todaysWork = useTodaysWork(classId)
   const [open, setOpen] = useState<string | null>(null)
-  // "Quiet for 5 minutes" is about time passing, not about a message arriving.
-  const [, setTick] = useState(0)
+  // "Quiet for 5 minutes" and "left the page · 12s" are about time passing, not about a
+  // message arriving; the second one counts seconds while anyone is away.
+  const [now, setNow] = useState(() => Date.now())
+  const anyoneAway = [...live.students.values()].some((s) => s.online && s.awaySince !== null)
   useEffect(() => {
-    const timer = setInterval(() => setTick((n) => n + 1), 30_000)
+    const timer = setInterval(() => setNow(Date.now()), anyoneAway ? 1_000 : 30_000)
     return () => clearInterval(timer)
-  }, [])
+  }, [anyoneAway])
 
-  const opened = open ? live.students.get(open) : undefined
+  const sittingOf = (studentId: string) => sittings.data?.find((s) => s.student_id === studentId)
+  const flagsOf = (student: LiveStudent | undefined) =>
+    student
+      ? flagsFor(student, now, {
+          todaysWork: running ? null : todaysWork.data?.assignment_id,
+          timesLeft: running ? (sittingOf(student.studentId)?.away_count ?? 0) : undefined,
+        })
+      : []
+  const connected = [...live.students.values()].filter((s) => s.online)
+  const allFinished =
+    connected.length > 0 && connected.every((s) => Boolean(sittingOf(s.studentId)?.finished_at))
+
+  // During a quiz a child who isn't connected can still be opened, for what they saved.
+  const rosterEntry = (roster.data ?? []).find((entry) => entry.student_id === open)
+  const opened: LiveStudent | undefined = open
+    ? live.students.get(open)?.online
+      ? live.students.get(open)
+      : running && rosterEntry
+        ? {
+            studentId: open,
+            displayName: rosterEntry.display_name,
+            online: false,
+            focus: null,
+            recent: [],
+            lastEditAt: null,
+            awaySince: null,
+            awayCount: 0,
+            awayTotal: 0,
+          }
+        : undefined
+    : undefined
   const docFor = (student: LiveStudent | undefined) =>
     student?.focus ? live.docs.get(student.focus.target) : undefined
   // Help is for classwork; never into an editor a quiz is being sat in.
@@ -273,7 +387,7 @@ export function Live() {
         </Link>
       </PageHeader>
 
-      <QuizBar classId={classId} />
+      {running ? <QuizBar running={running} classId={classId} allFinished={allFinished} /> : null}
 
       {live.state === 'refused' ? (
         <Notice tone="system-error">Could not open the live view. Sign in again and reload.</Notice>
@@ -289,7 +403,9 @@ export function Live() {
           key={opened.studentId}
           student={opened}
           doc={docFor(opened)}
-          canHelp={canHelp}
+          flags={flagsOf(opened)}
+          quizId={running?.id ?? null}
+          canHelp={canHelp && !running}
           childCursor={opened.focus ? live.cursors.get(opened.focus.target) : undefined}
           sendCursor={live.sendCursor}
           sendHelp={live.sendHelp}
@@ -306,6 +422,9 @@ export function Live() {
               name={entry.display_name}
               student={student}
               doc={docFor(student)}
+              flags={flagsOf(student)}
+              finished={Boolean(sittingOf(entry.student_id)?.finished_at)}
+              openable={Boolean(student?.online) || running !== null}
               onOpen={() => setOpen(entry.student_id)}
             />
           )

@@ -20,7 +20,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.audit import audit_entry
 from app.auth.principal import CurrentOwner, CurrentTeacher, Principal
 from app.auth.student_session import revoke_live_sessions
-from app.classwork import ensure_classwork
+from app.classwork import ensure_classwork, todays_assignment
 from app.db import get_session
 from app.erase import EraseIn, erase_class, names_match
 from app.join_codes import mint_code, rotate_code
@@ -210,6 +210,20 @@ async def update_class(
         await session.commit()
         await session.refresh(record)
     return ClassOut.build(record, await _mine(session, principal, record.id))
+
+
+class TodaysWorkOut(BaseModel):
+    assignment_id: uuid.UUID | None
+
+
+@router.get("/{class_id}/todays-work", response_model=TodaysWorkOut)
+async def todays_work(
+    class_id: uuid.UUID, principal: CurrentTeacher, session: SessionDep
+) -> TodaysWorkOut:
+    """The classwork this class is on: the live view notes a child with something else open."""
+    record = await get_owned_class(session, principal, class_id)
+    today = await todays_assignment(session, principal, record)
+    return TodaysWorkOut(assignment_id=today.id if today else None)
 
 
 @router.post("/{class_id}/archive", response_model=ClassOut)

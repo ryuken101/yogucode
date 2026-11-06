@@ -46,6 +46,32 @@ MAX_LADDER = 12
 CLASSWORK_SETTINGS = {"completions": True, "hints": True}
 
 
+async def todays_assignment(
+    session: AsyncSession, principal: Principal, klass: Class
+) -> Assignment | None:
+    """The classwork a class is on today, if its current lesson has one open. `klass` came
+    through scoping. What a child's Today shows, and what the live view compares them to."""
+    if klass.current_lesson_id is None:
+        return None
+    lesson = await session.get(Lesson, klass.current_lesson_id)
+    if lesson is None or lesson.centre_id != principal.centre_id:
+        return None
+    ladder = await get_ladder(session, principal, lesson)
+    if ladder is None:
+        return None
+    return (
+        await session.exec(
+            select(Assignment).where(
+                Assignment.class_id == klass.id,
+                Assignment.set_id == ladder.id,
+                Assignment.mode == AssignmentMode.CLASSWORK,
+                Assignment.status == AssignmentStatus.OPEN,
+                Assignment.centre_id == principal.centre_id,
+            )
+        )
+    ).one_or_none()
+
+
 async def get_ladder(
     session: AsyncSession, principal: Principal, lesson: Lesson
 ) -> ProblemSet | None:

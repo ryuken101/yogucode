@@ -22,7 +22,8 @@ import { Notice } from '../components/Notice'
 import type { Schemas } from '../lib/api'
 import { api } from '../lib/api'
 import { ApiError, messageFor } from '../lib/errors'
-import { markStudentTab } from '../lib/tabSession'
+import { useActiveQuiz } from '../lib/queries'
+import { markStudentTab, takeRemovedFromClass } from '../lib/tabSession'
 
 export function Join() {
   const navigate = useNavigate()
@@ -30,6 +31,9 @@ export function Join() {
   const [pin, setPin] = useState('')
   const [busy, setBusy] = useState(false)
   const [me, setMe] = useState<Schemas['StudentMeOut'] | null>(null)
+  const runningQuiz = useActiveQuiz(me !== null)
+  // Sent here by a teacher taking them out of the class: say so, rather than just a sign-in.
+  const [removed] = useState(takeRemovedFromClass)
   /** Something the child can fix: a wrong PIN, a lockout, no class yet. Always not-yet. */
   const [notYet, setNotYet] = useState<string | null>(null)
   /** Our fault: the API is unreachable. The only place system-error is allowed. */
@@ -63,6 +67,11 @@ export function Join() {
   return (
     <JoinShell>
       {me ? null : <Welcome />}
+      {removed && !me ? (
+        <div className="mb-4">
+          <Notice tone="info">Your teacher has taken you out of this class. Ask them if you’re not sure why.</Notice>
+        </div>
+      ) : null}
       <Card>
         {me ? (
           <>
@@ -70,7 +79,7 @@ export function Join() {
             <Notice tone="good">{me.class_name}</Notice>
             <div className="mt-4 flex flex-col gap-3">
               <Button variant="primary" onClick={() => navigate('/home')}>
-                Start writing Python
+                {runningQuiz.data ? 'Go to your quiz' : 'Start writing Python'}
               </Button>
             </div>
           </>

@@ -211,7 +211,7 @@ def test_settings() -> Settings:
         # The quiz timer would open a session outside the test's transaction; the lazy
         # finalise-on-read path is what the tests exercise instead.
         quiz_timer=False,
-        quiz_stop_grace_seconds=0,
+        quiz_hand_in_grace_seconds=0,
         # Show PIN on, under a key made fresh for the run. test_show_pin.py turns it off.
         pin_encryption_keys=TEST_PIN_KEY,
     )

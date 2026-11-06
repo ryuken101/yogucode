@@ -27,6 +27,7 @@ before anything reaches the hub.
 
 import asyncio
 import contextlib
+import time
 import uuid
 from collections import deque
 from dataclasses import dataclass, field
@@ -57,6 +58,11 @@ class StudentPresence:
     recent: deque[dict[str, Any]] = field(default_factory=lambda: deque(maxlen=MAX_RECENT_STATUS))
     # Documents this connection has proven it may publish (checked once, in the router).
     targets: set[str] = field(default_factory=set)
+    # Whether this child's Yogucode page is out of sight (6 Nov 2026), by the server's clock:
+    # when they left, how many times, and how long in total since they connected.
+    away_since: float | None = None
+    away_count: int = 0
+    away_total: float = 0.0
 
 
 @dataclass
@@ -142,6 +148,13 @@ class Hub:
             await self._to_teachers(room, {"type": "left", "student_id": str(student_id)})
             await _close(presence.socket, SIGNED_OUT)
 
+    async def tell_removed(self, student_id: uuid.UUID) -> None:
+        """Before `kick_student`: say why, so the sign-in page can explain it to the child."""
+        for room in list(self.rooms.values()):
+            presence = room.students.get(student_id)
+            if presence is not None:
+                await _send(presence.socket, {"type": "removed"})
+
     def is_helped(self, target: str) -> bool:
         """Whether a teacher is helping in this editor, so the child's own saves must wait."""
         return any(room.helping.get(target) for room in self.rooms.values())
@@ -154,6 +167,23 @@ class Hub:
         presence.focus = focus
         await self._to_teachers(
             room, {"type": "focus", "student_id": str(student_id), "focus": focus}
+        )
+
+    async def attention(self, class_id: uuid.UUID, student_id: uuid.UUID, *, away: bool):
+        """The child's page went out of sight, or came back. Live only: the record kept for a
+        quiz is `quiz_sittings`, which the child's page reports over HTTP."""
+        room = self.room(class_id)
+        presence = room.students.get(student_id)
+        if presence is None or away == (presence.away_since is not None):
+            return
+        if away:
+            presence.away_since = time.monotonic()
+            presence.away_count += 1
+        else:
+            presence.away_total += time.monotonic() - (presence.away_since or time.monotonic())
+            presence.away_since = None
+        await self._to_teachers(
+            room, {"type": "attention", "student_id": str(student_id), **self._attention(presence)}
         )
 
     async def status(self, class_id: uuid.UUID, student_id: uuid.UUID, status: dict[str, Any]):
@@ -338,8 +368,23 @@ class Hub:
             await self._to_teachers(room, message)
 
     @staticmethod
-    def _presence(p: StudentPresence) -> dict[str, Any]:
-        return {"student_id": str(p.student_id), "display_name": p.display_name, "focus": p.focus}
+    def _attention(p: StudentPresence) -> dict[str, Any]:
+        now = time.monotonic()
+        return {
+            # How long ago, not when: a teacher's clock and this one need not agree.
+            "away_for": None if p.away_since is None else round(now - p.away_since),
+            "away_count": p.away_count,
+            "away_total": round(p.away_total),
+        }
+
+    @classmethod
+    def _presence(cls, p: StudentPresence) -> dict[str, Any]:
+        return {
+            "student_id": str(p.student_id),
+            "display_name": p.display_name,
+            "focus": p.focus,
+            **cls._attention(p),
+        }
 
 
 hub = Hub()

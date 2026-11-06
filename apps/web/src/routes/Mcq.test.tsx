@@ -83,7 +83,7 @@ beforeEach(() => {
     http.get('/api/snippets', () => HttpResponse.json([])),
     http.get(`/api/assignments/${HW}/marking`, () =>
       HttpResponse.json({
-        assignment_id: HW, title: 'Quiz', due_at: null, released_at: null, students: [],
+        assignment_id: HW, title: 'Quiz', mode: 'homework', due_at: null, released_at: null, students: [],
         questions: [{ leaf_item_id: ITEM, title: 'range(5)', difficulty: 1, handed_in: 2, marked: 0 }],
       } satisfies Schemas['MarkingOverviewOut']),
     ),

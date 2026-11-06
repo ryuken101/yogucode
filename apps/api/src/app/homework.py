@@ -32,6 +32,7 @@ from app.models import (
     Attempt,
     AttemptStatus,
     Item,
+    ItemKind,
     Mark,
     Submission,
     SubmissionSource,
@@ -172,6 +173,16 @@ async def hand_in(
         submissions.append(submission)
     await session.flush()
     return submissions
+
+
+def is_answered(leaf: Leaf, attempt: Attempt | None) -> bool:
+    """A choice made, or code that isn't just the starter it opened with."""
+    if attempt is None:
+        return False
+    if leaf.leaf.kind == ItemKind.MCQ:
+        return attempt.choice is not None
+    source = leaf.problem if leaf.problem.shared_file else leaf.leaf
+    return attempt.code.strip() != source.starter_code.strip()
 
 
 def correct_from(passed: int | None, total: int | None) -> int:
