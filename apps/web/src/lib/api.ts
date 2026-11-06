@@ -25,7 +25,7 @@ const folderBase = (scope: FolderScope) => (scope === 'me' ? '/me/folders' : '/t
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api'
 
 interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PATCH' | 'PUT'
+  method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
   body?: unknown
   /**
    * Skip the Authorization header. The student routes are reached by people who have no
@@ -273,6 +273,24 @@ export const api = {
     const query = params.toString()
     return request<Schemas['ProblemSummaryOut'][]>(`/items${query ? `?${query}` : ''}`)
   },
+  problemFolders: () => request<Schemas['ProblemFolderOut'][]>('/problem-folders'),
+  createProblemFolder: (name: string) =>
+    request<Schemas['ProblemFolderOut']>('/problem-folders', {
+      method: 'POST',
+      body: { name } satisfies Schemas['ProblemFolderIn'],
+    }),
+  renameProblemFolder: (folderId: string, name: string) =>
+    request<Schemas['ProblemFolderOut']>(`/problem-folders/${folderId}`, {
+      method: 'PATCH',
+      body: { name } satisfies Schemas['ProblemFolderIn'],
+    }),
+  addToProblemFolder: (folderId: string, itemIds: string[]) =>
+    request<void>(`/problem-folders/${folderId}/items`, {
+      method: 'POST',
+      body: { item_ids: itemIds } satisfies Schemas['ProblemFolderItemsIn'],
+    }),
+  removeFromProblemFolder: (folderId: string, itemId: string) =>
+    request<void>(`/problem-folders/${folderId}/items/${itemId}`, { method: 'DELETE' }),
   importProblems: (yaml: string, apply: boolean) =>
     request<Schemas['ImportReportOut']>('/items/import', {
       method: 'POST',

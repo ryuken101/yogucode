@@ -210,7 +210,9 @@ function newQuizScreen() {
       status: 'active', course_id: null, current_lesson_id: null, join_code: 'X',
       created_at: '2026-10-01T00:00:00Z', updated_at: '2026-10-01T00:00:00Z' })),
     http.get('/api/items', () => HttpResponse.json([
-      { id: ITEM, title: 'Add to the end', difficulty: 1, kind: 'code', status: 'published' },
+      { id: ITEM, title: 'Add to the end', difficulty: 1, kind: 'code', status: 'published', version: 1,
+        concept_ids: [], primary_concept_id: null, part_labels: [], test_count: 1, folder_ids: [],
+        updated_at: '2026-10-01T00:00:00Z' },
     ])),
   )
   return renderScreen(
@@ -266,7 +268,9 @@ test('Start refused because another quiz runs: pressing it again makes no second
   )
   const { user } = newQuizScreen()
   await user.type(await screen.findByLabelText('Title'), 'Second quiz')
-  await user.selectOptions(await screen.findByLabelText('Add a published problem'), ITEM)
+  await user.click(screen.getByRole('button', { name: 'Add problems' }))
+  await user.click(await screen.findByRole('checkbox', { name: /Add to the end/, hidden: true }))
+  await user.click(screen.getByRole('button', { name: 'Add 1 problem', hidden: true }))
   for (let press = 0; press < 2; press++) {
     await user.click(screen.getByRole('button', { name: 'Start the quiz now' }))
     const dialog = await dialogTitled('Start the quiz for everyone?')

@@ -170,6 +170,14 @@ inside that check, scrambled (`problem_bank.with_reference`). That's not securit
 same accepted trade-off as hidden checks' expected values (spec §4). It is never stored on
 the test row.
 
+**Problem folders** (Ken, 7 Nov 2026; `problem_folders`, `problem_folder_items`,
+`routers/problem_folders.py`) are the bank's own groups, beside the concept groups it sorts
+itself into. Shared across the centre, as the bank is, and they work like labels: a problem
+can be in several. Separate from `teacher_folders`, which hold one teacher's private files.
+A new version is a new `items` row, so membership follows the version family: adding or
+removing either version covers both, and `copy_folder_memberships` runs wherever a new
+version is made. Deleting one goes to the Trash (kind `problem_folder`); its problems stay.
+
 **`teacher_documents`** are a teacher's private "My code" files, scoped to the centre and
 `user_id` (`scoping.get_own_teacher_document`): another teacher at the same centre gets a
 404. A separate table from `student_documents` for the same reason `users` is separate from

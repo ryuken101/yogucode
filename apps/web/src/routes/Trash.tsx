@@ -32,6 +32,7 @@ const KIND: Record<Entry['kind'], string> = {
   homework: 'Homework',
   file: 'File',
   folder: 'Folder',
+  problem_folder: 'Problem folder',
 }
 
 export function Trash() {
@@ -147,7 +148,9 @@ function PurgeDialog({
             ? 'Their account goes with everything they made, in every class.'
             : entry.kind === 'homework'
               ? 'Every child’s answers and marks on it go too.'
-              : 'Everything that went to the Trash with it goes too.'}
+              : entry.kind === 'problem_folder'
+                ? 'Only the folder goes. The problems in it stay in the bank.'
+                : 'Everything that went to the Trash with it goes too.'}
       </p>
       <p className="mt-2 font-medium">This can’t be undone.</p>
       {entry.needs_name ? (

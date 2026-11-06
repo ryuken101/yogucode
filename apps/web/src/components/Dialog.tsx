@@ -18,9 +18,11 @@ interface Props {
   children: ReactNode
   /** The action the dialog exists to confirm. Omit for an informational dialog. */
   confirm?: { label: string; onConfirm: () => void; disabled?: boolean }
+  /** Room for a list and its categories, rather than a sentence and a button. */
+  wide?: boolean
 }
 
-export function Dialog({ open, title, onClose, children, confirm }: Props) {
+export function Dialog({ open, title, onClose, children, confirm, wide = false }: Props) {
   const ref = useRef<HTMLDialogElement>(null)
 
   useEffect(() => {
@@ -38,7 +40,7 @@ export function Dialog({ open, title, onClose, children, confirm }: Props) {
         event.preventDefault()
         onClose()
       }}
-      className="m-auto w-[min(32rem,calc(100vw-2rem))] rounded-3xl bg-surface p-0 text-grape backdrop:bg-night/40"
+      className={`m-auto ${wide ? 'w-[min(56rem,calc(100vw-2rem))]' : 'w-[min(32rem,calc(100vw-2rem))]'} rounded-3xl bg-surface p-0 text-grape backdrop:bg-night/40`}
     >
       <div className="p-5">
         <h2 className="font-display font-semibold text-xl text-grape">{title}</h2>

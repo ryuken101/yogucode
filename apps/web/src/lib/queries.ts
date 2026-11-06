@@ -42,6 +42,7 @@ export const keys = {
   courses: ['courses'] as const,
   course: (courseId: string) => ['course', courseId] as const,
   problems: (filters: ProblemFilters) => ['problems', filters] as const,
+  problemFolders: ['problem-folders'] as const,
   allProblems: ['problems'] as const,
   problem: (itemId: string) => ['problem', itemId] as const,
   ladder: (lessonId: string) => ['ladder', lessonId] as const,
@@ -624,8 +625,40 @@ export function useSetClassCurriculum(classId: string) {
 
 /* --- teacher: problem bank ---------------------------------------------------------- */
 
-export function useProblems(filters: ProblemFilters) {
-  return useQuery({ queryKey: keys.problems(filters), queryFn: () => api.listProblems(filters) })
+export function useProblems(filters: ProblemFilters, enabled = true) {
+  return useQuery({ queryKey: keys.problems(filters), queryFn: () => api.listProblems(filters), enabled })
+}
+
+/** The bank's folders, shared by every teacher at the centre. */
+export function useProblemFolders() {
+  return useQuery({ queryKey: keys.problemFolders, queryFn: api.problemFolders })
+}
+
+/** Making, renaming and filling folders. Every one changes the bank's counts. */
+export function useProblemFolderEdit() {
+  const client = useQueryClient()
+  const onSuccess = () =>
+    Promise.all([
+      client.invalidateQueries({ queryKey: keys.problemFolders }),
+      client.invalidateQueries({ queryKey: ['problems'] }),
+    ])
+  return {
+    create: useMutation({ mutationFn: api.createProblemFolder, onSuccess }),
+    rename: useMutation({
+      mutationFn: ({ folderId, name }: { folderId: string; name: string }) => api.renameProblemFolder(folderId, name),
+      onSuccess,
+    }),
+    add: useMutation({
+      mutationFn: ({ folderId, itemIds }: { folderId: string; itemIds: string[] }) =>
+        api.addToProblemFolder(folderId, itemIds),
+      onSuccess,
+    }),
+    remove: useMutation({
+      mutationFn: ({ folderId, itemId }: { folderId: string; itemId: string }) =>
+        api.removeFromProblemFolder(folderId, itemId),
+      onSuccess,
+    }),
+  }
 }
 
 export function useProblem(itemId: string | null) {

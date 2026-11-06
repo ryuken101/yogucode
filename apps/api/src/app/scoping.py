@@ -50,6 +50,7 @@ from app.models import (
     ItemStatus,
     Lesson,
     LessonConcept,
+    ProblemFolder,
     Student,
     StudentDocument,
     StudentFolder,
@@ -557,6 +558,25 @@ async def list_visible_concepts(session: AsyncSession, principal: Principal) -> 
 
 
 # --- problem bank -----------------------------------------------------------------------
+
+
+async def get_owned_problem_folder(
+    session: AsyncSession, principal: Principal, folder_id: uuid.UUID
+) -> ProblemFolder:
+    """A live problem-bank folder in the principal's centre, or 404. Any teacher's: they are
+    shared, as the bank is."""
+    found = (
+        await session.exec(
+            select(ProblemFolder).where(
+                ProblemFolder.id == folder_id,
+                ProblemFolder.centre_id == principal.centre_id,
+                ProblemFolder.deleted_at.is_(None),  # type: ignore[union-attr]
+            )
+        )
+    ).one_or_none()
+    if found is None:
+        raise _not_found("folder")
+    return found
 
 
 async def get_owned_item(session: AsyncSession, principal: Principal, item_id: uuid.UUID) -> Item:

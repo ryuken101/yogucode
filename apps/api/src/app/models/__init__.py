@@ -42,6 +42,7 @@ from app.models.marking import (
     Submission,
     SubmissionSource,
 )
+from app.models.problem_folders import ProblemFolder, ProblemFolderItem
 from app.models.problems import Hint, Item, ItemConcept, ItemKind, ItemStatus, TestCase, TestKind
 from app.models.students import (
     Student,
@@ -88,6 +89,8 @@ __all__ = [
     "Lesson",
     "LessonConcept",
     "Mark",
+    "ProblemFolder",
+    "ProblemFolderItem",
     "ProblemSet",
     "QuizSitting",
     "SetItem",

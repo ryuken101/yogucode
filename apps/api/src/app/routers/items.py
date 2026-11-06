@@ -44,6 +44,7 @@ from app.problem_bank import (
     write_document,
 )
 from app.problem_import import ProblemFileError, apply_import, plan_import
+from app.routers.problem_folders import copy_folder_memberships, folder_ids_by_item
 from app.scoping import get_owned_item, list_owned_items
 
 router = APIRouter(prefix="/items", tags=["items"])
@@ -88,6 +89,8 @@ class ProblemSummaryOut(BaseModel):
     primary_concept_id: uuid.UUID | None
     part_labels: list[str]
     test_count: int
+    # Its folders in the bank (`routers/problem_folders.py`).
+    folder_ids: list[uuid.UUID]
     updated_at: datetime
 
 
@@ -279,6 +282,7 @@ async def list_problems(
         await session.exec(select(TestCase.item_id).where(col(TestCase.item_id).in_(list(owner))))
     ).all():
         test_counts[owner[item_id]] += 1
+    folders = await folder_ids_by_item(session, principal, item_ids)
 
     return [
         ProblemSummaryOut(
@@ -292,6 +296,7 @@ async def list_problems(
             primary_concept_id=primary.get(item.id),
             part_labels=labels[item.id],
             test_count=test_counts[item.id],
+            folder_ids=folders.get(item.id, []),
             updated_at=item.updated_at,
         )
         for item in items
@@ -397,6 +402,7 @@ async def new_version(
     session.add(successor)
     await session.flush()
     await write_document(session, principal, successor, doc)
+    await copy_folder_memberships(session, principal.centre_id, item.id, successor.id)
     session.add(_audit(principal, "item.new_version", successor, version=successor.version))
     await session.commit()
     await session.refresh(successor)

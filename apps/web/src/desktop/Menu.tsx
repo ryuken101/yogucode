@@ -22,6 +22,7 @@ export function Menu({
   items,
   align = 'left',
   width = 'w-72',
+  bare = false,
 }: {
   /** The accessible name of the button. */
   label: string
@@ -30,6 +31,8 @@ export function Menu({
   items: MenuItem[]
   align?: 'left' | 'right'
   width?: string
+  /** A small quiet button with no arrow, for the options on a row. */
+  bare?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const root = useRef<HTMLDivElement>(null)
@@ -58,15 +61,17 @@ export function Menu({
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className="flex min-h-10 items-center gap-1.5 rounded-xl px-3 py-2 text-[15px] font-medium text-grape hover:bg-grape-pale focus-visible:outline-2 focus-visible:outline-grape-deep"
+        className={`flex items-center gap-1.5 rounded-xl font-medium text-grape hover:bg-grape-pale focus-visible:outline-2 focus-visible:outline-grape-deep ${
+          bare ? 'px-1.5 py-1 text-sm' : 'min-h-10 px-3 py-2 text-[15px]'
+        }`}
       >
         {children}
-        <ChevronDown size={16} aria-hidden="true" />
+        {bare ? null : <ChevronDown size={16} aria-hidden="true" />}
       </button>
       {open ? (
         <div
           role="menu"
-          className={`absolute top-12 z-50 ${align === 'right' ? 'right-0' : 'left-0'} ${width} rounded-2xl border border-line bg-surface p-1.5`}
+          className={`absolute ${bare ? 'top-8' : 'top-12'} z-50 ${align === 'right' ? 'right-0' : 'left-0'} ${width} rounded-2xl border border-line bg-surface p-1.5`}
         >
           {items.map((item) => (
             <button

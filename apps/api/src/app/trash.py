@@ -50,6 +50,7 @@ from app.erase import (
     erase_course,
     erase_item,
     erase_lessons,
+    erase_problem_folder,
     erase_student,
     erase_student_files,
     erase_teacher_files,
@@ -70,6 +71,7 @@ from app.models import (
     EnrolmentStatus,
     Item,
     Lesson,
+    ProblemFolder,
     ProblemSet,
     SetItem,
     SetStatus,
@@ -92,7 +94,16 @@ ARCHIVED = "archived"
 
 # What the API calls each kind. "file" and "folder" are the caller's own: a child's for a
 # child, a teacher's for a teacher.
-TEACHER_KINDS = ("class", "student", "problem", "course", "unit", "lesson", "homework")
+TEACHER_KINDS = (
+    "class",
+    "student",
+    "problem",
+    "course",
+    "unit",
+    "lesson",
+    "homework",
+    "problem_folder",
+)
 FILE_KINDS = ("file", "folder")
 NAMED_PURGE = ("class", "student")
 
@@ -114,13 +125,14 @@ def _model(kind: str, principal: Principal) -> Any:
         "unit": Unit,
         "lesson": Lesson,
         "homework": Assignment,
+        "problem_folder": ProblemFolder,
     }[kind]
 
 
 def name_of(kind: str, row: Any) -> str:
     if kind == "student":
         return row.display_name
-    if kind in ("class", "course", "unit", "lesson", "folder"):
+    if kind in ("class", "course", "unit", "lesson", "folder", "problem_folder"):
         return row.name if hasattr(row, "name") else row.title
     return row.title
 
@@ -405,6 +417,8 @@ async def _erase(session: AsyncSession, kind: str, row: Any) -> Erased:
         return await erase_item(session, row.id)
     if kind == "homework":
         return await erase_assignment(session, row.id)
+    if kind == "problem_folder":
+        return await erase_problem_folder(session, row.id)
     if kind == "lesson":
         return await erase_lessons(session, [row.id])
     if kind == "unit":
@@ -537,6 +551,7 @@ async def list_trash(session: AsyncSession, principal: Principal) -> list[Entry]
             ("homework", r)
             for r in await trashed("homework", Assignment.mode != AssignmentMode.CLASSWORK)
         ]
+        rows += [("problem_folder", r) for r in await trashed("problem_folder")]
         owner_column = TeacherDocument.user_id
         folder_owner = TeacherFolder.user_id
     else:
@@ -608,6 +623,7 @@ _EXPIRY_ORDER: list[tuple[str, Any, str]] = [
     ("unit", Unit, "teacher"),
     ("course", Course, "teacher"),
     ("problem", Item, "teacher"),
+    ("problem_folder", ProblemFolder, "teacher"),
     ("student", Student, "teacher"),
     ("class", Class, "teacher"),
 ]

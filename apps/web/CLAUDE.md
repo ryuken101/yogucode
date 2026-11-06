@@ -334,3 +334,14 @@ a fake model (`monacoBinding.test.ts`), including two people typing at once.
   same thing, so the routing is for the child's benefit, not the security. The clock lives
   in the locked top bar; `useQuizTimeUp` is what locks a page at 0:00. `Answered` is `active`,
   never `good`: mint means correct.
+
+## The problem bank
+
+`problems/useBankBrowser.ts` loads the live bank once and sorts it in the browser, so the
+counts beside each category follow the search as it's typed. A concept group holds every
+problem with that tag, on the problem or a part, so counts can add up to more than the total.
+`BankSidebar` is the same on the Problems page and in `ProblemPicker`, but only the page edits
+folders and takes dragged problems. Folders come above concepts, and the page's sidebar is
+sticky with its own scroll: with 18 concepts below a long list, a folder otherwise scrolls out
+of reach of the row being dragged onto it. Every list of problems (quiz, homework, ladder)
+adds through `ProblemPicker`, by way of `ProblemListEditor`.

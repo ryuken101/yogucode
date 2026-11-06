@@ -1,16 +1,17 @@
 /**
  * An ordered list of published problems — a lesson's ladder, or a homework sheet.
  *
- * Add from the published bank, reorder, remove, and swap an older version for a newer one
+ * Add from the published bank (`ProblemPicker`), reorder, remove, and swap an older version for a newer one
  * when the row offers it (a list keeps the version it was given until a teacher chooses;
  * see `app/classwork.py`). Controlled: the parent owns the rows and decides when to save.
  */
 
+import { useState } from 'react'
 import { Badge } from '../components/Badge'
 import { Button } from '../components/Button'
 import { Dots } from '../components/Dots'
-import { Select } from '../components/Field'
 import { useProblems } from '../lib/queries'
+import { ProblemPicker } from './ProblemPicker'
 
 export interface ProblemRow {
   id: string
@@ -31,7 +32,7 @@ interface Props {
 export function ProblemListEditor({ rows, onChange, empty, limit = 12, disabled = false }: Props) {
   const published = useProblems({ statuses: ['published'] })
   const onList = new Set(rows.map((row) => row.id))
-  const addable = (published.data ?? []).filter((p) => !onList.has(p.id))
+  const [picking, setPicking] = useState(false)
 
   function move(index: number, by: number) {
     const next = [...rows]
@@ -101,34 +102,35 @@ export function ProblemListEditor({ rows, onChange, empty, limit = 12, disabled 
         </ol>
       )}
       {disabled ? null : (
-        <Select
-          label="Add a published problem"
-          value=""
-          disabled={rows.length >= limit}
-          onChange={(event) => {
-            const chosen = addable.find((p) => p.id === event.target.value)
-            if (chosen) {
-              onChange([
-                ...rows,
-                {
-                  id: chosen.id,
-                  title: chosen.title,
-                  difficulty: chosen.difficulty,
-                  newerVersionId: null,
-                  superseded: false,
-                },
-              ])
-            }
-          }}
-        >
-          <option value="">Choose…</option>
-          {addable.map((p) => (
-            <option key={p.id} value={p.id}>
-              {'●'.repeat(p.difficulty)} {p.title}
-            </option>
-          ))}
-        </Select>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button variant="secondary" disabled={rows.length >= limit} onClick={() => setPicking(true)}>
+            Add problems
+          </Button>
+          {rows.length >= limit ? (
+            <span className="text-sm text-muted">This list is full ({limit} at most).</span>
+          ) : null}
+        </div>
       )}
+      {picking ? (
+        <ProblemPicker
+          onList={onList}
+          limit={limit}
+          onClose={() => setPicking(false)}
+          onAdd={(chosen) => {
+            setPicking(false)
+            onChange([
+              ...rows,
+              ...chosen.map((p) => ({
+                id: p.id,
+                title: p.title,
+                difficulty: p.difficulty,
+                newerVersionId: null,
+                superseded: false,
+              })),
+            ])
+          }}
+        />
+      ) : null}
     </div>
   )
 }

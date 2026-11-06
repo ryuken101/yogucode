@@ -3618,6 +3618,65 @@
         "title": "ProblemDoc",
         "type": "object"
       },
+      "ProblemFolderIn": {
+        "properties": {
+          "name": {
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "ProblemFolderIn",
+        "type": "object"
+      },
+      "ProblemFolderItemsIn": {
+        "properties": {
+          "item_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Item Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "item_ids"
+        ],
+        "title": "ProblemFolderItemsIn",
+        "type": "object"
+      },
+      "ProblemFolderOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "updated_at"
+        ],
+        "title": "ProblemFolderOut",
+        "type": "object"
+      },
       "ProblemOut": {
         "properties": {
           "document": {
@@ -3715,6 +3774,14 @@
             "title": "Difficulty",
             "type": "integer"
           },
+          "folder_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Folder Ids",
+            "type": "array"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -3774,6 +3841,7 @@
           "primary_concept_id",
           "part_labels",
           "test_count",
+          "folder_ids",
           "updated_at"
         ],
         "title": "ProblemSummaryOut",
@@ -5749,7 +5817,8 @@
               "lesson",
               "homework",
               "file",
-              "folder"
+              "folder",
+              "problem_folder"
             ],
             "title": "Kind",
             "type": "string"
@@ -12287,6 +12356,311 @@
         ]
       }
     },
+    "/problem-folders": {
+      "get": {
+        "operationId": "list_folders_problem_folders_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProblemFolderOut"
+                  },
+                  "title": "Response List Folders Problem Folders Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Folders",
+        "tags": [
+          "problem-folders"
+        ]
+      },
+      "post": {
+        "operationId": "create_folder_problem_folders_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProblemFolderIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemFolderOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Folder",
+        "tags": [
+          "problem-folders"
+        ]
+      }
+    },
+    "/problem-folders/{folder_id}": {
+      "patch": {
+        "operationId": "rename_folder_problem_folders__folder_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "folder_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Folder Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProblemFolderIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemFolderOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rename Folder",
+        "tags": [
+          "problem-folders"
+        ]
+      }
+    },
+    "/problem-folders/{folder_id}/items": {
+      "post": {
+        "description": "Put problems in a folder. Adding one that is already there does nothing.",
+        "operationId": "add_items_problem_folders__folder_id__items_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "folder_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Folder Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProblemFolderItemsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Items",
+        "tags": [
+          "problem-folders"
+        ]
+      }
+    },
+    "/problem-folders/{folder_id}/items/{item_id}": {
+      "delete": {
+        "description": "Take a problem out of a folder. The problem itself is not touched.",
+        "operationId": "remove_item_problem_folders__folder_id__items__item_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "folder_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Folder Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Item",
+        "tags": [
+          "problem-folders"
+        ]
+      }
+    },
     "/quizzes/running": {
       "get": {
         "description": "Every quiz running at this centre, for every teacher and the owner: a class is\nanyone's to cover, so a quiz in any of them is worth knowing about. Before\n`/quizzes/{quiz_id}`, which would otherwise read \"running\" as an id.",
@@ -15358,7 +15732,8 @@
                 "lesson",
                 "homework",
                 "file",
-                "folder"
+                "folder",
+                "problem_folder"
               ],
               "title": "Kind",
               "type": "string"
@@ -15430,7 +15805,8 @@
                 "lesson",
                 "homework",
                 "file",
-                "folder"
+                "folder",
+                "problem_folder"
               ],
               "title": "Kind",
               "type": "string"
@@ -15512,7 +15888,8 @@
                 "lesson",
                 "homework",
                 "file",
-                "folder"
+                "folder",
+                "problem_folder"
               ],
               "title": "Kind",
               "type": "string"

@@ -22,7 +22,16 @@ router = APIRouter(tags=["trash"])
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 TeacherKind = Literal[
-    "class", "student", "problem", "course", "unit", "lesson", "homework", "file", "folder"
+    "class",
+    "student",
+    "problem",
+    "course",
+    "unit",
+    "lesson",
+    "homework",
+    "file",
+    "folder",
+    "problem_folder",
 ]
 ChildKind = Literal["file", "folder"]
 

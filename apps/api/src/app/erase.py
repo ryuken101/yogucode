@@ -53,6 +53,8 @@ from app.models import (
     Lesson,
     LessonConcept,
     Mark,
+    ProblemFolder,
+    ProblemFolderItem,
     ProblemSet,
     QuizSitting,
     SetItem,
@@ -229,6 +231,7 @@ async def erase_item(session: AsyncSession, item_id: uuid.UUID) -> Erased:
         ("test_cases", TestCase),
         ("hints", Hint),
         ("item_concepts", ItemConcept),
+        ("problem_folder_items", ProblemFolderItem),
     ]:
         await _delete(session, counts, name, delete(model).where(model.item_id.in_(ids)))  # type: ignore[attr-defined]
     # A newer version keeps its history, minus the link to the one that is going.
@@ -236,6 +239,24 @@ async def erase_item(session: AsyncSession, item_id: uuid.UUID) -> Erased:
         update(Item).where(Item.supersedes_id.in_(ids)).values(supersedes_id=None)  # type: ignore[union-attr]
     )
     await _delete(session, counts, "items", delete(Item).where(Item.id.in_(ids)))  # type: ignore[attr-defined]
+    return Erased(counts)
+
+
+async def erase_problem_folder(session: AsyncSession, folder_id: uuid.UUID) -> Erased:
+    """A bank folder and who was in it. The problems themselves stay."""
+    counts: dict[str, int] = {}
+    await _delete(
+        session,
+        counts,
+        "problem_folder_items",
+        delete(ProblemFolderItem).where(ProblemFolderItem.folder_id == folder_id),  # type: ignore[arg-type]
+    )
+    await _delete(
+        session,
+        counts,
+        "problem_folders",
+        delete(ProblemFolder).where(ProblemFolder.id == folder_id),  # type: ignore[arg-type]
+    )
     return Erased(counts)
 
 

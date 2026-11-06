@@ -1802,6 +1802,81 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/problem-folders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Folders */
+        get: operations["list_folders_problem_folders_get"];
+        put?: never;
+        /** Create Folder */
+        post: operations["create_folder_problem_folders_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/problem-folders/{folder_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Rename Folder */
+        patch: operations["rename_folder_problem_folders__folder_id__patch"];
+        trace?: never;
+    };
+    "/problem-folders/{folder_id}/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Items
+         * @description Put problems in a folder. Adding one that is already there does nothing.
+         */
+        post: operations["add_items_problem_folders__folder_id__items_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/problem-folders/{folder_id}/items/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Item
+         * @description Take a problem out of a folder. The problem itself is not touched.
+         */
+        delete: operations["remove_item_problem_folders__folder_id__items__item_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/quizzes/running": {
         parameters: {
             query?: never;
@@ -4140,6 +4215,31 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** ProblemFolderIn */
+        ProblemFolderIn: {
+            /** Name */
+            name: string;
+        };
+        /** ProblemFolderItemsIn */
+        ProblemFolderItemsIn: {
+            /** Item Ids */
+            item_ids: string[];
+        };
+        /** ProblemFolderOut */
+        ProblemFolderOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
         /** ProblemOut */
         ProblemOut: {
             document: components["schemas"]["ProblemDoc"];
@@ -4176,6 +4276,8 @@ export interface components {
             concept_ids: string[];
             /** Difficulty */
             difficulty: number;
+            /** Folder Ids */
+            folder_ids: string[];
             /**
              * Id
              * Format: uuid
@@ -4999,7 +5101,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "class" | "student" | "problem" | "course" | "unit" | "lesson" | "homework" | "file" | "folder";
+            kind: "class" | "student" | "problem" | "course" | "unit" | "lesson" | "homework" | "file" | "folder" | "problem_folder";
             /** Name */
             name: string;
             /** Needs Name */
@@ -8522,6 +8624,176 @@ export interface operations {
             };
         };
     };
+    list_folders_problem_folders_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemFolderOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_folder_problem_folders_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProblemFolderIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemFolderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rename_folder_problem_folders__folder_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                folder_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProblemFolderIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemFolderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_items_problem_folders__folder_id__items_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                folder_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProblemFolderItemsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_item_problem_folders__folder_id__items__item_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                folder_id: string;
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     running_quizzes_quizzes_running_get: {
         parameters: {
             query?: never;
@@ -10194,7 +10466,7 @@ export interface operations {
                 authorization?: string | null;
             };
             path: {
-                kind: "class" | "student" | "problem" | "course" | "unit" | "lesson" | "homework" | "file" | "folder";
+                kind: "class" | "student" | "problem" | "course" | "unit" | "lesson" | "homework" | "file" | "folder" | "problem_folder";
                 item_id: string;
             };
             cookie?: never;
@@ -10226,7 +10498,7 @@ export interface operations {
                 authorization?: string | null;
             };
             path: {
-                kind: "class" | "student" | "problem" | "course" | "unit" | "lesson" | "homework" | "file" | "folder";
+                kind: "class" | "student" | "problem" | "course" | "unit" | "lesson" | "homework" | "file" | "folder" | "problem_folder";
                 item_id: string;
             };
             cookie?: never;
@@ -10262,7 +10534,7 @@ export interface operations {
                 authorization?: string | null;
             };
             path: {
-                kind: "class" | "student" | "problem" | "course" | "unit" | "lesson" | "homework" | "file" | "folder";
+                kind: "class" | "student" | "problem" | "course" | "unit" | "lesson" | "homework" | "file" | "folder" | "problem_folder";
                 item_id: string;
             };
             cookie?: never;

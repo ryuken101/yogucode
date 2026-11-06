@@ -297,6 +297,15 @@ async def plan_import(session: AsyncSession, principal: Principal, text: str) ->
     return planned
 
 
+async def _keep_folders(
+    session: AsyncSession, principal: Principal, from_item: uuid.UUID, to_item: uuid.UUID
+) -> None:
+    # Imported here: the router's module imports this one.
+    from app.routers.problem_folders import copy_folder_memberships
+
+    await copy_folder_memberships(session, principal.centre_id, from_item, to_item)
+
+
 async def apply_import(
     session: AsyncSession, principal: Principal, planned: list[PlannedEntry]
 ) -> None:
@@ -319,6 +328,8 @@ async def apply_import(
             )
             session.add(item)
             await session.flush()
+            if previous:
+                await _keep_folders(session, principal, previous.id, item.id)
         await write_document(session, principal, item, entry.doc)
         entry.item_id = item.id
         session.add(
