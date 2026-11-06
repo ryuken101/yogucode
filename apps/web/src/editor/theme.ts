@@ -32,6 +32,16 @@ const PALETTE = {
   mint: '3DBE8B',
 } as const
 
+/** The syntax colours as CSS, for code shown outside the editor (`components/CodeBlock.tsx`). */
+export const SYNTAX = {
+  text: `#${PALETTE.text}`,
+  dusk: `#${PALETTE.dusk}`,
+  strawberry: `#${PALETTE.strawberry}`,
+  lemon: `#${PALETTE.lemon}`,
+  lavender: `#${PALETTE.lavender}`,
+  mint: `#${PALETTE.mint}`,
+} as const
+
 export function defineTheme(monaco: typeof Monaco): void {
   monaco.editor.defineTheme(THEME_NAME, {
     base: 'vs-dark',

@@ -245,7 +245,7 @@ export function ProblemAttempt() {
   if (problem.data?.kind === 'mcq' && leaves[0]) {
     const answer = leaves[0]
     return (
-      <div className="mx-auto flex max-w-2xl flex-col gap-4 px-6 py-8">
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-6 py-8">
         <BackLink mode={problem.data.mode} assignmentId={assignmentId} />
         <div className="flex items-center gap-3">
           <Dots value={problem.data.difficulty} />

@@ -345,3 +345,13 @@ folders and takes dragged problems. Folders come above concepts, and the page's 
 sticky with its own scroll: with 18 concepts below a long list, a folder otherwise scrolls out
 of reach of the row being dragged onto it. Every list of problems (quiz, homework, ladder)
 adds through `ProblemPicker`, by way of `ProblemListEditor`.
+
+## Code in prompts
+
+Add code (`problems/PromptField.tsx`) writes an ordinary markdown fence, so a prompt stays
+plain markdown. `components/Markdown.tsx` shows a `python` fence through `CodeBlock`, with
+line numbers and colours from `lib/pythonTokens.ts`, not Monaco, which a question page must
+not have to load. The colours match what the editor really shows: its Python grammar counts
+`print` and `True` as keywords, and brackets are lemon. A fence with no language stays plain,
+because it's usually a program's output. An answer option can have several lines and is shown
+one-colour; nothing trims it, because Python's indentation means something.

@@ -306,7 +306,7 @@ export function ProblemEditor() {
           />
           <PromptField
             name="Prompt"
-            label="What the student reads (markdown: `code`, **bold**, lists)"
+            label="What the student reads. “Add code” puts in a block of code."
             value={doc.prompt_md ?? ''}
             editable={editable}
             onChange={(prompt_md) => setDoc({ ...doc, prompt_md })}
@@ -427,7 +427,7 @@ export function ProblemEditor() {
               <div className="mb-4">
                 <PromptField
                   name="This part's prompt"
-                  label="What the student reads for this part (markdown)"
+                  label="What the student reads for this part. “Add code” puts in a block of code."
                   rows={3}
                   editable={editable}
                   value={(doc.parts ?? []).find((part) => part.label === leaf.key)?.prompt_md ?? ''}

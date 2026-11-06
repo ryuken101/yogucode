@@ -235,3 +235,21 @@ async def test_code_questions_are_never_marked_automatically(
         headers=aria["headers"],
     )
     assert response.status_code == 409
+
+
+async def test_an_answers_lines_and_indentation_survive_saving_and_publishing(
+    client, session: AsyncSession, signed_in
+) -> None:
+    """Code in an answer: Python's indentation means something, so nothing may tidy it."""
+    headers = await signed_in()
+    c = await concept(session, "indent")
+    text = "for i in range(2):\n    print(i)\n"
+    doc = mcq(str(c.id))
+    doc["options"][0]["text"] = text
+    doc["prompt_md"] = "What prints?\n\n```python\nif x:\n    y()\n```"
+
+    item = await published_mcq(client, headers, doc)
+
+    read = (await client.get(f"/items/{item['id']}", headers=headers)).json()["document"]
+    assert read["options"][0]["text"] == text
+    assert read["prompt_md"] == doc["prompt_md"]

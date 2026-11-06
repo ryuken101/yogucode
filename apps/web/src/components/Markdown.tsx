@@ -6,7 +6,19 @@
  * laptops — nothing a prompt contains should be able to put markup on that page.
  */
 
+import { Children, isValidElement } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 import ReactMarkdown from 'react-markdown'
+import { CodeBlock } from './CodeBlock'
+
+/** The source of a ```python block, or null for any other. Other languages, and fences with
+ * none, stay plain: those are usually a program's output, where colours and numbers mislead. */
+function pythonSource(children: ReactNode): string | null {
+  const only = Children.toArray(children)[0]
+  if (!isValidElement(only)) return null
+  const { className, children: text } = (only as ReactElement<{ className?: string; children?: ReactNode }>).props
+  return /\blanguage-(python|py)\b/.test(className ?? '') ? String(text ?? '') : null
+}
 
 export function Markdown({ children }: { children: string }) {
   return (
@@ -22,12 +34,19 @@ export function Markdown({ children }: { children: string }) {
           a: (props) => (
             <a className="text-grape-deep underline" target="_blank" rel="noreferrer" {...props} />
           ),
-          pre: (props) => (
-            <pre
-              className="my-3 overflow-x-auto rounded-lg bg-night p-3 font-mono text-sm text-cream"
-              {...props}
-            />
-          ),
+          pre: ({ children, ...props }) => {
+            const python = pythonSource(children)
+            if (python !== null) return <CodeBlock source={python} />
+            return (
+              // The `code` inside is styled for inline use (below): pale on this dark ground, undo it.
+              <pre
+                className="my-3 overflow-x-auto rounded-lg bg-night p-3 font-mono text-sm text-cream [&_code]:rounded-none [&_code]:bg-transparent [&_code]:px-0 [&_code]:text-[1em]"
+                {...props}
+              >
+                {children}
+              </pre>
+            )
+          },
           code: ({ className, ...props }) =>
             className ? (
               <code className={`font-mono ${className}`} {...props} />

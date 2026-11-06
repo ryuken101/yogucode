@@ -10,7 +10,7 @@
  */
 
 import { useId, useState } from 'react'
-import type { InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react'
+import type { InputHTMLAttributes, Ref, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react'
 
 const BOX =
   'w-full rounded-lg bg-surface px-3 py-2 text-grape ring-1 ring-grape/20 placeholder:text-muted/60 focus:outline-2 focus:outline-offset-0 focus:outline-grape disabled:opacity-50'
@@ -45,7 +45,7 @@ export function Textarea({
   label,
   hint,
   ...rest
-}: Common & TextareaHTMLAttributes<HTMLTextAreaElement>) {
+}: Common & TextareaHTMLAttributes<HTMLTextAreaElement> & { ref?: Ref<HTMLTextAreaElement> }) {
   const id = useId()
   return (
     <div className="flex flex-col gap-1.5">

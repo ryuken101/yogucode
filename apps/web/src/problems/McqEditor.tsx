@@ -31,8 +31,8 @@ export function McqEditor({ options, onChange, disabled }: Props) {
       <legend className="mb-1 text-sm font-medium text-grape">Options</legend>
       {options.map((option, index) => (
         <div key={index} className="rounded-lg bg-cream/60 p-3 ring-1 ring-line">
-          <div className="flex items-center gap-3">
-            <label className="flex items-center gap-1.5 text-sm text-grape">
+          <div className="flex items-start gap-3">
+            <label className="flex shrink-0 items-center gap-1.5 py-1.5 text-sm text-grape">
               <input
                 type="radio"
                 name="correct-option"
@@ -41,12 +41,16 @@ export function McqEditor({ options, onChange, disabled }: Props) {
               />
               Right answer
             </label>
-            <input
+            {/* Several lines, for code or a program's output. Grows with what's typed, and
+                keeps every space: Python's indentation means something. */}
+            <textarea
               aria-label={`Option ${index + 1}`}
               value={option.text}
+              rows={Math.max(1, option.text.split('\n').length)}
+              wrap="off"
               onChange={(e) => update(index, { text: e.target.value })}
               placeholder={`Option ${index + 1}`}
-              className="flex-1 rounded-lg bg-surface px-3 py-1.5 font-mono text-sm text-grape ring-1 ring-grape/20"
+              className="min-w-0 flex-1 resize-none overflow-x-auto rounded-lg bg-surface px-3 py-1.5 font-mono text-sm text-grape ring-1 ring-grape/20"
             />
             {disabled ? null : (
               <Button variant="quiet" onClick={() => onChange(options.filter((_, i) => i !== index))}>
