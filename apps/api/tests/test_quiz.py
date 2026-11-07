@@ -13,7 +13,7 @@ from sqlmodel import select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.live.hub import hub
-from app.models import Assignment, Attempt, ProblemSet, QuizSitting, Submission
+from app.models import Assignment, Attempt, Item, ProblemSet, QuizSitting, Submission
 from app.models.base import utcnow
 from work_builders import SOLUTION, homework, problem_doc, published
 
@@ -538,10 +538,22 @@ async def test_another_centres_sittings_and_answers_are_unreachable(
     )
     session.add(theirs)
     await session.flush()
+    their_item = Item(centre_id=foreign_centre["centre"].id, title="Theirs", prompt_md="SECRET")
+    session.add(their_item)
+    await session.flush()
+    their_attempt = Attempt(
+        centre_id=foreign_centre["centre"].id,
+        student_id=foreign_centre["student"].id,
+        assignment_id=theirs.id,
+        item_id=their_item.id,
+    )
+    session.add(their_attempt)
+    await session.flush()
     someone = uuid.uuid4()
     for path in [
         f"/quizzes/{theirs.id}/sittings",
         f"/quizzes/{theirs.id}/students/{someone}/answers",
+        f"/attempts/{their_attempt.id}/question",
         f"/classes/{foreign_centre['class'].id}/todays-work",
     ]:
         assert (await client.get(path, headers=headers)).status_code == 404, path
@@ -580,6 +592,7 @@ async def test_a_teacher_goes_through_what_a_child_has_saved_and_a_child_cannot(
     assert [(a["kind"], a["answered"]) for a in answers] == [("code", True), ("mcq", True)]
     assert answers[0]["code"] == "x = 1"
     assert answers[1]["choice"] == 1
+    assert answers[1]["prompt_md"] == "What does `list(range(5))` print?"
     assert [o["correct"] for o in answers[1]["options"]] == [True, False, False]
 
     assert (await client.get(path)).status_code == 403, "a child, with their cookie"

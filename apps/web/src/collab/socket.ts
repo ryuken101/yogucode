@@ -3,7 +3,9 @@
  *
  * `LiveSocket` is a WebSocket that reconnects on its own — centre wifi drops, laptops
  * sleep — with a growing pause between attempts, and gives up only when the server says
- * the problem is who you are (4401/4403/4404), since retrying will not change that.
+ * the problem is who you are (4401/4403/4404), since retrying will not change that, or that
+ * this child's newer connection has taken over (4409), since retrying would take it back and
+ * two tabs would replace each other forever.
  *
  * A child's page has **one** connection, shared by every editor on it (`studentLive`). On
  * every (re)connect each open editor sends its whole document again, which is how the
@@ -14,7 +16,7 @@ import { markRemovedFromClass } from '../lib/tabSession'
 
 export type Message = { type: string } & Record<string, unknown>
 
-const TERMINAL_CODES = new Set([4401, 4403, 4404])
+const TERMINAL_CODES = new Set([4401, 4403, 4404, 4409])
 const MAX_QUEUE = 500
 
 /** The ws:// or wss:// address of a live endpoint, through the same base as the REST API. */

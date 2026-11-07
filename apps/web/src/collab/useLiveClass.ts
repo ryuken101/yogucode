@@ -21,6 +21,7 @@ import { LiveSocket, fromBase64, toBase64, type Message } from './socket'
 
 const REMOTE = 'remote'
 const MAX_RECENT = 50
+const SITTINGS_REFRESH_MS = 2_000
 
 export interface LiveStatus {
   kind: 'run' | 'check' | 'error' | 'paste' | 'hint' | string
@@ -116,6 +117,15 @@ export function useLiveClass(classId: string) {
   }, [store])
 
   useEffect(() => {
+    let sittingsTimer: ReturnType<typeof setTimeout> | null = null
+    // The tile updates from the message itself, so a burst of children leaving and coming
+    // back can share one re-fetch of the record.
+    const refreshSittingsSoon = () => {
+      sittingsTimer ??= setTimeout(() => {
+        sittingsTimer = null
+        void client.invalidateQueries({ queryKey: ['quiz-sittings'] })
+      }, SITTINGS_REFRESH_MS)
+    }
 
     const upsert = (id: string, patch: Partial<LiveStudent>) => {
       const current = store.students.get(id) ?? {
@@ -165,7 +175,7 @@ export function useLiveClass(classId: string) {
         case 'attention':
           upsert(String(message.student_id), attention(message))
           // A quiz's record of it has just changed too.
-          void client.invalidateQueries({ queryKey: ['quiz-sittings'] })
+          refreshSittingsSoon()
           break
         case 'quiz_started':
         case 'quiz_ending':
@@ -225,7 +235,10 @@ export function useLiveClass(classId: string) {
       },
     })
     store.reset(live)
-    return () => live.close()
+    return () => {
+      if (sittingsTimer !== null) clearTimeout(sittingsTimer)
+      live.close()
+    }
   }, [classId, bump, newDoc, store, client])
 
   /** The teacher's cursor in a child's editor, or null to hide it when help ends. */

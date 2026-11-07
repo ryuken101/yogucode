@@ -16,6 +16,8 @@ import { Link, useParams } from 'react-router'
 import { Badge } from '../components/Badge'
 import { Button } from '../components/Button'
 import { Card, PageHeader } from '../components/Card'
+import { CodeGlance } from '../components/CodeBlock'
+import { Markdown } from '../components/Markdown'
 import { Notice } from '../components/Notice'
 import { StopQuizButton } from '../components/QuizControls'
 import { CodeSurface } from '../editor/CodeSurface'
@@ -25,8 +27,10 @@ import { useLiveClass, type LiveDoc, type LiveStudent } from '../collab/useLiveC
 import { useQueryClient } from '@tanstack/react-query'
 import type { Schemas } from '../lib/api'
 import { timeLeft } from '../lib/dates'
+import { isPythonFile, languageOf } from '../lib/fileType'
 import {
   keys,
+  useAttemptQuestion,
   useClass,
   useClassQuizzes,
   useQuizAnswers,
@@ -101,15 +105,42 @@ function Tile({
           {online ? (student?.focus?.title ?? 'nothing open') : 'not signed in'}
         </span>
       </span>
-      <pre className="mt-2 min-h-0 flex-1 overflow-hidden rounded-md bg-night p-2 font-mono text-[11px] leading-snug text-cream">
-        {code || ' '}
-      </pre>
+      {/* As in the editor, whose rule this is: a file is Python only if its name says so. */}
+      {student?.focus?.kind === 'file' && !isPythonFile(student.focus.title) ? (
+        <pre className="mt-2 min-h-0 flex-1 overflow-hidden rounded-md bg-night p-2 font-mono text-[11px] leading-snug text-cream">
+          {code || ' '}
+        </pre>
+      ) : (
+        <CodeGlance
+          source={code || ' '}
+          className="mt-2 min-h-0 flex-1 rounded-md p-2 text-[11px] leading-snug"
+        />
+      )}
       <span className="mt-2 flex min-h-6 flex-wrap items-center gap-2 text-xs text-muted">
         {check ? <span>{check}</span> : null}
         {finished ? <Badge variant="good">Finished</Badge> : null}
         <Flags flags={flags} />
       </span>
     </button>
+  )
+}
+
+/** What the child was asked, beside their code. */
+function QuestionPanel({ title, promptMd, options = [] }: { title: string; promptMd: string; options?: string[] }) {
+  return (
+    <section aria-label="The question" className="h-96 min-w-0 overflow-y-auto rounded-lg bg-cream/60 px-4 py-3 ring-1 ring-line">
+      <h3 className="font-display font-semibold text-grape">{title}</h3>
+      <Markdown>{promptMd}</Markdown>
+      {options.length ? (
+        <ul className="mt-2 flex flex-col gap-1.5">
+          {options.map((option, index) => (
+            <li key={index} className="whitespace-pre-wrap break-words rounded-lg bg-surface px-3 py-1.5 font-mono text-sm text-grape ring-1 ring-line">
+              {option}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
   )
 }
 
@@ -183,6 +214,18 @@ function Expanded({
   // The code question they are in is the live editor; the rest are their saved work. A
   // multiple-choice question has an empty document behind it, and nothing to watch being typed.
   const showSaved = shown !== undefined && !(shown === here && doc && shown.kind !== 'mcq')
+  // Outside a quiz, the question behind the problem they have open, following them. A file has none.
+  const openAttempt = !quizId && student.focus?.kind === 'problem' && target?.startsWith('attempt:')
+    ? target.slice('attempt:'.length)
+    : null
+  const openQuestion = useAttemptQuestion(openAttempt)
+  const question = quizId
+    ? shown && { title: shown.title, promptMd: shown.prompt_md }
+    : openQuestion.data && {
+        title: openQuestion.data.title,
+        promptMd: openQuestion.data.prompt_md,
+        options: openQuestion.data.options,
+      }
 
   // The child's cursor, drawn in this editor as it moves.
   useEffect(() => {
@@ -249,7 +292,9 @@ function Expanded({
           ))}
         </div>
       ) : null}
-      <div className={`h-96 rounded-lg ring-1 ring-grape/25 ${showSaved && shown.kind === 'mcq' ? 'overflow-auto' : 'overflow-hidden'}`}>
+      <div className={question ? 'grid gap-3 lg:grid-cols-[2fr_3fr]' : ''}>
+      {question ? <QuestionPanel {...question} /> : null}
+      <div className={`h-96 min-w-0 rounded-lg ring-1 ring-grape/25 ${showSaved && shown.kind === 'mcq' ? 'overflow-auto' : 'overflow-hidden'}`}>
         {showSaved ? (
           <SavedAnswer answer={shown} />
         ) : doc ? (
@@ -260,6 +305,7 @@ function Expanded({
             onChange={() => undefined}
             readOnly={!helping}
             autoFocus={false}
+            language={student.focus?.kind === 'file' ? languageOf(student.focus.title) : 'python'}
             onModel={(model) => {
               const binding = new MonacoYBinding(doc.doc.getText('code'), model)
               caret.current = new RemoteCaret(model, student.displayName)
@@ -277,6 +323,7 @@ function Expanded({
         ) : (
           <p className="p-4 text-sm text-muted">Their editor hasn’t sent anything yet.</p>
         )}
+      </div>
       </div>
     </Card>
   )

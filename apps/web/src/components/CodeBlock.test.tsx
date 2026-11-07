@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
 import { expect, test } from 'vitest'
-import { CodeBlock } from './CodeBlock'
+import { CodeBlock, CodeGlance } from './CodeBlock'
 import { Markdown } from './Markdown'
 
 test('a number for every line, blank ones too, and the indentation survives', () => {
@@ -32,4 +32,19 @@ test('inline code keeps its highlight, and a plain block does not get one', () =
   const { container } = render(<Markdown>{'Use `print`.\n\n```\n1\n```'}</Markdown>)
   expect(container.querySelector('p code')?.className).toContain('bg-grape-pale')
   expect(container.querySelector('pre')?.className).toContain('[&_code]:bg-transparent')
+})
+
+test('a glance has the colours and no line numbers', () => {
+  const { container } = render(<CodeGlance source={'print(1)\n'} />)
+  expect(screen.queryByTestId('line-numbers')).not.toBeInTheDocument()
+  expect(screen.getByText('print')).toHaveStyle({ color: '#FF5C8A' })
+  expect(container.querySelector('code')?.textContent).toBe('print(1)\n')
+})
+
+test('a re-render keeps the same elements, so a sideways scroll or a selection survives', () => {
+  const source = 'Look:\n\n```python\nprint(1)\n```'
+  const { rerender, container } = render(<Markdown>{source}</Markdown>)
+  const before = container.querySelector('pre')
+  rerender(<Markdown>{source}</Markdown>)
+  expect(container.querySelector('pre')).toBe(before)
 })

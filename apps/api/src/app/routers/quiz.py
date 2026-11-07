@@ -151,6 +151,7 @@ class QuizAnswerOut(BaseModel):
     problem_id: uuid.UUID
     title: str
     kind: ItemKind
+    prompt_md: str
     attempt_id: uuid.UUID | None
     code: str | None
     choice: int | None
@@ -460,6 +461,7 @@ async def quiz_answers(
                 problem_id=leaf.problem.id,
                 title=leaf.label,
                 kind=leaf.leaf.kind,
+                prompt_md=leaf.prompt_md,
                 attempt_id=attempt.id if attempt else None,
                 code=attempt.code if attempt and not mcq else None,
                 choice=attempt.choice if attempt else None,

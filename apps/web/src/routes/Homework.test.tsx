@@ -218,6 +218,76 @@ test('marking pre-fills Runs and Correct from the re-run and saves when moving o
   expect(screen.getByText('Not handed in — saved work')).toBeInTheDocument()
 })
 
+test('the question sits beside the answer, in the editor’s colours, and stays as the child changes', async () => {
+  const twoQuestions = (id: string, title: string, prompt: string, solution: string) =>
+    http.get(`/api/assignments/${HW}/marking/${id}`, () =>
+      HttpResponse.json({
+        assignment_id: HW, leaf_item_id: id, kind: 'code', options: [], title, prompt_md: prompt, solution_code: solution,
+        concept_ids: [], tests: [],
+        entries: [
+          entry({}),
+          entry({ student_id: S2, display_name: 'Bella N', attempt_id: A2, code: 'print(4)' }),
+          entry({ student_id: 's3', display_name: 'Cal R', attempt_id: null, code: null, source: 'not_started' }),
+          entry({ student_id: 's4', display_name: 'Dee T', attempt_id: 'a4', code: '' }),
+        ],
+      } satisfies Schemas['QuestionMarkingOut']),
+    )
+  const P2 = '018f0000-0000-7000-8000-0000000000c2'
+  server.use(
+    http.get(`/api/assignments/${HW}/marking`, () =>
+      HttpResponse.json({
+        assignment_id: HW, title: 'Lists practice', mode: 'homework', due_at: null, released_at: null,
+        questions: [
+          { leaf_item_id: P1, title: 'Add to the end', difficulty: 1, handed_in: 2, marked: 0 },
+          { leaf_item_id: P2, title: 'No solution', difficulty: 1, handed_in: 0, marked: 0 },
+        ],
+        students: [],
+      } satisfies Schemas['MarkingOverviewOut']),
+    ),
+    twoQuestions(P1, 'Add to the end', 'What does this print?\n\n```python\nprint(9)\n```', 'print(SOLVED)'),
+    twoQuestions(P2, 'No solution', 'Something else.', ''),
+    http.get('/api/snippets', () => HttpResponse.json([])),
+  )
+  check.mockResolvedValue({ compile_error: null, results: [] })
+  const { user } = renderScreen(
+    <Routes>
+      <Route path="/assignments/:assignmentId/mark/:itemId" element={<Marking />} />
+    </Routes>,
+    { route: `/assignments/${HW}/mark/${P1}` },
+  )
+
+  expect(await screen.findByText('What does this print?')).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: 'Add to the end' })).toBeInTheDocument()
+  // The child's code is coloured: `print` as a keyword, in both the question and the answer.
+  expect(screen.getAllByText('print')).toHaveLength(2)
+  for (const word of screen.getAllByText('print')) expect(word).toHaveStyle({ color: '#FF5C8A' })
+
+  // The solution waits to be asked for.
+  expect(screen.queryByText('SOLVED')).not.toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Show solution' }))
+  expect(screen.getByText('SOLVED')).toBeInTheDocument()
+
+  // Next child: the same question, and the solution is still open.
+  await user.click(screen.getByRole('button', { name: 'Next child' }))
+  await screen.findByRole('heading', { name: 'Bella N' })
+  expect(screen.getByText('What does this print?')).toBeInTheDocument()
+  expect(screen.getByText('SOLVED')).toBeInTheDocument()
+  expect(screen.getByText('4')).toBeInTheDocument()
+
+  // Nothing to colour, and nothing to run.
+  await user.click(screen.getByRole('button', { name: /Cal R/ }))
+  expect(await screen.findByText('Not started — nothing to mark.')).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Run' })).not.toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: /Dee T/ }))
+  expect(await screen.findByText('(nothing written)')).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Run' })).not.toBeInTheDocument()
+
+  // A new question closes the solution; one without a solution has no button.
+  await user.click(screen.getByRole('tab', { name: /No solution/ }))
+  expect(await screen.findByText('Something else.')).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /solution/ })).not.toBeInTheDocument()
+})
+
 /* --- progress -------------------------------------------------------------------------- */
 
 test('progress cells use the calm tones, and late is not-yet', () => {

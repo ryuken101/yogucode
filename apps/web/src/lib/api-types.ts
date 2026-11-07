@@ -224,6 +224,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/attempts/{attempt_id}/question": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Attempt Question
+         * @description What a child with this attempt open was asked. Any mode, unlike the routes above: Live
+         *     shows it for a lesson as well, and a running quiz doesn't stop a teacher reading it.
+         */
+        get: operations["attempt_question_attempts__attempt_id__question_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/me": {
         parameters: {
             query?: never;
@@ -2836,6 +2857,20 @@ export interface components {
             run_count: number;
             status: components["schemas"]["AttemptStatus"];
         };
+        /**
+         * AttemptQuestionOut
+         * @description The question behind a child's open editor, for the live view. No key and no solution:
+         *     the teacher is reading along, not marking.
+         */
+        AttemptQuestionOut: {
+            kind: components["schemas"]["ItemKind"];
+            /** Options */
+            options: string[];
+            /** Prompt Md */
+            prompt_md: string;
+            /** Title */
+            title: string;
+        };
         /** AttemptSaveIn */
         AttemptSaveIn: {
             /** Code */
@@ -4396,6 +4431,8 @@ export interface components {
              * Format: uuid
              */
             problem_id: string;
+            /** Prompt Md */
+            prompt_md: string;
             /** Title */
             title: string;
         };
@@ -5630,6 +5667,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MarkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    attempt_question_attempts__attempt_id__question_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                attempt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttemptQuestionOut"];
                 };
             };
             /** @description Validation Error */

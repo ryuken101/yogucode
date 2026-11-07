@@ -225,6 +225,29 @@ async def test_marking_counts_each_option_and_auto_marks(
     assert back["feedback"]["outcome"] == "not_yet"
 
 
+async def test_a_teacher_can_read_the_question_behind_an_attempt_and_nothing_more(
+    client, session: AsyncSession, student_on_roster
+) -> None:
+    from test_homework import as_student
+
+    aria = await student_on_roster("Aria K")
+    sheet = await sheet_with_mcq(client, session, aria)
+    await as_student(client, aria)
+    attempt_id = (await open_mcq(client, sheet))["leaves"][0]["attempt"]["id"]
+
+    path = f"/attempts/{attempt_id}/question"
+    assert (await client.get(path)).status_code == 403, "a child, with their cookie"
+    response = await client.get(path, headers=aria["headers"])
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "title": "What does range(5) give?",
+        "kind": "mcq",
+        "prompt_md": "What does `list(range(5))` print?",
+        "options": ["[0, 1, 2, 3, 4]", "[1, 2, 3, 4, 5]", "[0, 1, 2, 3, 4, 5]"],
+    }
+    assert "SECRET" not in response.text and "correct" not in response.text
+
+
 async def test_code_questions_are_never_marked_automatically(
     client, session: AsyncSession, signed_in_student
 ) -> None:

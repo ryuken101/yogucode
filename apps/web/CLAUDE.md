@@ -203,6 +203,10 @@ the result back to a child, line by line and key by key, and shows it all at onc
 reduced motion is asked for. Its colours are the console's: cream for output, lavender for
 what was typed.
 
+**Stop repeats until the program ends** (`usePython.stop`, 7 Nov 2026): one signal was sometimes
+lost, leaving `while True: pass` running until a second press. `run` clears the interrupt on
+the page's side, so a signal landing after the last program ended can't kill the next one.
+
 ## The editor
 
 Monaco, behind `React.lazy` in `src/editor/CodeSurface.tsx`. `/join`, the class list and
@@ -345,6 +349,15 @@ folders and takes dragged problems. Folders come above concepts, and the page's 
 sticky with its own scroll: with 18 concepts below a long list, a folder otherwise scrolls out
 of reach of the row being dragged onto it. Every list of problems (quiz, homework, ladder)
 adds through `ProblemPicker`, by way of `ProblemListEditor`.
+
+## Marking
+
+The question sits beside the answer and stays in view, with the checks and marks under the
+answer in the same column, so nothing being judged scrolls away from what was asked. Live's
+open tile shows the question too (`GET /attempts/{id}/question` outside a quiz, which carries no
+key or solution). `problems/RunAnswer.tsx` runs an answer with its own worker, so a program at
+`input()` can't hold up the class's checks, and with `run(code, { fresh: true })`, so one child's
+variables can't hide the next child's mistake. Running saves nothing and changes no mark.
 
 ## Code in prompts
 

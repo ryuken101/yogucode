@@ -11,6 +11,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   answerStdin,
   cancelStdin,
+  clearInterrupt,
   createInterruptBuffer,
   createStdinBuffer,
   isWaitingForStdin,
@@ -75,6 +76,9 @@ export type RunState =
 
 const INDEX_URL = '/pyodide/'
 
+/** How often Stop signals again while the program hasn't ended. See `stop`. */
+const STOP_REPEAT_MS = 250
+
 export interface RunFinished {
   ok: boolean
   interrupted: boolean
@@ -103,6 +107,15 @@ export function usePython({ onRunFinished }: { onRunFinished?: (run: RunFinished
   const pendingChecks = useRef(new Map<number, (run: TestRun | null) => void>())
   /** Example runs in flight, the same way. */
   const pendingExamples = useRef(new Map<number, (run: ExampleRun | null) => void>())
+  /** Set from a run or check being sent until the worker says it ended: what Stop can stop. */
+  const working = useRef(false)
+  const stopTimer = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const finishedWork = useCallback(() => {
+    working.current = false
+    if (stopTimer.current !== null) clearInterval(stopTimer.current)
+    stopTimer.current = null
+  }, [])
 
   const [state, setState] = useState<RunState>(() =>
     isolated()
@@ -124,19 +137,21 @@ export function usePython({ onRunFinished }: { onRunFinished?: (run: RunFinished
 
   useEffect(
     () => () => {
+      finishedWork()
       worker.current?.terminate()
       worker.current = null
     },
-    [],
+    [finishedWork],
   )
 
   /** Nothing is coming back for anything in flight; let every caller move on. */
   const settleAll = useCallback(() => {
+    finishedWork()
     for (const resolve of pendingChecks.current.values()) resolve(null)
     pendingChecks.current.clear()
     for (const resolve of pendingExamples.current.values()) resolve(null)
     pendingExamples.current.clear()
-  }, [])
+  }, [finishedWork])
 
   const ensureWorker = useCallback((): Worker => {
     if (worker.current) return worker.current
@@ -183,6 +198,7 @@ export function usePython({ onRunFinished }: { onRunFinished?: (run: RunFinished
           })
           break
         case 'done':
+          finishedWork()
           setState({ status: 'idle' })
           // A stop is said in the console's own voice, not as a Python traceback.
           if (message.interrupted) append({ stream: 'system', text: '\n── stopped ──\n' })
@@ -196,6 +212,7 @@ export function usePython({ onRunFinished }: { onRunFinished?: (run: RunFinished
         case 'checked': {
           const resolve = pendingChecks.current.get(message.runId)
           pendingChecks.current.delete(message.runId)
+          finishedWork()
           resolve?.(message.run)
           setState({ status: 'idle' })
           break
@@ -203,6 +220,7 @@ export function usePython({ onRunFinished }: { onRunFinished?: (run: RunFinished
         case 'exampled': {
           const resolve = pendingExamples.current.get(message.runId)
           pendingExamples.current.delete(message.runId)
+          finishedWork()
           resolve?.(message.run)
           setState({ status: 'idle' })
           break
@@ -227,14 +245,18 @@ export function usePython({ onRunFinished }: { onRunFinished?: (run: RunFinished
     })
     worker.current = created
     return created
-  }, [append, settleAll])
+  }, [append, finishedWork, settleAll])
 
   const run = useCallback(
-    (code: string) => {
+    (code: string, { fresh = false }: { fresh?: boolean } = {}) => {
       if (state.status === 'unsupported') return
       setOutput([])
       runId.current += 1
+      working.current = true
       const created = ensureWorker()
+      // Cleared here, not when the worker gets to it: on a slow machine that can be seconds
+      // later, and clearing then lost a Stop pressed in between, leaving the loop running.
+      if (interrupt.current) clearInterrupt(interrupt.current)
 
       // On a cold page the first Run arrives while Pyodide is still downloading. The
       // worker holds the run and executes it the moment it is ready, so the child presses
@@ -245,7 +267,7 @@ export function usePython({ onRunFinished }: { onRunFinished?: (run: RunFinished
       } else {
         setState({ status: 'running' })
       }
-      created.postMessage({ type: 'run', runId: runId.current, code })
+      created.postMessage({ type: 'run', runId: runId.current, code, fresh })
     },
     [ensureWorker, state.status],
   )
@@ -261,6 +283,7 @@ export function usePython({ onRunFinished }: { onRunFinished?: (run: RunFinished
     (code: string, tests: TestCheck[]): Promise<TestRun | null> => {
       if (state.status === 'unsupported') return Promise.resolve(null)
       runId.current += 1
+      working.current = true
       const id = runId.current
       const created = ensureWorker()
       if (!ready.current) {
@@ -286,6 +309,7 @@ export function usePython({ onRunFinished }: { onRunFinished?: (run: RunFinished
     (code: string, inputs: string[]): Promise<ExampleRun | null> => {
       if (state.status === 'unsupported') return Promise.resolve(null)
       runId.current += 1
+      working.current = true
       const id = runId.current
       const created = ensureWorker()
       if (!ready.current) {
@@ -321,13 +345,22 @@ export function usePython({ onRunFinished }: { onRunFinished?: (run: RunFinished
    * looks at the interrupt buffer — that case has to be unblocked through the stdin
    * channel. Getting this wrong leaves a child pressing a Stop button that does nothing,
    * which is the failure this branch exists to prevent.
+   *
+   * It repeats until the program has ended, because one signal is sometimes lost: in Chrome
+   * about one Stop in thirty left `while True: pass` running, and a second press ended it
+   * (7 Nov 2026). The program can also reach an `input()` between signals, so each repeat
+   * chooses its route again. A signal landing just after the end is cleared by the next `run`,
+   * and by the worker for a check.
    */
   const stop = useCallback(() => {
-    if (stdin.current && isWaitingForStdin(stdin.current)) {
-      cancelStdin(stdin.current)
-      return
+    const signal = () => {
+      if (stdin.current && isWaitingForStdin(stdin.current)) cancelStdin(stdin.current)
+      else if (interrupt.current) signalInterrupt(interrupt.current)
     }
-    if (interrupt.current) signalInterrupt(interrupt.current)
+    signal()
+    if (working.current && stopTimer.current === null) {
+      stopTimer.current = setInterval(signal, STOP_REPEAT_MS)
+    }
   }, [])
 
   return { state, output, run, check, example, stop, answer }

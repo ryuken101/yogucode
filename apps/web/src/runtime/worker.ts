@@ -29,11 +29,17 @@ import graderSource from './grader.py?raw'
 
 // Pyodide's own types describe far more than this worker touches, and importing them would
 // pull the package into the bundle — the whole point is that it is fetched at runtime.
+interface PyDict {
+  set(key: string, value: string): void
+  destroy(): void
+}
+
 interface Pyodide {
   version: string
   FS: { writeFile(path: string, data: string): void }
   runPython(code: string): unknown
-  runPythonAsync(code: string): Promise<unknown>
+  runPythonAsync(code: string, options?: { globals: PyDict }): Promise<unknown>
+  globals: { get(name: 'dict'): () => PyDict }
   pyimport(name: string): {
     run_tests(code: string, tests: string): string
     run_example(code: string, inputs: string): string
@@ -221,13 +227,13 @@ async function run(message: Extract<ToWorker, { type: 'run' }>): Promise<void> {
   currentRunId = message.runId
   stoppedAtPrompt = false
   sink.reset()
-  // A Stop pressed before this run started must not kill it.
-  clearInterrupt(interruptBuffer)
 
   let ok = true
   let interrupted = false
+  const globals = message.fresh ? pyodide.globals.get('dict')() : undefined
+  globals?.set('__name__', '__main__')
   try {
-    await pyodide.runPythonAsync(message.code)
+    await pyodide.runPythonAsync(message.code, globals ? { globals } : undefined)
   } catch (error) {
     ok = false
     const text = error instanceof Error ? error.message : String(error)
@@ -236,6 +242,7 @@ async function run(message: Extract<ToWorker, { type: 'run' }>): Promise<void> {
     // mistake, not a failure of ours. A stop is neither, and the page says so itself.
     if (!interrupted) sink.write('stderr', `${text.trimEnd()}\n`)
   } finally {
+    globals?.destroy()
     sink.flush()
     clearInterrupt(interruptBuffer)
     post({ type: 'done', runId: message.runId, ok, interrupted })

@@ -55,6 +55,7 @@ export const keys = {
   runningQuizzes: ['running-quizzes'] as const,
   quizSittings: (quizId: string) => ['quiz-sittings', quizId] as const,
   quizAnswers: (quizId: string, studentId: string) => ['quiz-answers', quizId, studentId] as const,
+  attemptQuestion: (attemptId: string) => ['attempt-question', attemptId] as const,
   todaysWork: (classId: string) => ['todays-work', classId] as const,
   sheet: (assignmentId: string) => ['sheet', assignmentId] as const,
   homework: (classId: string) => ['homework', classId] as const,
@@ -888,6 +889,14 @@ export function useQuizAnswers(quizId: string | null, studentId: string) {
     queryFn: () => api.quizAnswers(quizId ?? '', studentId),
     enabled: Boolean(quizId),
     refetchInterval: 5_000,
+  })
+}
+
+export function useAttemptQuestion(attemptId: string | null) {
+  return useQuery({
+    queryKey: keys.attemptQuestion(attemptId ?? ''),
+    queryFn: () => api.attemptQuestion(attemptId ?? ''),
+    enabled: Boolean(attemptId),
   })
 }
 

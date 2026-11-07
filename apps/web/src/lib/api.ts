@@ -260,6 +260,8 @@ export const api = {
   quizSittings: (quizId: string) => request<Schemas['SittingOut'][]>(`/quizzes/${quizId}/sittings`),
   quizAnswers: (quizId: string, studentId: string) =>
     request<Schemas['QuizAnswerOut'][]>(`/quizzes/${quizId}/students/${studentId}/answers`),
+  attemptQuestion: (attemptId: string) =>
+    request<Schemas['AttemptQuestionOut']>(`/attempts/${attemptId}/question`),
   todaysWork: (classId: string) => request<Schemas['TodaysWorkOut']>(`/classes/${classId}/todays-work`),
 
   /* --- teacher: problem bank ----------------------------------------------------- */

@@ -12,9 +12,9 @@ from datetime import timedelta
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.models import Assignment, Attempt, AuditLog, ProblemSet, Submission
+from app.models import Assignment, Attempt, AuditLog, Concept, ProblemSet, Submission
 from app.models.base import utcnow
-from work_builders import SOLUTION, homework
+from work_builders import SOLUTION, homework, problem_doc, published
 
 
 async def open_leaf(client, assignment_id: str, item_id: str) -> dict:
@@ -545,3 +545,34 @@ async def test_a_due_date_in_the_past_is_refused(
         f"/assignments/{hw['assignment']['id']}/set", headers=aria["headers"]
     )
     assert refused.status_code == 409
+
+
+async def test_the_question_behind_a_part_has_the_problems_words_and_the_parts(
+    client, session: AsyncSession, student_on_roster
+) -> None:
+    aria = await student_on_roster("Aria K")
+    hw = await homework(client, session, aria, set_it=False)
+    concept = (await session.exec(select(Concept).where(Concept.label == "Lists"))).first()
+    part = problem_doc(str(concept.id)) | {"label": "a", "prompt_md": "Now part a."}
+    del part["title"]
+    item = await published(
+        client,
+        aria["headers"],
+        {"title": "Shopping", "prompt_md": "A shopping list.", "parts": [part]},
+    )
+    assignment_id = hw["assignment"]["id"]
+    await client.patch(
+        f"/assignments/{assignment_id}", json={"item_ids": [item["id"]]}, headers=aria["headers"]
+    )
+    await client.post(f"/assignments/{assignment_id}/set", headers=aria["headers"])
+    await as_student(client, aria)
+    opened = await client.post(f"/me/assignments/{assignment_id}/items/{item['id']}/open")
+    attempt_id = opened.json()["leaves"][0]["attempt"]["id"]
+
+    response = await client.get(f"/attempts/{attempt_id}/question", headers=aria["headers"])
+    assert response.status_code == 200, response.text
+    question = response.json()
+    assert question["title"] == "Shopping (a)"
+    assert question["prompt_md"] == "A shopping list.\n\nNow part a."
+    assert question["options"] == []
+    assert SOLUTION not in response.text and "secret" not in response.text

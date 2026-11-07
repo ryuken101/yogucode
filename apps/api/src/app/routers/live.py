@@ -18,7 +18,8 @@
 transaction mode (`db.py`), so each check commits straight away and the connection goes
 back. The socket then holds nothing but memory.
 
-Close codes: 4401 not signed in, 4403 not allowed, 4404 not found or not yours.
+Close codes: 4401 not signed in, 4403 not allowed, 4404 not found or not yours, 4409 replaced
+by the same child's newer connection.
 """
 
 import asyncio
@@ -27,6 +28,7 @@ import uuid
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.websockets import WebSocketState
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.auth.principal import (
@@ -138,6 +140,14 @@ async def _close(websocket: WebSocket, code: int) -> None:
         await websocket.close(code=code)
 
 
+async def _next_message(websocket: WebSocket) -> Any:
+    """The next message. If the hub closed this socket since the last one, that's a normal
+    end, where `receive_json` would raise a RuntimeError instead."""
+    if websocket.application_state != WebSocketState.CONNECTED:
+        raise WebSocketDisconnect
+    return await websocket.receive_json()
+
+
 async def _may_publish(session: AsyncSession, principal: Principal, target: str) -> bool:
     parsed = parse_target(target)
     if parsed is None:
@@ -178,7 +188,7 @@ async def student_socket(websocket: WebSocket, session: SessionDep, settings: Se
     await socket.send_json({"type": "ready", "class_id": str(klass.id)})
     try:
         while True:
-            message = await websocket.receive_json()
+            message = await _next_message(websocket)
             kind = message.get("type") if isinstance(message, dict) else None
             if kind == "focus":
                 focus = message.get("focus")
@@ -247,7 +257,7 @@ async def teacher_socket(
     await hub.join_teacher(klass.id, socket, user.id)
     try:
         while True:
-            message = await websocket.receive_json()
+            message = await _next_message(websocket)
             kind = message.get("type") if isinstance(message, dict) else None
             if kind == "cursor":
                 target, offset = message.get("target"), message.get("offset")

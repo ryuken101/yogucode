@@ -8,7 +8,7 @@
 
 import { Children, isValidElement } from 'react'
 import type { ReactElement, ReactNode } from 'react'
-import ReactMarkdown from 'react-markdown'
+import ReactMarkdown, { type Components } from 'react-markdown'
 import { CodeBlock } from './CodeBlock'
 
 /** The source of a ```python block, or null for any other. Other languages, and fences with
@@ -20,43 +20,44 @@ function pythonSource(children: ReactNode): string | null {
   return /\blanguage-(python|py)\b/.test(className ?? '') ? String(text ?? '') : null
 }
 
+// Out here so they keep their identity: made during render, every re-render of a page would
+// rebuild the question's DOM, losing a selection or a code block's sideways scroll. Marking and
+// Live re-render on every key.
+const COMPONENTS: Components = {
+  p: (props) => <p className="my-2 leading-relaxed" {...props} />,
+  ul: (props) => <ul className="my-2 list-disc pl-6" {...props} />,
+  ol: (props) => <ol className="my-2 list-decimal pl-6" {...props} />,
+  h1: (props) => <h3 className="mt-4 mb-2 font-display font-semibold text-lg" {...props} />,
+  h2: (props) => <h3 className="mt-4 mb-2 font-display font-semibold text-lg" {...props} />,
+  h3: (props) => <h4 className="mt-3 mb-1 font-display font-semibold" {...props} />,
+  a: (props) => (
+    <a className="text-grape-deep underline" target="_blank" rel="noreferrer" {...props} />
+  ),
+  pre: ({ children, ...props }) => {
+    const python = pythonSource(children)
+    if (python !== null) return <CodeBlock source={python} />
+    return (
+      // The `code` inside is styled for inline use (below): pale on this dark ground, undo it.
+      <pre
+        className="my-3 overflow-x-auto rounded-lg bg-night p-3 font-mono text-sm text-cream [&_code]:rounded-none [&_code]:bg-transparent [&_code]:px-0 [&_code]:text-[1em]"
+        {...props}
+      >
+        {children}
+      </pre>
+    )
+  },
+  code: ({ className, ...props }) =>
+    className ? (
+      <code className={`font-mono ${className}`} {...props} />
+    ) : (
+      <code className="rounded bg-grape-pale/50 px-1 font-mono text-[0.9em]" {...props} />
+    ),
+}
+
 export function Markdown({ children }: { children: string }) {
   return (
     <div className="prose-prompt text-grape">
-      <ReactMarkdown
-        components={{
-          p: (props) => <p className="my-2 leading-relaxed" {...props} />,
-          ul: (props) => <ul className="my-2 list-disc pl-6" {...props} />,
-          ol: (props) => <ol className="my-2 list-decimal pl-6" {...props} />,
-          h1: (props) => <h3 className="mt-4 mb-2 font-display font-semibold text-lg" {...props} />,
-          h2: (props) => <h3 className="mt-4 mb-2 font-display font-semibold text-lg" {...props} />,
-          h3: (props) => <h4 className="mt-3 mb-1 font-display font-semibold" {...props} />,
-          a: (props) => (
-            <a className="text-grape-deep underline" target="_blank" rel="noreferrer" {...props} />
-          ),
-          pre: ({ children, ...props }) => {
-            const python = pythonSource(children)
-            if (python !== null) return <CodeBlock source={python} />
-            return (
-              // The `code` inside is styled for inline use (below): pale on this dark ground, undo it.
-              <pre
-                className="my-3 overflow-x-auto rounded-lg bg-night p-3 font-mono text-sm text-cream [&_code]:rounded-none [&_code]:bg-transparent [&_code]:px-0 [&_code]:text-[1em]"
-                {...props}
-              >
-                {children}
-              </pre>
-            )
-          },
-          code: ({ className, ...props }) =>
-            className ? (
-              <code className={`font-mono ${className}`} {...props} />
-            ) : (
-              <code className="rounded bg-grape-pale/50 px-1 font-mono text-[0.9em]" {...props} />
-            ),
-        }}
-      >
-        {children}
-      </ReactMarkdown>
+      <ReactMarkdown components={COMPONENTS}>{children}</ReactMarkdown>
     </div>
   )
 }

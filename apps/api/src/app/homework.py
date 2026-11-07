@@ -55,6 +55,13 @@ class Leaf:
             else self.problem.title
         )
 
+    @property
+    def prompt_md(self) -> str:
+        """The question as a whole: the problem's words, then the part's if this is one."""
+        if self.leaf.parent_id is None:
+            return self.problem.prompt_md
+        return f"{self.problem.prompt_md}\n\n{self.leaf.prompt_md}"
+
 
 async def set_leaves(session: AsyncSession, principal: Principal, set_id: uuid.UUID) -> list[Leaf]:
     """A set's problems, expanded to their parts, in the order a child meets them."""

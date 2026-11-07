@@ -266,7 +266,7 @@ on, one uvicorn worker — the live hub and quiz timers live in process memory).
 `release_command` runs `alembic upgrade head` against Supabase on each deploy, upgrade
 only. Never run a downgrade against production. **Exactly one machine**: the first
 `fly deploy` creates two "for high availability", which would split a class across two
-in-memory hubs — deploy with `--ha=false` and keep `fly scale count 1`. Every table has
+in-memory hubs — deploy with `--ha=false` and keep `fly scale count 1`. **The connection limit is set in `fly.toml`** because every child and teacher holds a live connection open all lesson, and Fly's default is low enough to queue a small class (7 Nov 2026). `app/monitoring.py` logs slow requests, stalls and open connections; uvicorn's `connection closed` line doesn't appear for every socket that closes, so count from those `open:` lines, not from it. Every table has
 **row-level security on with no policies** (migration `cce4cbf9b9f0`,
 `test_every_table_has_row_level_security`): Supabase serves the public schema to its
 `anon` role, and RLS is what keeps children's records unreadable with the public key.

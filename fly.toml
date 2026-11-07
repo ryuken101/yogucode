@@ -46,6 +46,14 @@ primary_region = "syd"
   auto_start_machines = true
   min_machines_running = 1
 
+  # Every child and teacher holds a live connection open for the whole lesson, and those
+  # count here. Fly's default limit is low enough that a small class queued every request
+  # (7 Nov 2026). An idle socket costs this machine very little.
+  [http_service.concurrency]
+    type = "connections"
+    soft_limit = 150
+    hard_limit = 200
+
   [[http_service.checks]]
     grace_period = "15s"
     interval = "30s"

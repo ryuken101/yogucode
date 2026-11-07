@@ -46,7 +46,7 @@ class Socket(Protocol):
 
 
 # Close codes, as in `routers/live.py`.
-SIGNED_OUT, REMOVED = 4401, 4403
+SIGNED_OUT, REMOVED, REPLACED = 4401, 4403, 4409
 
 
 @dataclass
@@ -99,12 +99,26 @@ async def _close(socket: Socket, code: int) -> None:
             await close(code)
 
 
+async def _retire(socket: Socket) -> None:
+    """Tell a replaced connection why, then close it, or it holds one of the app's limited
+    connections for as long as the old tab stays open."""
+    await _send(socket, {"type": "replaced"})
+    await _close(socket, REPLACED)
+
+
 class Hub:
     def __init__(self) -> None:
         self.rooms: dict[uuid.UUID, Room] = {}
+        # Held so a running task isn't garbage collected.
+        self._retiring: set[asyncio.Task[None]] = set()
 
     def room(self, class_id: uuid.UUID) -> Room:
         return self.rooms.setdefault(class_id, Room(class_id))
+
+    def in_rooms(self) -> tuple[int, int]:
+        """How many children and teacher sockets are in a room, for `app.monitoring`."""
+        rooms = self.rooms.values()
+        return sum(len(r.students) for r in rooms), sum(len(r.teachers) for r in rooms)
 
     async def _to_teachers(self, room: Room, message: dict[str, Any], skip: Socket | None = None):
         await asyncio.gather(*(_send(t, message) for t in list(room.teachers) if t is not skip))
@@ -116,9 +130,12 @@ class Hub:
         previous = room.students.get(presence.student_id)
         room.students[presence.student_id] = presence
         if previous is not None and previous.socket is not presence.socket:
-            # The same child in a second tab: the newest connection wins, and the old one
-            # is told so rather than silently going deaf.
-            await _send(previous.socket, {"type": "replaced"})
+            # The same child in a second tab, or back from a dropped connection: the newest
+            # wins. In the background, because closing a dead laptop's socket waits for a
+            # reply that never comes, and the child's new connection must not wait with it.
+            task = asyncio.create_task(_retire(previous.socket))
+            self._retiring.add(task)
+            task.add_done_callback(self._retiring.discard)
         await self._to_teachers(room, {"type": "joined", **self._presence(presence)})
 
     async def leave_student(self, class_id: uuid.UUID, student_id: uuid.UUID, socket: Socket):

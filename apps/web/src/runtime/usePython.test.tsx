@@ -20,6 +20,7 @@ import type { FromWorker, ToWorker } from './protocol'
 let posted: ToWorker[] = []
 /** Held so the test controls when boot finishes. */
 let finishBoot: (() => void) | null = null
+const workers: StubWorker[] = []
 
 class StubWorker {
   onmessage: ((event: MessageEvent<FromWorker>) => void) | null = null
@@ -27,6 +28,7 @@ class StubWorker {
   terminate = vi.fn()
 
   postMessage(message: ToWorker) {
+    if (message.type === 'init') workers.push(this)
     posted.push(message)
     if (message.type !== 'init') return
 
@@ -105,4 +107,40 @@ test('without cross-origin isolation it refuses rather than hanging', () => {
   expect(result.current.state.status).toBe('unsupported')
   act(() => result.current.run('print("hello")'))
   expect(posted).toHaveLength(0)
+})
+
+test('Stop keeps signalling until the program has really ended, then stops signalling', async () => {
+  vi.useFakeTimers()
+  try {
+    const { result } = renderHook(() => usePython())
+    act(() => result.current.run('while True: pass'))
+    const init = posted.find((m) => m.type === 'init')
+    const buffer = init && init.type === 'init' ? init.interrupt : new Uint8Array(1)
+
+    act(() => result.current.stop())
+    expect(buffer[0]).toBe(2)
+    // The worker's Python saw it and it came to nothing: the signal has to come again.
+    buffer[0] = 0
+    act(() => vi.advanceTimersByTime(250))
+    expect(buffer[0]).toBe(2)
+
+    buffer[0] = 0
+    const id = posted.find((m) => m.type === 'run')
+    act(() => workers.at(-1)?.onmessage?.({ data: { type: 'done', runId: id && id.type === 'run' ? id.runId : 0, ok: false, interrupted: true } } as MessageEvent<FromWorker>))
+    act(() => vi.advanceTimersByTime(1000))
+    expect(buffer[0]).toBe(0)
+    expect(result.current.state.status).toBe('idle')
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+test('a Stop pressed with nothing running can’t end the next run', () => {
+  const { result } = renderHook(() => usePython())
+  act(() => result.current.run('print(1)'))
+  const init = posted.find((m) => m.type === 'init')
+  const buffer = init && init.type === 'init' ? init.interrupt : new Uint8Array(1)
+  buffer[0] = 2
+  act(() => result.current.run('print(2)'))
+  expect(buffer[0]).toBe(0)
 })

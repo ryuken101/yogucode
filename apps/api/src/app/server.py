@@ -25,8 +25,10 @@ in `REDIRECT_HOSTS` redirect: Fly's health check, local development and tests re
 app by other names and are untouched.
 """
 
+import contextlib
 import mimetypes
 import os
+from collections.abc import AsyncIterator
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -35,6 +37,7 @@ from starlette.datastructures import Headers
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.main import app as api
+from app.monitoring import RequestTiming, monitor_loop
 from app.trash import purge_loop
 
 # Not every slim image's mimetypes table knows these, and a .wasm served as
@@ -124,6 +127,12 @@ def host_list(value: str | None) -> frozenset[str]:
     return frozenset(h.strip().lower() for h in (value or "").split(",") if h.strip())
 
 
+@contextlib.asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    async with purge_loop(app), monitor_loop():
+        yield
+
+
 def create_site(
     dist: Path | None = None,
     canonical_host: str | None = None,
@@ -136,7 +145,7 @@ def create_site(
     if redirect_hosts is None:
         redirect_hosts = os.getenv("REDIRECT_HOSTS", "")
     canonical, redirects = canonical_host.strip().lower(), host_list(redirect_hosts)
-    site = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=purge_loop)
+    site = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
     site.mount("/api", api)
 
     # HEAD as well as GET: uptime monitors and some link checkers only ask for headers.
@@ -160,8 +169,9 @@ def create_site(
 
     if canonical and redirects:
         site.add_middleware(CanonicalHost, canonical=canonical, redirect_hosts=redirects)
-    # Added last, so it is outermost: redirects carry the isolation headers too.
+    # After the redirects, so they carry the isolation headers too.
     site.add_middleware(IsolationHeaders)
+    site.add_middleware(RequestTiming)
     return site
 
 

@@ -101,7 +101,8 @@ export interface TestRun {
 /** Sent from the page to the worker. */
 export type ToWorker =
   | { type: 'init'; indexURL: string; interrupt: Uint8Array; stdin: SharedArrayBuffer }
-  | { type: 'run'; runId: number; code: string }
+  /** `fresh`: in new globals, for someone else's program, so the last one's variables can't help it. */
+  | { type: 'run'; runId: number; code: string; fresh?: boolean }
   /** Grade `code` against `tests` in fresh globals; the child's session is untouched. */
   | { type: 'check'; runId: number; code: string; tests: TestCheck[] }
   /** Run `code` once, typing `inputs` at its `input()`s, and record the conversation. */

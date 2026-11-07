@@ -119,15 +119,50 @@ test('marking shows how many chose each option, with the misconception, and pre-
     { route: `/assignments/${HW}/mark/${ITEM}` },
   )
 
-  const answers = await screen.findByText('The class’s answers')
-  const panel = answers.closest('section')!
-  expect(within(panel).getByText('6')).toBeInTheDocument()
-  expect(within(panel).getByText(/thinks range includes the end/)).toBeInTheDocument()
-  expect(screen.getByText('Suggests: thinks range includes the end')).toBeInTheDocument()
+  // Every option is listed, the child's picked out, and a wrong one is never red.
+  const answers = await screen.findByRole('list', { name: 'The class’s answers' })
+  const [right, theirs] = within(answers).getAllByRole('listitem')
+  expect(within(right!).getByText('right').className).toContain('good')
+  expect(within(right!).getByText('1 chose this')).toBeInTheDocument()
+  expect(within(right!).queryByText('Their answer')).not.toBeInTheDocument()
+  expect(within(theirs!).getByText('Their answer')).toBeInTheDocument()
+  expect(within(theirs!).getByText('not yet').className).toContain('not-yet')
+  expect(within(theirs!).getByText('6 chose this')).toBeInTheDocument()
+  expect(within(theirs!).getByText('Suggests: thinks range includes the end')).toBeInTheDocument()
+  expect(answers.innerHTML).not.toContain('strawberry')
+  expect(answers.innerHTML).not.toContain('system-error')
+  // Multiple choice has no solution to show and nothing to run.
+  expect(screen.queryByRole('button', { name: 'Show solution' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Run' })).not.toBeInTheDocument()
   // Wrong answer → Correct 0, and no Approach for multiple choice.
   expect(within(screen.getByRole('radiogroup', { name: 'Correct' })).getByRole('radio', { name: '0' })).toHaveAttribute('aria-checked', 'true')
   expect(screen.queryByRole('radiogroup', { name: 'Approach' })).not.toBeInTheDocument()
 
   await user.click(screen.getByRole('button', { name: 'Mark all automatically' }))
   await waitFor(() => expect(autoMarked).toBe(true))
+})
+
+test('marking says when a child chose nothing', async () => {
+  server.use(
+    http.get(`/api/assignments/${HW}/marking/${ITEM}`, () =>
+      HttpResponse.json({
+        assignment_id: HW, leaf_item_id: ITEM, kind: 'mcq', title: 'range(5)', prompt_md: 'What prints?', solution_code: '',
+        concept_ids: [], tests: [],
+        options: [{ text: '[0..4]', correct: true, misconception: null, chosen_by: 0 }],
+        entries: [{
+          student_id: 's1', display_name: 'Aria K', attempt_id: 'a1', code: '', source: 'not_handed_in', submitted_at: null,
+          late: false, child_passed: null, child_total: null, hints_used: 0, mark: null, note: '', choice: null,
+        }],
+      } satisfies Schemas['QuestionMarkingOut']),
+    ),
+  )
+  renderScreen(
+    <Routes>
+      <Route path="/assignments/:assignmentId/mark/:itemId" element={<Marking />} />
+    </Routes>,
+    { route: `/assignments/${HW}/mark/${ITEM}` },
+  )
+  expect(await screen.findByText('No answer chosen.')).toBeInTheDocument()
+  expect(screen.getByText('What prints?')).toBeInTheDocument()
+  expect(screen.queryByText('Their answer')).not.toBeInTheDocument()
 })

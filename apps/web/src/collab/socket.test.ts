@@ -52,3 +52,15 @@ test('a dropped connection is not a sign-out, and reconnects', () => {
   expect(signedOut).not.toHaveBeenCalled()
   expect(FakeWebSocket.made.length).toBeGreaterThan(1)
 })
+
+test('a tab replaced by a newer connection stays closed, or the two would fight forever', () => {
+  vi.useFakeTimers()
+  vi.stubGlobal('WebSocket', FakeWebSocket)
+  const signedOut = vi.fn()
+  studentLive().onSignedOut(signedOut)
+
+  FakeWebSocket.made[0]!.onclose?.({ code: 4409 })
+  vi.advanceTimersByTime(60_000)
+  expect(FakeWebSocket.made).toHaveLength(1)
+  expect(signedOut).not.toHaveBeenCalled()
+})

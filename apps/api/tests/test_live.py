@@ -453,3 +453,70 @@ async def test_help_on_an_editor_nobody_has_open_is_refused() -> None:
     local, class_id, _, child = await _room_with_child()
     assert await local.help(class_id, FakeSocket(), "document:nope", on=True) is False
     assert child.helps() == []
+
+
+async def test_a_childs_newer_connection_closes_the_old_one(
+    client, session, signed_in_student
+) -> None:
+    """Before 7 Nov 2026 the old one stayed open, holding one of the app's limited
+    connections for as long as the old tab did."""
+    aria = await signed_in_student()
+    async with (
+        sockets(client) as ws_client,
+        aconnect_ws("http://test/live/teacher", ws_client) as teacher,
+    ):
+        await teacher.send_json(
+            {"type": "auth", "token": token_of(aria["headers"]), "class_id": aria["class_id"]}
+        )
+        await next_of(teacher, "snapshot")
+        async with aconnect_ws("http://test/live/student", ws_client) as old_tab:
+            await next_of(old_tab, "ready")
+            await next_of(teacher, "joined")
+            async with aconnect_ws("http://test/live/student", ws_client) as new_tab:
+                await next_of(new_tab, "ready")
+                await next_of(old_tab, "replaced")
+                assert await closed_with(old_tab) == 4409
+
+                # The child is still here, on the new one, and the teacher still sees them.
+                await new_tab.send_json({"type": "focus", "focus": {"title": "Q1"}})
+                message = await next_of(teacher, "focus")
+                assert message["student_id"] == aria["student_id"]
+                assert message["focus"]["title"] == "Q1"
+
+
+async def test_replacing_a_dead_connection_does_not_hold_up_the_new_one() -> None:
+    """Closing a dead laptop's socket waits for a reply that never comes."""
+    from app.live.hub import StudentPresence
+
+    local, class_id, student_id, _ = await _room_with_child()
+
+    class DeadSocket(ClosableSocket):
+        async def close(self, code: int) -> None:
+            await asyncio.Event().wait()
+
+    dead = DeadSocket()
+    await local.join_student(class_id, StudentPresence(dead, student_id, "Aria K"))
+    new = FakeSocket()
+    async with asyncio.timeout(1):
+        await local.join_student(class_id, StudentPresence(new, student_id, "Aria K"))
+    assert local.rooms[class_id].students[student_id].socket is new
+
+    for task in list(local._retiring):
+        task.cancel()
+    await asyncio.gather(*local._retiring, return_exceptions=True)
+
+
+async def test_a_replaced_socket_is_told_and_closed_but_a_teacher_is_not() -> None:
+    from app.live.hub import StudentPresence
+
+    local, class_id, student_id, _ = await _room_with_child()
+    old, teacher = ClosableSocket(), ClosableSocket()
+    await local.join_student(class_id, StudentPresence(old, student_id, "Aria K"))
+    await local.join_teacher(class_id, teacher, student_id)
+
+    await local.join_student(class_id, StudentPresence(FakeSocket(), student_id, "Aria K"))
+    await asyncio.gather(*local._retiring)
+
+    assert old.closed == 4409
+    assert {"type": "replaced"} in old.sent
+    assert teacher.closed is None

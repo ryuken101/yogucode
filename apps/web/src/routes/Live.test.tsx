@@ -75,7 +75,11 @@ test('the token goes first, the snapshot fills the tiles, and keystrokes stream 
     { route: `/classes/${CLASS}/live` },
   )
 
-  expect(await screen.findByText(/numbers = \[1, 2, 3\]/)).toBeInTheDocument()
+  // The tile is in the editor's colours, so its text is broken into coloured pieces.
+  const tileCode = () => document.querySelector('pre code')?.textContent ?? ''
+  await waitFor(() => expect(tileCode()).toContain('numbers = [1, 2, 3]'))
+  expect(screen.getByText('numbers')).toHaveStyle({ color: '#FFF6E9' })
+  expect(screen.getByText('1')).toHaveStyle({ color: '#B9ACE6' })
   expect(auth).toEqual({ type: 'auth', token: 'teacher-token', class_id: CLASS })
   expect(screen.getByText('Add to the end')).toBeInTheDocument()
   expect(screen.getByText('not signed in')).toBeInTheDocument() // Bella's empty seat
@@ -84,7 +88,7 @@ test('the token goes first, the snapshot fills the tiles, and keystrokes stream 
   const before = Y.encodeStateVector(doc)
   doc.getText('code').insert(20, 'numbers.append(5)\n')
   send({ type: 'doc', student_id: ARIA, target: TARGET, update: toBase64(Y.encodeStateAsUpdate(doc, before)), full: false })
-  await waitFor(() => expect(screen.getByText(/numbers\.append\(5\)/)).toBeInTheDocument())
+  await waitFor(() => expect(tileCode()).toContain('numbers.append(5)'))
 
   // A finished child is flagged good; nothing on the page is system-error.
   send({ type: 'status', student_id: ARIA, status: { kind: 'check', target: TARGET, passed: 2, total: 2, compile_error: null, at: Date.now() } })
@@ -173,4 +177,147 @@ test('Help tells the relay to lock the child’s editor, and Done helping unlock
   await waitFor(() =>
     expect(sent).toContainEqual({ type: 'help', target: TARGET, on: false }),
   )
+})
+
+/* --- the question beside the code (Ken, 7 Nov 2026) ------------------------------------- */
+
+function connectAria(doc: Y.Doc, focus: object, onSend?: (send: (message: unknown) => void) => void) {
+  let authed = false
+  server.use(
+    liveSockets.addEventListener('connection', ({ client }) => {
+      onSend?.((message) => client.send(JSON.stringify(message)))
+      client.addEventListener('message', () => {
+        if (authed) return
+        authed = true
+        client.send(
+          JSON.stringify({
+            type: 'snapshot',
+            students: [{ student_id: ARIA, display_name: 'Aria K', focus, recent: [] }],
+            docs: [{ target: (focus as { target: string }).target, student_id: ARIA, updates: [toBase64(Y.encodeStateAsUpdate(doc))] }],
+          }),
+        )
+      })
+    }),
+  )
+}
+
+function renderLive() {
+  return renderScreen(
+    <Routes>
+      <Route path="/classes/:classId/live" element={<Live />} />
+    </Routes>,
+    { route: `/classes/${CLASS}/live` },
+  )
+}
+
+test('an open problem shows its question, and it follows the child to the next one', async () => {
+  const OTHER = '018f0000-0000-7000-8000-0000000000bb'
+  const doc = new Y.Doc()
+  doc.getText('code').insert(0, 'print(1)\n')
+  server.use(
+    http.get('/api/attempts/:id/question', ({ params }) =>
+      HttpResponse.json({
+        title: params.id === OTHER ? 'Second' : 'First',
+        kind: 'code',
+        prompt_md: params.id === OTHER ? 'The second question.' : 'What does this print?',
+        options: [],
+      } satisfies Schemas['AttemptQuestionOut']),
+    ),
+  )
+  let send: (message: unknown) => void = () => {}
+  connectAria(doc, { target: TARGET, kind: 'problem', title: 'First' }, (s) => (send = s))
+  const { user } = renderLive()
+
+  await user.click(await screen.findByRole('button', { name: /Aria K/ }))
+  expect(await screen.findByText('What does this print?')).toBeInTheDocument()
+
+  send({ type: 'focus', student_id: ARIA, focus: { target: `attempt:${OTHER}`, kind: 'problem', title: 'Second' } })
+  expect(await screen.findByText('The second question.')).toBeInTheDocument()
+  expect(screen.queryByText('What does this print?')).not.toBeInTheDocument()
+})
+
+test('a non-Python file is plain on its tile and has no question', async () => {
+  const DOCUMENT = 'document:018f0000-0000-7000-8000-0000000000dd'
+  const doc = new Y.Doc()
+  doc.getText('code').insert(0, 'print is a word\n')
+  let asked = false
+  server.use(
+    http.get('/api/attempts/:id/question', () => {
+      asked = true
+      return HttpResponse.json({})
+    }),
+  )
+  connectAria(doc, { target: DOCUMENT, kind: 'file', title: 'notes.txt' })
+  const { user } = renderLive()
+
+  const tile = await screen.findByText(/print is a word/, { selector: 'pre' })
+  expect(tile.querySelector('span')).toBeNull()
+  await user.click(screen.getByRole('button', { name: /Aria K/ }))
+  await screen.findByRole('button', { name: 'Close' })
+  expect(screen.queryByRole('region', { name: 'The question' })).not.toBeInTheDocument()
+  expect(asked).toBe(false)
+})
+
+test('during a quiz the question follows the tab, including one they haven’t opened', async () => {
+  const QUIZ = '018f0000-0000-7000-8000-0000000000ee'
+  const answer = (item_id: string, title: string, prompt_md: string) =>
+    ({ item_id, problem_id: item_id, title, kind: 'code', prompt_md, attempt_id: null, code: null, choice: null, options: [], answered: false }) satisfies Schemas['QuizAnswerOut']
+  server.use(
+    http.get(`/api/classes/${CLASS}/quizzes`, () =>
+      HttpResponse.json([
+        { id: QUIZ, title: 'Friday quiz', running: true, ends_at: new Date(Date.now() + 600_000).toISOString() },
+      ] as unknown as Schemas['QuizOut'][]),
+    ),
+    http.get(`/api/quizzes/${QUIZ}/sittings`, () => HttpResponse.json([])),
+    http.get(`/api/quizzes/${QUIZ}/students/${ARIA}/answers`, () =>
+      HttpResponse.json([answer('q1', 'First', 'Quiz question one.'), answer('q2', 'Second', 'Quiz question two.')]),
+    ),
+  )
+  connectAria(new Y.Doc(), { target: TARGET, kind: 'problem', title: 'First', mode: 'quiz' })
+  const { user } = renderLive()
+
+  await user.click(await screen.findByRole('button', { name: /Aria K/ }))
+  expect(await screen.findByText('Quiz question one.')).toBeInTheDocument()
+  await user.click(screen.getByRole('tab', { name: /Second/ }))
+  expect(await screen.findByText('Quiz question two.')).toBeInTheDocument()
+  expect(screen.queryByText('Quiz question one.')).not.toBeInTheDocument()
+})
+
+test('children leaving and coming back in a burst share one re-fetch of the quiz record', async () => {
+  const QUIZ = '018f0000-0000-7000-8000-0000000000ee'
+  let fetches = 0
+  server.use(
+    http.get(`/api/classes/${CLASS}/quizzes`, () =>
+      HttpResponse.json([
+        { id: QUIZ, title: 'Friday quiz', running: true, ends_at: new Date(Date.now() + 600_000).toISOString() },
+      ] as unknown as Schemas['QuizOut'][]),
+    ),
+    http.get(`/api/quizzes/${QUIZ}/sittings`, () => {
+      fetches += 1
+      return HttpResponse.json([])
+    }),
+  )
+  let send: (data: string) => void = () => undefined
+  server.use(
+    liveSockets.addEventListener('connection', ({ client }) => {
+      client.addEventListener('message', () => {
+        send = (data) => client.send(data)
+        client.send(JSON.stringify({
+          type: 'snapshot',
+          students: [{ student_id: ARIA, display_name: 'Aria K', focus: null, recent: [] }],
+          docs: [],
+        }))
+      })
+    }),
+  )
+  renderLive()
+  await screen.findByRole('button', { name: /Aria K/ })
+  await waitFor(() => expect(fetches).toBe(1))
+
+  for (const away_count of [1, 2, 3, 4, 5]) {
+    send(JSON.stringify({ type: 'attention', student_id: ARIA, away_for: null, away_count, away_total: 0 }))
+  }
+  await waitFor(() => expect(fetches).toBe(2), { timeout: 4_000 })
+  await new Promise((resolve) => setTimeout(resolve, 300))
+  expect(fetches).toBe(2)
 })

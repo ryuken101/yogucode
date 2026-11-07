@@ -29,10 +29,34 @@ const STYLES: Record<TokenKind, CSSProperties> = {
   bracket: { color: SYNTAX.lemon },
 }
 
-export function CodeBlock({ source }: { source: string }) {
+function Tokens({ lines }: { lines: ReturnType<typeof tokenLines> }) {
+  return lines.map((line, index) => (
+    <Fragment key={index}>
+      {line.map((token, at) => (
+        <span key={at} style={STYLES[token.kind]}>
+          {token.text}
+        </span>
+      ))}
+      {index < lines.length - 1 ? '\n' : null}
+    </Fragment>
+  ))
+}
+
+/** A glance at the code, on a Live tile: same colours, no numbers, clipped to what's given. */
+export function CodeGlance({ source, className = '' }: { source: string; className?: string }) {
+  return (
+    <pre className={`overflow-hidden bg-night font-mono ${className}`}>
+      <code>
+        <Tokens lines={tokenLines(source)} />
+      </code>
+    </pre>
+  )
+}
+
+export function CodeBlock({ source, className = 'my-3' }: { source: string; className?: string }) {
   const lines = tokenLines(source.replace(/\n+$/, ''))
   return (
-    <div className="my-3 flex overflow-hidden rounded-lg bg-night font-mono text-sm leading-6">
+    <div className={`${className} flex overflow-hidden rounded-lg bg-night font-mono text-sm leading-6`}>
       {/* Out of the selection, so copying the code doesn't bring the numbers. */}
       <div
         aria-hidden="true"
@@ -47,16 +71,7 @@ export function CodeBlock({ source }: { source: string }) {
       <pre className="min-w-0 flex-1 overflow-x-auto py-3 pr-4">
         {/* One run of text with real line breaks, so copying it gives back the same code. */}
         <code className="block w-max min-w-full whitespace-pre">
-          {lines.map((line, index) => (
-            <Fragment key={index}>
-              {line.map((token, at) => (
-                <span key={at} style={STYLES[token.kind]}>
-                  {token.text}
-                </span>
-              ))}
-              {index < lines.length - 1 ? '\n' : null}
-            </Fragment>
-          ))}
+          <Tokens lines={lines} />
         </code>
       </pre>
     </div>

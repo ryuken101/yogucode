@@ -145,6 +145,16 @@ class QuestionMarkingOut(BaseModel):
     entries: list[MarkingEntryOut]
 
 
+class AttemptQuestionOut(BaseModel):
+    """The question behind a child's open editor, for the live view. No key and no solution:
+    the teacher is reading along, not marking."""
+
+    title: str
+    kind: ItemKind
+    prompt_md: str
+    options: list[str]
+
+
 class MarkIn(BaseModel):
     runs: bool
     correct: int = Field(ge=0, le=2)
@@ -330,7 +340,6 @@ async def mark_question(
         if leaf.leaf.parent_id
         else doc
     )
-    prompt = doc.prompt_md + (f"\n\n{leaf_doc.prompt_md}" if leaf.leaf.parent_id else "")
 
     attempts = {
         a.student_id: a
@@ -410,12 +419,31 @@ async def mark_question(
         if counts
         else [],
         title=leaf.label,
-        prompt_md=prompt,
+        prompt_md=leaf.prompt_md,
         # A part of a shared file has no solution of its own: the file's is the one.
         solution_code=solution,
         concept_ids=leaf_doc.concept_ids,
         tests=with_reference(leaf_doc.tests, solution),
         entries=entries,
+    )
+
+
+@router.get("/attempts/{attempt_id}/question", response_model=AttemptQuestionOut)
+async def attempt_question(
+    attempt_id: uuid.UUID, principal: CurrentTeacher, session: SessionDep
+) -> AttemptQuestionOut:
+    """What a child with this attempt open was asked. Any mode, unlike the routes above: Live
+    shows it for a lesson as well, and a running quiz doesn't stop a teacher reading it."""
+    attempt = await get_centre_attempt(session, principal, attempt_id)
+    assignment = await get_owned_assignment(session, principal, attempt.assignment_id)
+    leaf = await _leaf(session, principal, assignment, attempt.item_id)
+    return AttemptQuestionOut(
+        title=leaf.label,
+        kind=leaf.leaf.kind,
+        prompt_md=leaf.prompt_md,
+        options=[str(option.get("text", "")) for option in leaf.leaf.options or []]
+        if leaf.leaf.kind == ItemKind.MCQ
+        else [],
     )
 
 

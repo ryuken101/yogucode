@@ -144,6 +144,37 @@
         "title": "AttemptOut",
         "type": "object"
       },
+      "AttemptQuestionOut": {
+        "description": "The question behind a child's open editor, for the live view. No key and no solution:\nthe teacher is reading along, not marking.",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/ItemKind"
+          },
+          "options": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Options",
+            "type": "array"
+          },
+          "prompt_md": {
+            "title": "Prompt Md",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "kind",
+          "prompt_md",
+          "options"
+        ],
+        "title": "AttemptQuestionOut",
+        "type": "object"
+      },
       "AttemptSaveIn": {
         "properties": {
           "code": {
@@ -4076,6 +4107,10 @@
             "title": "Problem Id",
             "type": "string"
           },
+          "prompt_md": {
+            "title": "Prompt Md",
+            "type": "string"
+          },
           "title": {
             "title": "Title",
             "type": "string"
@@ -4086,6 +4121,7 @@
           "problem_id",
           "title",
           "kind",
+          "prompt_md",
           "attempt_id",
           "code",
           "choice",
@@ -6878,6 +6914,66 @@
           }
         },
         "summary": "Save Mark",
+        "tags": [
+          "marking"
+        ]
+      }
+    },
+    "/attempts/{attempt_id}/question": {
+      "get": {
+        "description": "What a child with this attempt open was asked. Any mode, unlike the routes above: Live\nshows it for a lesson as well, and a running quiz doesn't stop a teacher reading it.",
+        "operationId": "attempt_question_attempts__attempt_id__question_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attempt_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Attempt Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttemptQuestionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Attempt Question",
         "tags": [
           "marking"
         ]
