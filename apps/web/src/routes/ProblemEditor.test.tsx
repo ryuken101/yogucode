@@ -35,7 +35,7 @@ const ITEM_ID = '018f0000-0000-7000-8000-0000000000a1'
 const LISTS = '018f0000-0000-7000-8000-0000000000c1'
 
 const concepts: Schemas['ConceptOut'][] = [
-  { id: LISTS, key: 'lists', label: 'Lists', status: 'provisional' },
+  { id: LISTS, key: 'lists', label: 'Lists', status: 'provisional', own: false },
 ]
 
 function readyDoc(): Schemas['ProblemDoc'] {

@@ -13,13 +13,14 @@ own autosave, which is a different case. A course is cheap to audit and occasion
 useful to have answered — "who renamed Unit 3?".
 """
 
+import re
 import uuid
 from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
-from sqlmodel import delete, func, select
+from sqlmodel import col, delete, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.audit import audit_entry
@@ -27,8 +28,21 @@ from app.auth.principal import CurrentTeacher
 from app.classwork import get_ladder as get_lesson_ladder
 from app.classwork import ladder_items, newest_version, open_classwork_for_lesson, set_ladder
 from app.db import get_session
-from app.models import Concept, Course, CurriculumStatus, ItemStatus, Lesson, LessonConcept, Unit
+from app.models import (
+    Concept,
+    ConceptStatus,
+    Course,
+    CurriculumStatus,
+    Item,
+    ItemConcept,
+    ItemStatus,
+    Lesson,
+    LessonConcept,
+    Unit,
+)
+from app.models.base import utcnow
 from app.scoping import (
+    get_own_concept,
     get_owned_course,
     get_owned_lesson,
     get_owned_unit,
@@ -65,10 +79,23 @@ class ConceptOut(BaseModel):
     key: str
     label: str
     status: str
+    # The centre made it (Ken, 14 Nov 2026), so a teacher may rename or remove it. The
+    # global taxonomy is never edited here.
+    own: bool
 
     @classmethod
     def build(cls, record: Concept) -> "ConceptOut":
-        return cls(id=record.id, key=record.key, label=record.label, status=record.status)
+        return cls(
+            id=record.id,
+            key=record.key,
+            label=record.label,
+            status=record.status,
+            own=record.centre_id is not None,
+        )
+
+
+class ConceptIn(BaseModel):
+    label: str = Field(min_length=1, max_length=40)
 
 
 class CourseOut(BaseModel):
@@ -144,8 +171,144 @@ class LessonConceptsIn(BaseModel):
 
 @router.get("/concepts", response_model=list[ConceptOut])
 async def list_concepts(principal: CurrentTeacher, session: SessionDep) -> list[ConceptOut]:
-    """The taxonomy a teacher can tag with. Read-only here; it is edited as YAML."""
+    """The taxonomy a teacher can tag with: the global one (edited as YAML) and the centre's own."""
     return [ConceptOut.build(c) for c in await list_visible_concepts(session, principal)]
+
+
+def _label(raw: str) -> str:
+    label = " ".join(raw.split())
+    if not label:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="A tag needs a name"
+        )
+    return label
+
+
+async def _refuse_duplicate(
+    session: AsyncSession, principal: CurrentTeacher, label: str, besides: uuid.UUID | None = None
+) -> None:
+    for concept in await list_visible_concepts(session, principal):
+        if concept.id != besides and concept.label.casefold() == label.casefold():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"There’s already a tag called {concept.label}",
+            )
+
+
+async def _free_key(session: AsyncSession, principal: CurrentTeacher, label: str) -> str:
+    """A key no row has, global or this centre's, archived included. A centre row with a
+    global key would *replace* that concept (`list_visible_concepts`), not sit beside it."""
+    base = re.sub(r"[^a-z0-9]+", "_", label.casefold()).strip("_") or "tag"
+    taken = set(
+        (
+            await session.exec(
+                select(Concept.key).where(
+                    (Concept.centre_id == principal.centre_id) | (Concept.centre_id.is_(None))  # type: ignore[union-attr]
+                )
+            )
+        ).all()
+    )
+    key, n = base, 1
+    while key in taken:
+        n += 1
+        key = f"{base}_{n}"
+    return key
+
+
+@router.post("/concepts", response_model=ConceptOut, status_code=status.HTTP_201_CREATED)
+async def create_concept(
+    body: ConceptIn, principal: CurrentTeacher, session: SessionDep
+) -> ConceptOut:
+    """A tag of the centre's own (Ken, 14 Nov 2026): any teacher may add one, and every
+    teacher at the centre sees it, as they see the whole bank. It goes after the others."""
+    label = _label(body.label)
+    await _refuse_duplicate(session, principal, label)
+    visible = await list_visible_concepts(session, principal)
+    record = Concept(
+        centre_id=principal.centre_id,
+        key=await _free_key(session, principal, label),
+        label=label,
+        sort_order=max((c.sort_order for c in visible), default=0) + SORT_STEP,
+        status=ConceptStatus.ACTIVE,
+    )
+    session.add(record)
+    await session.flush()
+    session.add(audit_entry(principal, "concept.created", "concept", record.id, label=label))
+    await session.commit()
+    await session.refresh(record)
+    return ConceptOut.build(record)
+
+
+@router.patch("/concepts/{concept_id}", response_model=ConceptOut)
+async def rename_concept(
+    concept_id: uuid.UUID, body: ConceptIn, principal: CurrentTeacher, session: SessionDep
+) -> ConceptOut:
+    """Rename one of the centre's tags. The key stays, so problem files naming it still work."""
+    record = await get_own_concept(session, principal, concept_id)
+    label = _label(body.label)
+    if label != record.label:
+        await _refuse_duplicate(session, principal, label, besides=record.id)
+        record.label = label
+        record.updated_at = utcnow()
+        session.add(record)
+        session.add(audit_entry(principal, "concept.renamed", "concept", record.id, label=label))
+        await session.commit()
+        await session.refresh(record)
+    return ConceptOut.build(record)
+
+
+@router.post("/concepts/{concept_id}/archive", response_model=ConceptOut)
+async def archive_concept(
+    concept_id: uuid.UUID, principal: CurrentTeacher, session: SessionDep
+) -> ConceptOut:
+    """Remove one of the centre's tags — refused while a problem or lesson still uses it.
+
+    Stripping it instead would leave a problem without its main concept, which publishing
+    needs, and `check_concepts` refuses an archived tag, so the problem could not be saved
+    as it stands. The row is archived, never deleted: old versions keep their reference.
+    """
+    record = await get_own_concept(session, principal, concept_id)
+    problems = (
+        await session.exec(
+            select(func.count(func.distinct(func.coalesce(Item.parent_id, Item.id))))
+            .select_from(ItemConcept)
+            .join(Item, Item.id == ItemConcept.item_id)  # type: ignore[arg-type]
+            .where(
+                ItemConcept.concept_id == record.id,
+                Item.centre_id == principal.centre_id,
+                col(Item.status).in_([ItemStatus.DRAFT, ItemStatus.PUBLISHED]),
+            )
+        )
+    ).one()
+    lessons = (
+        await session.exec(
+            select(func.count())
+            .select_from(LessonConcept)
+            .join(Lesson, Lesson.id == LessonConcept.lesson_id)  # type: ignore[arg-type]
+            .where(
+                LessonConcept.concept_id == record.id,
+                Lesson.centre_id == principal.centre_id,
+                Lesson.status != CurriculumStatus.ARCHIVED,
+            )
+        )
+    ).one()
+    if problems or lessons:
+        uses = [
+            f"{n} {word}{'' if n == 1 else 's'}"
+            for n, word in ((problems, "problem"), (lessons, "lesson"))
+            if n
+        ]
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Used by {' and '.join(uses)}. Take the tag off them first.",
+        )
+    record.status = ConceptStatus.ARCHIVED
+    record.updated_at = utcnow()
+    session.add(record)
+    session.add(audit_entry(principal, "concept.archived", "concept", record.id))
+    await session.commit()
+    await session.refresh(record)
+    return ConceptOut.build(record)
 
 
 # --- courses ------------------------------------------------------------------------

@@ -155,6 +155,15 @@ export const api = {
   /* --- teacher: curriculum ------------------------------------------------------- */
 
   listConcepts: () => request<Schemas['ConceptOut'][]>('/concepts'),
+  createConcept: (label: string) =>
+    request<Schemas['ConceptOut']>('/concepts', { method: 'POST', body: { label } satisfies Schemas['ConceptIn'] }),
+  renameConcept: (conceptId: string, label: string) =>
+    request<Schemas['ConceptOut']>(`/concepts/${conceptId}`, {
+      method: 'PATCH',
+      body: { label } satisfies Schemas['ConceptIn'],
+    }),
+  archiveConcept: (conceptId: string) =>
+    request<Schemas['ConceptOut']>(`/concepts/${conceptId}/archive`, { method: 'POST' }),
   listCourses: () => request<Schemas['CourseOut'][]>('/courses'),
   readCourse: (courseId: string) => request<Schemas['CourseTreeOut']>(`/courses/${courseId}`),
   createCourse: (title: string) =>

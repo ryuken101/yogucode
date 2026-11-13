@@ -580,8 +580,21 @@ export function useFolderActions(scope: FolderScope) {
 /* --- teacher: curriculum ------------------------------------------------------------ */
 
 export function useConcepts() {
-  // The taxonomy changes by YAML seed, not in a session; no reason to refetch it.
+  // Changes only by YAML seed or a teacher's own edit below, which invalidates it.
   return useQuery({ queryKey: keys.concepts, queryFn: api.listConcepts, staleTime: Infinity })
+}
+
+/** The centre's own tags (Ken, 14 Nov 2026): add, rename, remove. Built-ins are YAML only. */
+export function useConceptEdits() {
+  const client = useQueryClient()
+  const refresh = () => client.invalidateQueries({ queryKey: keys.concepts })
+  const create = useMutation({ mutationFn: api.createConcept, onSuccess: refresh })
+  const rename = useMutation({
+    mutationFn: ({ id, label }: { id: string; label: string }) => api.renameConcept(id, label),
+    onSuccess: refresh,
+  })
+  const remove = useMutation({ mutationFn: api.archiveConcept, onSuccess: refresh })
+  return { create, rename, remove }
 }
 
 export function useCourses() {

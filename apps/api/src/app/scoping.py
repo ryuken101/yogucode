@@ -534,6 +534,25 @@ async def list_course_outline(
     return units, lessons, links
 
 
+async def get_own_concept(
+    session: AsyncSession, principal: Principal, concept_id: uuid.UUID
+) -> Concept:
+    """A concept this centre made itself (Ken, 14 Nov 2026), not archived, or 404. The global
+    taxonomy is visible to every centre but edited only as YAML, so it is a 404 here too."""
+    found = (
+        await session.exec(
+            select(Concept).where(
+                Concept.id == concept_id,
+                Concept.centre_id == principal.centre_id,
+                Concept.status != ConceptStatus.ARCHIVED,
+            )
+        )
+    ).one_or_none()
+    if found is None:
+        raise _not_found("concept")
+    return found
+
+
 async def list_visible_concepts(session: AsyncSession, principal: Principal) -> list[Concept]:
     """The taxonomy as this centre sees it: global concepts, with the centre's own on top.
 

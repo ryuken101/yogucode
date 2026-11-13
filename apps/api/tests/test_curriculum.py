@@ -299,3 +299,134 @@ async def test_an_archived_lesson_cannot_be_today(client, signed_in) -> None:
         headers=headers,
     )
     assert response.status_code == 422
+
+
+# --- the centre's own concept tags (Ken, 14 Nov 2026) ---------------------------------
+
+
+async def test_a_teacher_adds_a_tag_the_whole_centre_can_use(
+    client, signed_in, session: AsyncSession
+) -> None:
+    headers = await signed_in()
+    (lists,) = await make_concepts(session, "lists")
+
+    response = await client.post(
+        "/concepts", json={"label": "  Turtle   drawing "}, headers=headers
+    )
+    assert response.status_code == 201, response.text
+    tag = response.json()
+    assert (tag["label"], tag["key"], tag["own"], tag["status"]) == (
+        "Turtle drawing",
+        "turtle_drawing",
+        True,
+        "active",
+    )
+    concepts = (await client.get("/concepts", headers=headers)).json()
+    assert [c["key"] for c in concepts] == ["lists", "turtle_drawing"], "after the built-ins"
+    assert concepts[0]["own"] is False
+
+    # It tags a problem like any other.
+    from work_builders import problem_doc
+
+    made = await client.post("/items", json=problem_doc(tag["id"]), headers=headers)
+    assert made.status_code == 201, made.text
+    audit = (await session.exec(select(AuditLog).where(AuditLog.action == "concept.created"))).one()
+    assert audit.target_id == uuid.UUID(tag["id"])
+    assert lists.label == "Lists"
+
+
+async def test_a_tag_name_is_never_used_twice(client, signed_in, session: AsyncSession) -> None:
+    headers = await signed_in()
+    await make_concepts(session, "variables")
+
+    for label in ["VARIABLES", "variables "]:
+        response = await client.post("/concepts", json={"label": label}, headers=headers)
+        assert response.status_code == 409, label
+    assert (
+        await client.post("/concepts", json={"label": "   "}, headers=headers)
+    ).status_code == 422
+
+    # A different name whose key a built-in already has gets its own key, rather than
+    # replacing the built-in (a centre row with a global key overrides it).
+    shouted = await client.post("/concepts", json={"label": "Variables!"}, headers=headers)
+    assert shouted.status_code == 201
+    assert shouted.json()["key"] == "variables_2"
+    labels = [c["label"] for c in (await client.get("/concepts", headers=headers)).json()]
+    assert labels == ["Variables", "Variables!"]
+
+
+async def test_a_tag_is_renamed_but_keeps_its_key(client, signed_in, session: AsyncSession) -> None:
+    headers = await signed_in()
+    await make_concepts(session, "loops")
+    tag = (await client.post("/concepts", json={"label": "Turtel"}, headers=headers)).json()
+
+    renamed = await client.patch(
+        f"/concepts/{tag['id']}", json={"label": "Turtle"}, headers=headers
+    )
+    assert renamed.status_code == 200
+    assert (renamed.json()["label"], renamed.json()["key"]) == ("Turtle", "turtel")
+    clash = await client.patch(f"/concepts/{tag['id']}", json={"label": "loops"}, headers=headers)
+    assert clash.status_code == 409
+
+
+async def test_only_the_centres_own_tags_can_be_changed(
+    client, signed_in, session: AsyncSession, foreign_centre
+) -> None:
+    headers = await signed_in()
+    (built_in,) = await make_concepts(session, "lists")
+    (theirs,) = await make_concepts(session, "vex", centre_id=foreign_centre["centre"].id)
+
+    for concept in (built_in, theirs):
+        rename = await client.patch(
+            f"/concepts/{concept.id}", json={"label": "Mine now"}, headers=headers
+        )
+        assert rename.status_code == 404
+        assert (
+            await client.post(f"/concepts/{concept.id}/archive", headers=headers)
+        ).status_code == 404
+    assert (built_in.label, built_in.status, theirs.status) == (
+        "Lists",
+        "provisional",
+        "provisional",
+    )
+
+
+async def test_a_student_cannot_change_tags(client, signed_in_student) -> None:
+    await signed_in_student()
+    some = uuid.uuid4()
+    assert (await client.post("/concepts", json={"label": "x"})).status_code == 403
+    assert (await client.patch(f"/concepts/{some}", json={"label": "x"})).status_code == 403
+    assert (await client.post(f"/concepts/{some}/archive")).status_code == 403
+
+
+async def test_a_tag_in_use_cannot_be_removed(client, signed_in, session: AsyncSession) -> None:
+    from work_builders import problem_doc
+
+    headers = await signed_in()
+    tag = (await client.post("/concepts", json={"label": "Turtle"}, headers=headers)).json()
+    item = (await client.post("/items", json=problem_doc(tag["id"]), headers=headers)).json()
+    tree = await build_course(client, headers)
+    await client.put(
+        f"/lessons/{tree['lessons'][0]['id']}/concepts",
+        json={"concept_ids": [tag["id"]]},
+        headers=headers,
+    )
+
+    refused = await client.post(f"/concepts/{tag['id']}/archive", headers=headers)
+    assert refused.status_code == 409
+    assert (
+        refused.json()["detail"] == "Used by 1 problem and 1 lesson. Take the tag off them first."
+    )
+
+    await client.post(f"/items/{item['id']}/archive", headers=headers)
+    await client.put(
+        f"/lessons/{tree['lessons'][0]['id']}/concepts", json={"concept_ids": []}, headers=headers
+    )
+    removed = await client.post(f"/concepts/{tag['id']}/archive", headers=headers)
+    assert removed.status_code == 200
+    assert all(
+        c["id"] != tag["id"] for c in (await client.get("/concepts", headers=headers)).json()
+    )
+    # Its row stays, archived; the same name can be used again, with a fresh key.
+    again = (await client.post("/concepts", json={"label": "Turtle"}, headers=headers)).json()
+    assert again["key"] == "turtle_2"

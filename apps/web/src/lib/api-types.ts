@@ -944,11 +944,60 @@ export interface paths {
         };
         /**
          * List Concepts
-         * @description The taxonomy a teacher can tag with. Read-only here; it is edited as YAML.
+         * @description The taxonomy a teacher can tag with: the global one (edited as YAML) and the centre's own.
          */
         get: operations["list_concepts_concepts_get"];
         put?: never;
+        /**
+         * Create Concept
+         * @description A tag of the centre's own (Ken, 14 Nov 2026): any teacher may add one, and every
+         *     teacher at the centre sees it, as they see the whole bank. It goes after the others.
+         */
+        post: operations["create_concept_concepts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/concepts/{concept_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Rename Concept
+         * @description Rename one of the centre's tags. The key stays, so problem files naming it still work.
+         */
+        patch: operations["rename_concept_concepts__concept_id__patch"];
+        trace?: never;
+    };
+    "/concepts/{concept_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive Concept
+         * @description Remove one of the centre's tags — refused while a problem or lesson still uses it.
+         *
+         *     Stripping it instead would leave a problem without its main concept, which publishing
+         *     needs, and `check_concepts` refuses an archived tag, so the problem could not be saved
+         *     as it stands. The row is archived, never deleted: old versions keep their reference.
+         */
+        post: operations["archive_concept_concepts__concept_id__archive_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3160,6 +3209,11 @@ export interface components {
             /** Reference */
             reference?: string | null;
         };
+        /** ConceptIn */
+        ConceptIn: {
+            /** Label */
+            label: string;
+        };
         /** ConceptOut */
         ConceptOut: {
             /**
@@ -3171,6 +3225,8 @@ export interface components {
             key: string;
             /** Label */
             label: string;
+            /** Own */
+            own: boolean;
             /** Status */
             status: string;
         };
@@ -6968,6 +7024,111 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConceptOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_concept_concepts_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConceptIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rename_concept_concepts__concept_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                concept_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConceptIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_concept_concepts__concept_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                concept_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConceptOut"];
                 };
             };
             /** @description Validation Error */

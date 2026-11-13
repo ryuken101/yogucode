@@ -6,7 +6,9 @@ mechanism is not. Swapping the taxonomy must be a config edit (seed/concepts.yam
 configured for a different course without changing code?
 
 `centre_id IS NULL` means a global concept shared by every centre; a non-null centre_id
-is a centre's own override or addition.
+is a centre's own override or addition. Teachers add, rename and remove the centre's own
+from the problem editor's tag picker (Ken, 14 Nov 2026; `routers/curriculum.py`). Those get
+a key no global concept has, so they sit beside the taxonomy rather than override it.
 """
 
 import uuid

@@ -841,6 +841,21 @@
         "title": "CompareTest",
         "type": "object"
       },
+      "ConceptIn": {
+        "properties": {
+          "label": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label"
+        ],
+        "title": "ConceptIn",
+        "type": "object"
+      },
       "ConceptOut": {
         "properties": {
           "id": {
@@ -856,6 +871,10 @@
             "title": "Label",
             "type": "string"
           },
+          "own": {
+            "title": "Own",
+            "type": "boolean"
+          },
           "status": {
             "title": "Status",
             "type": "string"
@@ -865,7 +884,8 @@
           "id",
           "key",
           "label",
-          "status"
+          "status",
+          "own"
         ],
         "title": "ConceptOut",
         "type": "object"
@@ -9264,7 +9284,7 @@
     },
     "/concepts": {
       "get": {
-        "description": "The taxonomy a teacher can tag with. Read-only here; it is edited as YAML.",
+        "description": "The taxonomy a teacher can tag with: the global one (edited as YAML) and the centre's own.",
         "operationId": "list_concepts_concepts_get",
         "parameters": [
           {
@@ -9311,6 +9331,194 @@
           }
         },
         "summary": "List Concepts",
+        "tags": [
+          "curriculum"
+        ]
+      },
+      "post": {
+        "description": "A tag of the centre's own (Ken, 14 Nov 2026): any teacher may add one, and every\nteacher at the centre sees it, as they see the whole bank. It goes after the others.",
+        "operationId": "create_concept_concepts_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConceptIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConceptOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Concept",
+        "tags": [
+          "curriculum"
+        ]
+      }
+    },
+    "/concepts/{concept_id}": {
+      "patch": {
+        "description": "Rename one of the centre's tags. The key stays, so problem files naming it still work.",
+        "operationId": "rename_concept_concepts__concept_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "concept_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Concept Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConceptIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConceptOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rename Concept",
+        "tags": [
+          "curriculum"
+        ]
+      }
+    },
+    "/concepts/{concept_id}/archive": {
+      "post": {
+        "description": "Remove one of the centre's tags \u2014 refused while a problem or lesson still uses it.\n\nStripping it instead would leave a problem without its main concept, which publishing\nneeds, and `check_concepts` refuses an archived tag, so the problem could not be saved\nas it stands. The row is archived, never deleted: old versions keep their reference.",
+        "operationId": "archive_concept_concepts__concept_id__archive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "concept_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Concept Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConceptOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Archive Concept",
         "tags": [
           "curriculum"
         ]
