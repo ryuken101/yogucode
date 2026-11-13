@@ -4980,6 +4980,82 @@
         "title": "SnippetStatus",
         "type": "string"
       },
+      "StartedMarkOut": {
+        "description": "A mark on a question the child never started, with the attempt opened to hold it.",
+        "properties": {
+          "approach": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approach"
+          },
+          "attempt_id": {
+            "format": "uuid",
+            "title": "Attempt Id",
+            "type": "string"
+          },
+          "comment_md": {
+            "title": "Comment Md",
+            "type": "string"
+          },
+          "correct": {
+            "title": "Correct",
+            "type": "integer"
+          },
+          "released": {
+            "title": "Released",
+            "type": "boolean"
+          },
+          "runs": {
+            "title": "Runs",
+            "type": "boolean"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "verified_passed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified Passed"
+          },
+          "verified_total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified Total"
+          }
+        },
+        "required": [
+          "runs",
+          "correct",
+          "approach",
+          "comment_md",
+          "verified_passed",
+          "verified_total",
+          "released",
+          "stale",
+          "attempt_id"
+        ],
+        "title": "StartedMarkOut",
+        "type": "object"
+      },
       "StartedProblemOut": {
         "description": "A lesson problem the child has opened, for My work's Lessons tab.",
         "properties": {
@@ -6585,6 +6661,96 @@
           }
         },
         "summary": "Auto Mark",
+        "tags": [
+          "marking"
+        ]
+      }
+    },
+    "/assignments/{assignment_id}/marking/{leaf_item_id}/students/{student_id}/mark": {
+      "put": {
+        "description": "Mark a question the child never opened (Ken, 14 Nov 2026): a comment on how to start\nis still feedback. Opens their attempt for them \u2014 the starter code, the same row they\nwould get by opening it, as hand-in does for every question \u2014 and marks that.",
+        "operationId": "save_mark_not_started_assignments__assignment_id__marking__leaf_item_id__students__student_id__mark_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assignment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Assignment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "leaf_item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Leaf Item Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartedMarkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Mark Not Started",
         "tags": [
           "marking"
         ]

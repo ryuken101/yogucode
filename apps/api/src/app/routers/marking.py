@@ -26,6 +26,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.audit import audit_entry
 from app.auth.principal import CurrentTeacher, Principal
+from app.classwork import open_attempt
 from app.db import get_session
 from app.homework import Leaf, latest_submissions, set_leaves
 from app.models import (
@@ -101,6 +102,12 @@ class MarkOut(BaseModel):
     released: bool
     # The child handed in again after this mark was written; the mark is on an older copy.
     stale: bool
+
+
+class StartedMarkOut(MarkOut):
+    """A mark on a question the child never started, with the attempt opened to hold it."""
+
+    attempt_id: uuid.UUID
 
 
 class MarkingEntryOut(BaseModel):
@@ -459,6 +466,45 @@ async def save_mark(
     at the exact code it judged."""
     attempt = await get_centre_attempt(session, principal, attempt_id)
     assignment = await _homework(session, principal, attempt.assignment_id)
+    return await _save_mark(session, principal, assignment, attempt, body)
+
+
+@router.put(
+    "/assignments/{assignment_id}/marking/{leaf_item_id}/students/{student_id}/mark",
+    response_model=StartedMarkOut,
+)
+async def save_mark_not_started(
+    assignment_id: uuid.UUID,
+    leaf_item_id: uuid.UUID,
+    student_id: uuid.UUID,
+    body: MarkIn,
+    principal: CurrentTeacher,
+    session: SessionDep,
+) -> StartedMarkOut:
+    """Mark a question the child never opened (Ken, 14 Nov 2026): a comment on how to start
+    is still feedback. Opens their attempt for them — the starter code, the same row they
+    would get by opening it, as hand-in does for every question — and marks that."""
+    assignment = await _homework(session, principal, assignment_id)
+    leaf = await _leaf(session, principal, assignment, leaf_item_id)
+    student = await get_owned_student(session, principal, student_id)
+    if student.id not in {s.id for s in await _students(session, principal, assignment)}:
+        raise _not_found("student")
+    # A part of a shared-file problem starts, like its siblings, from the problem's file.
+    starter = leaf.problem.starter_code if leaf.problem.shared_file else None
+    attempt = await open_attempt(
+        session, principal, assignment, leaf.leaf, starter=starter, student_id=student.id
+    )
+    saved = await _save_mark(session, principal, assignment, attempt, body)
+    return StartedMarkOut(**saved.model_dump(), attempt_id=attempt.id)
+
+
+async def _save_mark(
+    session: AsyncSession,
+    principal: Principal,
+    assignment: Assignment,
+    attempt: Attempt,
+    body: MarkIn,
+) -> MarkOut:
     submission = (await latest_submissions(session, principal, [attempt.id])).get(attempt.id)
     if submission is None:
         submission = Submission(

@@ -227,6 +227,12 @@ export const api = {
     }),
   saveMark: (attemptId: string, body: Schemas['MarkIn']) =>
     request<Schemas['MarkOut']>(`/attempts/${attemptId}/mark`, { method: 'PUT', body }),
+  /** A question the child never started: the server opens their attempt and marks it. */
+  saveMarkNotStarted: (assignmentId: string, itemId: string, studentId: string, body: Schemas['MarkIn']) =>
+    request<Schemas['StartedMarkOut']>(
+      `/assignments/${assignmentId}/marking/${itemId}/students/${studentId}/mark`,
+      { method: 'PUT', body },
+    ),
   saveNote: (assignmentId: string, studentId: string, note: string) =>
     request<Schemas['NoteIn']>(`/assignments/${assignmentId}/notes/${studentId}`, {
       method: 'PUT',

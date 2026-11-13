@@ -271,6 +271,7 @@ async def open_attempt(
     leaf: Item,
     *,
     starter: str | None = None,
+    student_id: uuid.UUID | None = None,
 ) -> Attempt:
     """The child's attempt at a leaf, created with the starter code on first open — the
     leaf's own, or `starter` (a shared-file problem's) when given.
@@ -278,13 +279,17 @@ async def open_attempt(
     `ON CONFLICT DO NOTHING` rather than check-then-insert: a child with the problem open
     in two tabs opens it twice at once, and the second must find the first's row rather
     than fail on the unique constraint.
+
+    `student_id` is the child's when someone else opens it for them: a teacher marking a
+    question the child never started (`routers/marking.py`). Otherwise it is the principal.
     """
+    student_id = principal.subject_id if student_id is None else student_id
     await session.exec(
         pg_insert(Attempt)  # type: ignore[call-overload]
         .values(
             id=new_uuid(),
             centre_id=principal.centre_id,
-            student_id=principal.subject_id,
+            student_id=student_id,
             assignment_id=assignment.id,
             item_id=leaf.id,
             code=leaf.starter_code if starter is None else starter,
@@ -301,7 +306,7 @@ async def open_attempt(
             select(Attempt).where(
                 Attempt.assignment_id == assignment.id,
                 Attempt.item_id == leaf.id,
-                Attempt.student_id == principal.subject_id,
+                Attempt.student_id == student_id,
             )
         )
     ).one()

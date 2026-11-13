@@ -122,6 +122,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/assignments/{assignment_id}/marking/{leaf_item_id}/students/{student_id}/mark": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Save Mark Not Started
+         * @description Mark a question the child never opened (Ken, 14 Nov 2026): a comment on how to start
+         *     is still feedback. Opens their attempt for them — the starter code, the same row they
+         *     would get by opening it, as hand-in does for every question — and marks that.
+         */
+        put: operations["save_mark_not_started_assignments__assignment_id__marking__leaf_item_id__students__student_id__mark_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/assignments/{assignment_id}/notes/{student_id}": {
         parameters: {
             query?: never;
@@ -4773,6 +4795,33 @@ export interface components {
          */
         SnippetStatus: "active" | "archived";
         /**
+         * StartedMarkOut
+         * @description A mark on a question the child never started, with the attempt opened to hold it.
+         */
+        StartedMarkOut: {
+            /** Approach */
+            approach: number | null;
+            /**
+             * Attempt Id
+             * Format: uuid
+             */
+            attempt_id: string;
+            /** Comment Md */
+            comment_md: string;
+            /** Correct */
+            correct: number;
+            /** Released */
+            released: boolean;
+            /** Runs */
+            runs: boolean;
+            /** Stale */
+            stale: boolean;
+            /** Verified Passed */
+            verified_passed: number | null;
+            /** Verified Total */
+            verified_total: number | null;
+        };
+        /**
          * StartedProblemOut
          * @description A lesson problem the child has opened, for My work's Lessons tab.
          */
@@ -5493,6 +5542,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AutoMarkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_mark_not_started_assignments__assignment_id__marking__leaf_item_id__students__student_id__mark_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                assignment_id: string;
+                leaf_item_id: string;
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarkIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StartedMarkOut"];
                 };
             };
             /** @description Validation Error */

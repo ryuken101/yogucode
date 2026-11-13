@@ -347,6 +347,65 @@ async def test_marking_saved_work_freezes_a_copy_first(
     assert audit.target_id == uuid.UUID(aria["student_id"])
 
 
+async def test_a_question_never_started_can_still_be_marked(
+    client, session: AsyncSession, signed_in_student
+) -> None:
+    """Ken, 14 Nov 2026: a comment on how to start is feedback too."""
+    aria = await signed_in_student()
+    hw = await homework(client, session, aria)
+    assignment_id = hw["assignment"]["id"]
+    item_id = hw["items"][0]["id"]
+    headers = aria["headers"]
+    path = f"/assignments/{assignment_id}/marking/{item_id}/students/{aria['student_id']}/mark"
+
+    response = await client.put(
+        path, json={"runs": False, "correct": 0, "comment_md": "Start with a loop"}, headers=headers
+    )
+    assert response.status_code == 200, response.text
+    attempt_id = response.json()["attempt_id"]
+    # Again: the same attempt, not a second one.
+    again = await client.put(
+        path, json={"runs": False, "correct": 0, "comment_md": "Start here"}, headers=headers
+    )
+    assert again.json()["attempt_id"] == attempt_id
+    attempt = (await session.exec(select(Attempt))).one()
+    assert attempt.code == "numbers = [1, 2, 3]\n", "the starter, as if they had opened it"
+
+    view = (
+        await client.get(f"/assignments/{assignment_id}/marking/{item_id}", headers=headers)
+    ).json()
+    entry = view["entries"][0]
+    assert (entry["source"], entry["mark"]["comment_md"]) == ("saved_work", "Start here")
+
+    await client.post(f"/assignments/{assignment_id}/release", headers=headers)
+    sheet = (await client.get(f"/me/homework/{assignment_id}")).json()
+    assert sheet["leaves"][0]["feedback"]["comment_md"] == "Start here"
+    assert sheet["leaves"][0]["feedback"]["outcome"] == "not_yet"
+
+
+async def test_marking_a_never_started_question_stays_in_the_class(
+    client, session: AsyncSession, signed_in_student, foreign_centre
+) -> None:
+    aria = await signed_in_student()
+    hw = await homework(client, session, aria)
+    assignment_id = hw["assignment"]["id"]
+    item_id = hw["items"][0]["id"]
+    body = {"runs": False, "correct": 0, "comment_md": "x"}
+
+    for student_id, leaf_id in [
+        (foreign_centre["student"].id, item_id),  # another centre's child
+        (uuid.uuid4(), item_id),  # no such child
+        (aria["student_id"], uuid.uuid4()),  # not a question on this sheet
+    ]:
+        response = await client.put(
+            f"/assignments/{assignment_id}/marking/{leaf_id}/students/{student_id}/mark",
+            json=body,
+            headers=aria["headers"],
+        )
+        assert response.status_code == 404, (student_id, leaf_id, response.text)
+    assert (await session.exec(select(Attempt))).all() == []
+
+
 async def test_a_mark_goes_stale_when_the_child_hands_in_again(
     client, session: AsyncSession, signed_in_student
 ) -> None:

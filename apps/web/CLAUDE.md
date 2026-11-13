@@ -358,6 +358,9 @@ open tile shows the question too (`GET /attempts/{id}/question` outside a quiz, 
 key or solution). `problems/RunAnswer.tsx` runs an answer with its own worker, so a program at
 `input()` can't hold up the class's checks, and with `run(code, { fresh: true })`, so one child's
 variables can't hide the next child's mistake. Running saves nothing and changes no mark.
+A question the child never started can still be marked (Ken, 14 Nov 2026): the save goes to
+`PUT /assignments/{id}/marking/{item}/students/{student}/mark`, which opens the child's
+attempt with the starter code, as hand-in does, and marks it.
 
 ## Code in prompts
 

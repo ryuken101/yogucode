@@ -191,11 +191,11 @@ export function Marking() {
   const entry = entries[index]
 
   async function saveCurrent() {
-    if (!entry || !entry.attempt_id) return
+    if (!entry) return
     const form = forms[entry.student_id]
     if (!form) return
     const run = runs[entry.student_id]
-    const saved = await api.saveMark(entry.attempt_id, {
+    const body: Schemas['MarkIn'] = {
       runs: form.runs,
       correct: form.correct,
       approach: form.approach,
@@ -203,13 +203,26 @@ export function Marking() {
       verified_passed: run ? run.results.filter((r) => r.passed).length : null,
       verified_total: run ? run.results.length : null,
       snippet_ids: form.snippetIds,
-    })
+    }
+    // A child who never opened the question has no attempt yet: the server opens one to
+    // hold the mark (14 Nov 2026), and says which.
+    let attemptId = entry.attempt_id
+    let saved: Schemas['MarkOut']
+    if (attemptId) {
+      saved = await api.saveMark(attemptId, body)
+    } else {
+      const started = await api.saveMarkNotStarted(assignmentId, itemId, entry.student_id, body)
+      attemptId = started.attempt_id
+      saved = started
+    }
     client.setQueryData(
       keys.markingQuestion(assignmentId, itemId),
       (current: Schemas['QuestionMarkingOut'] | undefined) =>
         current && {
           ...current,
-          entries: current.entries.map((e) => (e.student_id === entry.student_id ? { ...e, mark: saved } : e)),
+          entries: current.entries.map((e) =>
+            e.student_id === entry.student_id ? { ...e, attempt_id: attemptId, mark: saved } : e,
+          ),
         },
     )
     setForms((current) => {
@@ -420,7 +433,7 @@ export function Marking() {
                 </div>
               </>
             ) : entry.code === null ? (
-              <p className="text-muted">Not started — nothing to mark.</p>
+              <p className="text-muted">Not started. You can still mark it and leave a comment.</p>
             ) : entry.code === '' ? (
               <p className="text-muted">(nothing written)</p>
             ) : (
@@ -457,119 +470,117 @@ export function Marking() {
             </Card>
           )}
 
-          {entry.attempt_id ? (
-            <Card>
-              <div className="flex flex-wrap items-center gap-6">
-                {isMcq ? null : (
-                <div className="flex items-center gap-2">
-                  <span className="w-20 text-sm font-medium text-grape">Runs</span>
-                  <button
-                    type="button"
-                    aria-pressed={form.runs}
-                    onClick={() => setForm({ runs: !form.runs })}
-                    className={`w-12 rounded-lg py-1 text-sm ring-1 ${form.runs ? 'bg-grape-pale ring-grape' : 'bg-surface ring-grape/20'}`}
-                  >
-                    {form.runs ? '✓' : '—'}
-                  </button>
-                </div>
-                )}
-                <Scale label="Correct" value={form.correct} onChange={(correct) => setForm({ correct })} />
-                {isMcq ? null : (
-                  <Scale label="Approach" value={form.approach} onChange={(approach) => setForm({ approach })} />
-                )}
+          <Card>
+            <div className="flex flex-wrap items-center gap-6">
+              {isMcq ? null : (
+              <div className="flex items-center gap-2">
+                <span className="w-20 text-sm font-medium text-grape">Runs</span>
+                <button
+                  type="button"
+                  aria-pressed={form.runs}
+                  onClick={() => setForm({ runs: !form.runs })}
+                  className={`w-12 rounded-lg py-1 text-sm ring-1 ${form.runs ? 'bg-grape-pale ring-grape' : 'bg-surface ring-grape/20'}`}
+                >
+                  {form.runs ? '✓' : '—'}
+                </button>
               </div>
+              )}
+              <Scale label="Correct" value={form.correct} onChange={(correct) => setForm({ correct })} />
+              {isMcq ? null : (
+                <Scale label="Approach" value={form.approach} onChange={(approach) => setForm({ approach })} />
+              )}
+            </div>
 
-              <div className="mt-4 flex flex-col gap-4">
-                <div className="flex flex-col gap-2">
-                  <Textarea
-                    label="Comment for the student"
-                    rows={3}
-                    value={form.comment}
-                    onChange={(event) => setForm({ comment: event.target.value })}
-                  />
-                  <div className="flex gap-2">
-                    <Button
-                      variant="quiet"
-                      disabled={!form.comment.trim()}
-                      onClick={() =>
-                        void api
-                          .createSnippet({ body: form.comment.trim(), concept_id: data.concept_ids[0] ?? null })
-                          .then(() => client.invalidateQueries({ queryKey: keys.snippets }))
-                      }
-                    >
-                      Save as a snippet
-                    </Button>
-                  </div>
-                  {form.comment ? (
-                    <div className="rounded-lg bg-cream/60 px-3 py-1 text-sm ring-1 ring-line">
-                      <Markdown>{form.comment}</Markdown>
-                    </div>
-                  ) : null}
-                </div>
-                <div className="flex flex-col gap-2">
-                  <TextInput
-                    label="Snippets"
-                    placeholder="Search…"
-                    value={snippetQuery}
-                    onChange={(event) => setSnippetQuery(event.target.value)}
-                  />
-                  <ul className="flex flex-col gap-1">
-                    {shownSnippets.map((snippet) => (
-                      <li key={snippet.id} className="flex items-start gap-1">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setForm({
-                              comment: form.comment ? `${form.comment.trimEnd()}\n${snippet.body}` : snippet.body,
-                              snippetIds: [...form.snippetIds, snippet.id],
-                            })
-                          }
-                          className="w-full rounded-lg bg-surface px-3 py-1.5 text-left text-sm text-grape ring-1 ring-line hover:ring-grape"
-                        >
-                          {snippet.body}
-                        </button>
-                        <button
-                          type="button"
-                          aria-label={`Delete the snippet “${snippet.body}”`}
-                          title="Delete snippet"
-                          onClick={() => setDeletingSnippet(snippet)}
-                          className="mt-1 rounded-lg p-1 text-muted hover:bg-grape-pale hover:text-grape"
-                        >
-                          <X size={14} aria-hidden="true" />
-                        </button>
-                      </li>
-                    ))}
-                    {shownSnippets.length === 0 ? (
-                      <li className="text-sm text-muted">No snippets yet — save a comment you’ll reuse.</li>
-                    ) : null}
-                  </ul>
-                </div>
-              </div>
-
-              <div className="mt-4">
+            <div className="mt-4 flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
                 <Textarea
-                  label={`Overall note to ${entry.display_name} on this ${isQuiz ? 'quiz' : 'homework'} (optional)`}
-                  rows={2}
-                  value={note}
-                  onChange={(event) => setNotes((current) => ({ ...current, [entry.student_id]: event.target.value }))}
-                  onBlur={() => {
-                    if (note !== entry.note) {
-                      void api.saveNote(assignmentId, entry.student_id, note).catch(setError)
-                    }
-                  }}
+                  label="Comment for the student"
+                  rows={3}
+                  value={form.comment}
+                  onChange={(event) => setForm({ comment: event.target.value })}
                 />
+                <div className="flex gap-2">
+                  <Button
+                    variant="quiet"
+                    disabled={!form.comment.trim()}
+                    onClick={() =>
+                      void api
+                        .createSnippet({ body: form.comment.trim(), concept_id: data.concept_ids[0] ?? null })
+                        .then(() => client.invalidateQueries({ queryKey: keys.snippets }))
+                    }
+                  >
+                    Save as a snippet
+                  </Button>
+                </div>
+                {form.comment ? (
+                  <div className="rounded-lg bg-cream/60 px-3 py-1 text-sm ring-1 ring-line">
+                    <Markdown>{form.comment}</Markdown>
+                  </div>
+                ) : null}
               </div>
+              <div className="flex flex-col gap-2">
+                <TextInput
+                  label="Snippets"
+                  placeholder="Search…"
+                  value={snippetQuery}
+                  onChange={(event) => setSnippetQuery(event.target.value)}
+                />
+                <ul className="flex flex-col gap-1">
+                  {shownSnippets.map((snippet) => (
+                    <li key={snippet.id} className="flex items-start gap-1">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setForm({
+                            comment: form.comment ? `${form.comment.trimEnd()}\n${snippet.body}` : snippet.body,
+                            snippetIds: [...form.snippetIds, snippet.id],
+                          })
+                        }
+                        className="w-full rounded-lg bg-surface px-3 py-1.5 text-left text-sm text-grape ring-1 ring-line hover:ring-grape"
+                      >
+                        {snippet.body}
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Delete the snippet “${snippet.body}”`}
+                        title="Delete snippet"
+                        onClick={() => setDeletingSnippet(snippet)}
+                        className="mt-1 rounded-lg p-1 text-muted hover:bg-grape-pale hover:text-grape"
+                      >
+                        <X size={14} aria-hidden="true" />
+                      </button>
+                    </li>
+                  ))}
+                  {shownSnippets.length === 0 ? (
+                    <li className="text-sm text-muted">No snippets yet — save a comment you’ll reuse.</li>
+                  ) : null}
+                </ul>
+              </div>
+            </div>
 
-              <div className="mt-4 flex gap-2">
-                <Button variant="primary" onClick={() => void go(index + 1).then(() => undefined)} disabled={index === entries.length - 1}>
-                  Save and next →
-                </Button>
-                <Button variant="secondary" onClick={() => void saveCurrent().catch(setError)}>
-                  Save
-                </Button>
-              </div>
-            </Card>
-          ) : null}
+            <div className="mt-4">
+              <Textarea
+                label={`Overall note to ${entry.display_name} on this ${isQuiz ? 'quiz' : 'homework'} (optional)`}
+                rows={2}
+                value={note}
+                onChange={(event) => setNotes((current) => ({ ...current, [entry.student_id]: event.target.value }))}
+                onBlur={() => {
+                  if (note !== entry.note) {
+                    void api.saveNote(assignmentId, entry.student_id, note).catch(setError)
+                  }
+                }}
+              />
+            </div>
+
+            <div className="mt-4 flex gap-2">
+              <Button variant="primary" onClick={() => void go(index + 1).then(() => undefined)} disabled={index === entries.length - 1}>
+                Save and next →
+              </Button>
+              <Button variant="secondary" onClick={() => void saveCurrent().catch(setError)}>
+                Save
+              </Button>
+            </div>
+          </Card>
         </div>
       </div>
 

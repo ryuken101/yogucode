@@ -218,6 +218,51 @@ test('marking pre-fills Runs and Correct from the re-run and saves when moving o
   expect(screen.getByText('Not handed in — saved work')).toBeInTheDocument()
 })
 
+test('a child who never started the question can still be marked and given a comment', async () => {
+  const marks: { path: string; body: Schemas['MarkIn'] }[] = []
+  server.use(
+    http.get(`/api/assignments/${HW}/marking`, () =>
+      HttpResponse.json({
+        assignment_id: HW, title: 'Lists practice', mode: 'homework', due_at: null, released_at: null,
+        questions: [{ leaf_item_id: P1, title: 'Add to the end', difficulty: 1, handed_in: 0, marked: 0 }],
+        students: [],
+      } satisfies Schemas['MarkingOverviewOut']),
+    ),
+    http.get(`/api/assignments/${HW}/marking/${P1}`, () =>
+      HttpResponse.json({
+        assignment_id: HW, leaf_item_id: P1, kind: 'code', options: [], title: 'Add to the end', prompt_md: '', solution_code: '',
+        concept_ids: [], tests: [test1],
+        entries: [entry({ attempt_id: null, code: null, source: 'not_started', submitted_at: null, child_passed: null, child_total: null })],
+      } satisfies Schemas['QuestionMarkingOut']),
+    ),
+    http.get('/api/snippets', () => HttpResponse.json([])),
+    http.put(`/api/assignments/${HW}/marking/${P1}/students/:studentId/mark`, async ({ request }) => {
+      const body = (await request.json()) as Schemas['MarkIn']
+      marks.push({ path: new URL(request.url).pathname, body })
+      return HttpResponse.json({ ...body, comment_md: body.comment_md ?? '', approach: body.approach ?? null,
+        verified_passed: null, verified_total: null, released: false, stale: false, attempt_id: A1 } satisfies Schemas['StartedMarkOut'])
+    }),
+  )
+  const { user } = renderScreen(
+    <Routes>
+      <Route path="/assignments/:assignmentId/mark/:itemId" element={<Marking />} />
+    </Routes>,
+    { route: `/assignments/${HW}/mark/${P1}` },
+  )
+
+  await screen.findByRole('heading', { name: 'Aria K' })
+  // Nothing ran, so nothing is pre-filled as passing.
+  expect(within(screen.getByRole('radiogroup', { name: 'Correct' })).getByRole('radio', { name: '0' })).toHaveAttribute('aria-checked', 'true')
+  await user.type(screen.getByLabelText('Comment for the student'), 'Start with a loop')
+  await user.click(screen.getByRole('button', { name: 'Save' }))
+
+  await waitFor(() => expect(marks).toHaveLength(1))
+  expect(marks[0]).toEqual({
+    path: `/api/assignments/${HW}/marking/${P1}/students/${S1}/mark`,
+    body: expect.objectContaining({ runs: false, correct: 0, comment_md: 'Start with a loop' }),
+  })
+})
+
 test('the question sits beside the answer, in the editor’s colours, and stays as the child changes', async () => {
   const twoQuestions = (id: string, title: string, prompt: string, solution: string) =>
     http.get(`/api/assignments/${HW}/marking/${id}`, () =>
@@ -276,7 +321,7 @@ test('the question sits beside the answer, in the editor’s colours, and stays 
 
   // Nothing to colour, and nothing to run.
   await user.click(screen.getByRole('button', { name: /Cal R/ }))
-  expect(await screen.findByText('Not started — nothing to mark.')).toBeInTheDocument()
+  expect(await screen.findByText('Not started. You can still mark it and leave a comment.')).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Run' })).not.toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: /Dee T/ }))
   expect(await screen.findByText('(nothing written)')).toBeInTheDocument()
