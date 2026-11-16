@@ -3769,6 +3769,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Newer Version Id */
+            newer_version_id: string | null;
             status: components["schemas"]["ItemStatus"];
             /** Title */
             title: string;
@@ -4785,6 +4787,8 @@ export interface components {
             late: boolean;
             /** Leaves */
             leaves: components["schemas"]["SheetLeafOut"][];
+            /** Needs Hand In Again */
+            needs_hand_in_again: boolean;
             /** Note */
             note: string | null;
             /** Returned */

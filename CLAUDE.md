@@ -143,6 +143,15 @@ instant of 0:00 lost children's last typing. Finalising re-reads the locked row 
 Marking routes refuse a running quiz. Withdrawing a child mid-quiz hands in what they saved
 (`hand_in_for_removed_child`), since the final hand-in reaches enrolled children only.
 
+**A set homework's problems can still change** (Ken, 16 Nov 2026, reversing "fixed once
+set"; `routers/homework.py`). Add, remove, reorder or swap to a newer version, with the
+builder confirming first. Nothing is deleted: every reader builds the sheet from its
+current `set_items`, so a removed problem's attempts are hidden and come back if it is added
+again. A swap carries each child's code to the new version (`homework.carry_attempts`,
+code only, never an MCQ choice). A problem a child hasn't handed in, on a sheet they did hand
+in, sets `SheetOut.needs_hand_in_again`. Returned sheets stay locked. Quizzes are unchanged:
+editable until Start.
+
 **`quiz_sittings`** (one row per quiz and child, made on first need): "I'm finished", and how
 often and how long they left the page. Finished changes nothing else: they can still edit,
 and the rest of their account stays closed until the quiz ends. All finished tells the

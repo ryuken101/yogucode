@@ -42,7 +42,7 @@ function leaf(overrides: Partial<Schemas['SheetLeafOut']>): Schemas['SheetLeafOu
 function sheet(overrides: Partial<Schemas['SheetOut']> = {}): Schemas['SheetOut'] {
   return {
     assignment_id: HW, title: 'Lists practice', due_at: '2099-10-16T05:00:00Z', closed: false,
-    returned: false, late: false, handed_in_at: null, note: null,
+    returned: false, late: false, handed_in_at: null, needs_hand_in_again: false, note: null,
     leaves: [
       leaf({ attempt_id: A1, progress: 'passing' }),
       leaf({ problem_id: P2, leaf_item_id: P2, title: 'Countdown' }),
@@ -108,6 +108,30 @@ test('hand in checks every problem first and shows how each one is doing', async
     { attempt_id: A2, passed: 0, total: 1 },
   ])
   expect(await screen.findByText(/Handed in/)).toBeInTheDocument()
+})
+
+test('a problem added after hand-in asks, in not-yet lemon, to hand in again', async () => {
+  server.use(
+    http.get(`/api/me/homework/${HW}`, () =>
+      HttpResponse.json(
+        sheet({
+          handed_in_at: '2026-10-07T01:00:00Z',
+          needs_hand_in_again: true,
+          leaves: [
+            leaf({ attempt_id: A1, progress: 'passing', handed_in: true }),
+            leaf({ problem_id: P2, leaf_item_id: P2, title: 'Countdown' }),
+          ],
+        }),
+      ),
+    ),
+  )
+  renderSheet()
+
+  const notice = await screen.findByText(/changed this homework since you handed it in/)
+  expect(notice.className).toContain('bg-not-yet')
+  expect(notice.className).not.toContain('system-error')
+  expect(screen.getAllByText('Not handed in yet')).toHaveLength(1)
+  expect(screen.getByRole('button', { name: 'Hand in again' })).toBeInTheDocument()
 })
 
 test('given-back work is read-only: comments and colours, no numbers, no system-error', async () => {

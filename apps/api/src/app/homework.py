@@ -203,3 +203,73 @@ def correct_from(passed: int | None, total: int | None) -> int:
 
 def leaf_ids(leaves: Sequence[Leaf]) -> list[uuid.UUID]:
     return [leaf.leaf.id for leaf in leaves]
+
+
+async def _leaves_of(session: AsyncSession, principal: Principal, problem: Item) -> list[Item]:
+    parts = (
+        await session.exec(
+            select(Item)
+            .where(Item.parent_id == problem.id, Item.centre_id == principal.centre_id)
+            .order_by(col(Item.sort_order))
+        )
+    ).all()
+    return list(parts) or [problem]
+
+
+async def carry_attempts(
+    session: AsyncSession,
+    principal: Principal,
+    assignment: Assignment,
+    old: Item,
+    new: Item,
+) -> None:
+    """Swapping a set homework's problem for its newer version carries each child's code
+    across (Ken, 16 Nov 2026), so a fix to the problem doesn't cost them their work.
+
+    Only code is carried. A multiple-choice answer is not, since the options may have
+    changed. Parts are matched by position, and a problem whose shape changed (parts
+    added to or taken from a single problem) carries nothing. An attempt already on the new
+    version is never overwritten. The carried attempt has no submission, so a child who had
+    handed in is asked to hand in again. The caller commits.
+    """
+    old_leaves = await _leaves_of(session, principal, old)
+    new_leaves = await _leaves_of(session, principal, new)
+    if (old_leaves == [old]) != (new_leaves == [new]):
+        return
+    for old_leaf, new_leaf in zip(old_leaves, new_leaves, strict=False):
+        if old_leaf.kind != ItemKind.CODE or new_leaf.kind != ItemKind.CODE:
+            continue
+        attempts = (
+            await session.exec(
+                select(Attempt).where(
+                    Attempt.assignment_id == assignment.id,
+                    Attempt.item_id == old_leaf.id,
+                    Attempt.centre_id == principal.centre_id,
+                )
+            )
+        ).all()
+        already = set(
+            (
+                await session.exec(
+                    select(Attempt.student_id).where(
+                        Attempt.assignment_id == assignment.id,
+                        Attempt.item_id == new_leaf.id,
+                    )
+                )
+            ).all()
+        )
+        for attempt in attempts:
+            if attempt.student_id in already:
+                continue
+            carried = await open_attempt(
+                session,
+                principal,
+                assignment,
+                new_leaf,
+                starter=attempt.code,
+                student_id=attempt.student_id,
+            )
+            # Their file in Files keeps being saved to, as it was from the old version.
+            carried.document_id = attempt.document_id
+            session.add(carried)
+    await session.flush()

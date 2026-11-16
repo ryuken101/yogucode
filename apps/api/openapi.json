@@ -2245,6 +2245,18 @@
             "title": "Id",
             "type": "string"
           },
+          "newer_version_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Newer Version Id"
+          },
           "status": {
             "$ref": "#/components/schemas/ItemStatus"
           },
@@ -2257,7 +2269,8 @@
           "id",
           "title",
           "difficulty",
-          "status"
+          "status",
+          "newer_version_id"
         ],
         "title": "HomeworkProblemOut",
         "type": "object"
@@ -4803,6 +4816,10 @@
             "title": "Leaves",
             "type": "array"
           },
+          "needs_hand_in_again": {
+            "title": "Needs Hand In Again",
+            "type": "boolean"
+          },
           "note": {
             "anyOf": [
               {
@@ -4831,6 +4848,7 @@
           "returned",
           "late",
           "handed_in_at",
+          "needs_hand_in_again",
           "note",
           "leaves"
         ],

@@ -2,8 +2,10 @@
  * Write or edit one homework for one class: title, problems, due date and time, hints.
  *
  * A draft until **Set homework**, which makes it appear for the class at once (no
- * scheduling, by Ken's decision). After that the problems are fixed — children have
- * started on them — but the title, due date and hints can still change.
+ * scheduling, by Ken's decision). After that everything can still change, problems too
+ * (Ken, 16 Nov 2026). A change to the problems of a set homework is confirmed first,
+ * since children see it at once. Removed work is kept and comes back if the problem is
+ * added again. Children who handed in are asked to hand in again.
  */
 
 import { useState } from 'react'
@@ -34,7 +36,7 @@ function fromHomework(homework: Schemas['HomeworkOut']): Draft {
       id: p.id,
       title: p.title,
       difficulty: p.difficulty,
-      newerVersionId: null,
+      newerVersionId: p.newer_version_id ?? null,
       superseded: p.status !== 'published',
     })),
     due: toLocalInput(homework.due_at),
@@ -48,6 +50,7 @@ export function HomeworkBuilder() {
   const klass = useClass(classId)
   const existing = useHomework(assignmentId ?? null)
   const [edited, setDraft] = useState<Draft | null>(null)
+  const [confirming, setConfirming] = useState(false)
   const draft: Draft | null =
     edited ?? (existing.data ? fromHomework(existing.data) : assignmentId ? null : {
       title: '',
@@ -65,11 +68,7 @@ export function HomeworkBuilder() {
     if (!assignmentId) {
       return api.createHomework(classId, { ...body, item_ids: d.rows.map((r) => r.id) })
     }
-    const fixed = existing.data && existing.data.status !== 'draft'
-    return api.updateHomework(
-      assignmentId,
-      fixed ? body : { ...body, item_ids: d.rows.map((r) => r.id) },
-    )
+    return api.updateHomework(assignmentId, { ...body, item_ids: d.rows.map((r) => r.id) })
   })
   const setIt = useHomeworkMutation(classId, (id: string) => api.setHomework(id))
 
@@ -78,7 +77,12 @@ export function HomeworkBuilder() {
   if (!draft) return null
 
   const status = existing.data?.status ?? 'draft'
-  const fixed = status !== 'draft'
+  const isSet = status !== 'draft'
+  const before = existing.data?.problems.map((p) => p.id) ?? []
+  const after = draft.rows.map((r) => r.id)
+  const added = after.filter((id) => !before.includes(id))
+  const removed = before.filter((id) => !after.includes(id))
+  const problemsChanged = before.join() !== after.join()
   const update = (patch: Partial<Draft>) => setDraft({ ...draft, ...patch })
   const back = () => navigate(`/classes/${classId}`)
   // A due date being chosen must be in the future; one already set may fall due (the
@@ -88,6 +92,11 @@ export function HomeworkBuilder() {
   const ready = draft.title.trim() && draft.rows.length > 0 && draft.due && !pastDue
 
   async function saveDraft() {
+    if (isSet && problemsChanged && !confirming) {
+      setConfirming(true)
+      return
+    }
+    setConfirming(false)
     const saved = await save.mutateAsync(draft!)
     setDraft(null)
     if (!assignmentId) navigate(`/classes/${classId}/homework/${saved.id}`, { replace: true })
@@ -149,18 +158,56 @@ export function HomeworkBuilder() {
 
       <Card className="mb-6">
         <h2 className="mb-3 font-display font-semibold text-lg text-grape">Problems</h2>
-        {fixed ? (
+        {isSet ? (
           <p className="mb-3 text-sm text-muted">
-            The problems are fixed now that students have this homework.
+            Students already have this homework, so they’ll see any change as soon as you save.
           </p>
         ) : null}
         <ProblemListEditor
           rows={draft.rows}
-          onChange={(rows) => update({ rows })}
-          disabled={fixed}
+          onChange={(rows) => {
+            setConfirming(false)
+            update({ rows })
+          }}
           empty="No problems yet. Two or three is plenty for a week."
         />
       </Card>
+
+      {confirming ? (
+        <div
+          role="status"
+          className="mb-4 rounded-2xl bg-grape-pale/40 px-4 py-3 text-sm text-grape ring-1 ring-grape/20"
+        >
+          <p className="font-medium">Change the problems on a homework students already have?</p>
+          <ul className="mt-1 list-disc pl-5">
+            <li>Students will see the change straight away.</li>
+            {removed.length > 0 ? (
+              <li>
+                Work on a problem you take off is kept, and comes back if you add the problem
+                again.
+              </li>
+            ) : null}
+            {added.length > 0 ? (
+              <li>Students who have handed in will be asked to hand in again.</li>
+            ) : null}
+            {added.length > 0 && existing.data && existing.data.returned > 0 ? (
+              <li>
+                {existing.data.returned === 1
+                  ? '1 student already has their work back and can’t do the new problems.'
+                  : `${existing.data.returned} students already have their work back and can’t do the new problems.`}
+              </li>
+            ) : null}
+          </ul>
+          <div className="mt-3 flex gap-2">
+            <Button variant="primary" disabled={save.isPending} onClick={() => void saveDraft()}>
+              Save changes
+            </Button>
+            <Button variant="quiet" onClick={() => setConfirming(false)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       {error ? (
         <div className="mb-4">
@@ -174,10 +221,16 @@ export function HomeworkBuilder() {
         </Button>
         <Button
           variant="secondary"
-          disabled={save.isPending || !draft.title.trim() || edited === null}
+          disabled={
+            save.isPending ||
+            !draft.title.trim() ||
+            edited === null ||
+            confirming ||
+            (isSet && draft.rows.length === 0)
+          }
           onClick={() => void saveDraft()}
         >
-          {fixed ? 'Save changes' : 'Save draft'}
+          {isSet ? 'Save changes' : 'Save draft'}
         </Button>
         {status === 'draft' ? (
           <Button

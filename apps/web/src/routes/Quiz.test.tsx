@@ -34,7 +34,7 @@ const inTenMinutes = () => new Date(Date.now() + 10 * 60_000).toISOString()
 function sheet(overrides: Partial<Schemas['SheetOut']> = {}): Schemas['SheetOut'] {
   return {
     assignment_id: QUIZ, title: 'Lists quiz', due_at: null, closed: false, returned: false, late: false,
-    handed_in_at: null, note: null,
+    handed_in_at: null, needs_hand_in_again: false, note: null,
     leaves: [{ problem_id: ITEM, leaf_item_id: ITEM, title: 'Add to the end', problem_title: 'Add to the end', difficulty: 1, attempt_id: null,
       progress: 'not_started', answered: false, handed_in: false, changed_since_hand_in: false, feedback: null }],
     ...overrides,

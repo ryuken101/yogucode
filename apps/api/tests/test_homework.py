@@ -12,7 +12,16 @@ from datetime import timedelta
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.models import Assignment, Attempt, AuditLog, Concept, ProblemSet, Submission
+from app.models import (
+    Assignment,
+    Attempt,
+    AuditLog,
+    Concept,
+    Item,
+    ItemStatus,
+    ProblemSet,
+    Submission,
+)
 from app.models.base import utcnow
 from work_builders import SOLUTION, homework, problem_doc, published
 
@@ -186,7 +195,55 @@ async def test_setting_needs_problems_and_a_due_date(
     assert response.status_code == 409
 
 
-async def test_once_set_the_problems_are_fixed_but_the_due_date_is_not(
+async def test_once_set_the_due_date_and_hints_can_still_change(
+    client, session: AsyncSession, signed_in_student
+) -> None:
+    aria = await signed_in_student()
+    hw = await homework(client, session, aria)
+    path = f"/assignments/{hw['assignment']['id']}"
+
+    moved = await client.patch(
+        path, json={"due_at": "2099-02-01T16:00:00+11:00", "hints": False}, headers=aria["headers"]
+    )
+    assert moved.status_code == 200
+    assert moved.json()["due_at"].startswith("2099-02-01")
+    assert moved.json()["hints"] is False
+
+
+# --- changing a set homework's problems (Ken, 16 Nov 2026) ----------------------------
+
+
+async def _extra_problem(client, headers, hw: dict, title: str = "Extra") -> dict:
+    return await published(client, headers, problem_doc(str(hw["concept"].id), title=title))
+
+
+async def test_a_set_homeworks_problems_can_be_added_removed_and_reordered(
+    client, session: AsyncSession, signed_in_student
+) -> None:
+    aria = await signed_in_student()
+    hw = await homework(client, session, aria, problems=2)
+    path = f"/assignments/{hw['assignment']['id']}"
+    first, second = (i["id"] for i in hw["items"])
+    extra = await _extra_problem(client, aria["headers"], hw)
+
+    response = await client.patch(
+        path, json={"item_ids": [extra["id"], second]}, headers=aria["headers"]
+    )
+    assert response.status_code == 200, response.text
+    assert [p["id"] for p in response.json()["problems"]] == [extra["id"], second]
+    entry = (
+        await session.exec(
+            select(AuditLog)
+            .where(AuditLog.action == "homework.updated")
+            .order_by(AuditLog.created_at.desc())  # type: ignore[union-attr]
+        )
+    ).first()
+    assert entry is not None
+    assert entry.payload["added"] == [extra["id"]]
+    assert entry.payload["removed"] == [first]
+
+
+async def test_a_set_homework_keeps_at_least_one_problem(
     client, session: AsyncSession, signed_in_student
 ) -> None:
     aria = await signed_in_student()
@@ -195,12 +252,195 @@ async def test_once_set_the_problems_are_fixed_but_the_due_date_is_not(
 
     refused = await client.patch(path, json={"item_ids": []}, headers=aria["headers"])
     assert refused.status_code == 409
-    moved = await client.patch(
-        path, json={"due_at": "2099-02-01T16:00:00+11:00", "hints": False}, headers=aria["headers"]
+
+
+async def test_an_archived_homeworks_problems_cannot_change(
+    client, session: AsyncSession, signed_in_student
+) -> None:
+    aria = await signed_in_student()
+    hw = await homework(client, session, aria)
+    assignment = await session.get(Assignment, uuid.UUID(hw["assignment"]["id"]))
+    assignment.status = "archived"
+    session.add(assignment)
+    await session.flush()
+    extra = await _extra_problem(client, aria["headers"], hw)
+
+    refused = await client.patch(
+        f"/assignments/{assignment.id}", json={"item_ids": [extra["id"]]}, headers=aria["headers"]
     )
-    assert moved.status_code == 200
-    assert moved.json()["due_at"].startswith("2099-02-01")
-    assert moved.json()["hints"] is False
+    assert refused.status_code in (404, 409)
+
+
+async def test_another_centres_problem_cannot_be_added_to_a_set_homework(
+    client, session: AsyncSession, signed_in_student, foreign_centre
+) -> None:
+    aria = await signed_in_student()
+    hw = await homework(client, session, aria)
+    theirs = Item(
+        centre_id=foreign_centre["centre"].id,
+        title="Someone else's problem",
+        status=ItemStatus.PUBLISHED,
+    )
+    session.add(theirs)
+    await session.flush()
+    item_id = str(theirs.id)
+
+    refused = await client.patch(
+        f"/assignments/{hw['assignment']['id']}",
+        json={"item_ids": [hw["items"][0]["id"], item_id]},
+        headers=aria["headers"],
+    )
+    assert refused.status_code == 422
+
+
+async def test_removing_a_started_problem_hides_the_work_and_adding_it_back_restores_it(
+    client, session: AsyncSession, signed_in_student
+) -> None:
+    aria = await signed_in_student()
+    hw = await homework(client, session, aria, problems=2)
+    assignment_id = hw["assignment"]["id"]
+    path = f"/assignments/{assignment_id}"
+    first, second = (i["id"] for i in hw["items"])
+    leaf = await open_leaf(client, assignment_id, first)
+    await client.patch(f"/me/attempts/{leaf['attempt']['id']}", json={"code": "my work"})
+
+    await client.patch(path, json={"item_ids": [second]}, headers=aria["headers"])
+    sheet = (await client.get(f"/me/homework/{assignment_id}")).json()
+    assert [entry["problem_id"] for entry in sheet["leaves"]] == [second]
+    assert (
+        await client.post(f"/me/assignments/{assignment_id}/items/{first}/open")
+    ).status_code == 404
+    gone = await client.get(f"{path}/marking/{first}", headers=aria["headers"])
+    assert gone.status_code == 404
+    kept = await session.get(Attempt, uuid.UUID(leaf["attempt"]["id"]))
+    assert kept is not None and kept.code == "my work"
+
+    await client.patch(path, json={"item_ids": [first, second]}, headers=aria["headers"])
+    back = await open_leaf(client, assignment_id, first)
+    assert back["attempt"]["id"] == leaf["attempt"]["id"]
+    assert back["attempt"]["code"] == "my work"
+
+
+async def test_a_problem_added_after_hand_in_asks_the_child_to_hand_in_again(
+    client, session: AsyncSession, signed_in_student
+) -> None:
+    aria = await signed_in_student()
+    hw = await homework(client, session, aria)
+    assignment_id = hw["assignment"]["id"]
+    await client.post(f"/me/homework/{assignment_id}/hand-in", json={})
+    sheet = (await client.get(f"/me/homework/{assignment_id}")).json()
+    assert sheet["needs_hand_in_again"] is False
+
+    extra = await _extra_problem(client, aria["headers"], hw)
+    await client.patch(
+        f"/assignments/{assignment_id}",
+        json={"item_ids": [hw["items"][0]["id"], extra["id"]]},
+        headers=aria["headers"],
+    )
+    sheet = (await client.get(f"/me/homework/{assignment_id}")).json()
+    assert [entry["handed_in"] for entry in sheet["leaves"]] == [True, False]
+    assert sheet["needs_hand_in_again"] is True
+    card = (await client.get("/me/home")).json()["homework"][0]
+    assert card["changed_since_hand_in"] is True
+
+    sheet = (await client.post(f"/me/homework/{assignment_id}/hand-in", json={})).json()
+    assert [entry["handed_in"] for entry in sheet["leaves"]] == [True, True]
+    assert sheet["needs_hand_in_again"] is False
+
+
+async def test_swapping_in_a_newer_version_carries_the_childs_code(
+    client, session: AsyncSession, signed_in_student
+) -> None:
+    aria = await signed_in_student()
+    headers = aria["headers"]
+    hw = await homework(client, session, aria)
+    assignment_id = hw["assignment"]["id"]
+    v1 = hw["items"][0]
+    leaf = await open_leaf(client, assignment_id, v1["id"])
+    await client.patch(f"/me/attempts/{leaf['attempt']['id']}", json={"code": "my work"})
+    await client.post(f"/me/homework/{assignment_id}/hand-in", json={})
+
+    v2 = (await client.post(f"/items/{v1['id']}/new-version", headers=headers)).json()
+    await client.post(
+        f"/items/{v2['id']}/publish",
+        json={"verified_updated_at": v2["updated_at"]},
+        headers=headers,
+    )
+    offered = (await client.get(f"/assignments/{assignment_id}", headers=headers)).json()
+    assert offered["problems"][0]["newer_version_id"] == v2["id"]
+
+    swapped = await client.patch(
+        f"/assignments/{assignment_id}", json={"item_ids": [v2["id"]]}, headers=headers
+    )
+    assert swapped.status_code == 200, swapped.text
+    assert swapped.json()["problems"][0]["newer_version_id"] is None
+
+    carried = await open_leaf(client, assignment_id, v2["id"])
+    assert carried["attempt"]["code"] == "my work"
+    sheet = (await client.get(f"/me/homework/{assignment_id}")).json()
+    assert sheet["needs_hand_in_again"] is True
+
+
+async def test_swapping_versions_carries_each_parts_code_to_its_part(
+    client, session: AsyncSession, signed_in_student
+) -> None:
+    aria = await signed_in_student()
+    headers = aria["headers"]
+    hw = await homework(client, session, aria)
+    assignment_id = hw["assignment"]["id"]
+    parts = []
+    for label in ("a", "b"):
+        part = problem_doc(str(hw["concept"].id)) | {"label": label, "prompt_md": f"Part {label}."}
+        del part["title"]
+        parts.append(part)
+    v1 = await published(
+        client, headers, {"title": "Shopping", "prompt_md": "A list.", "parts": parts}
+    )
+    path = f"/assignments/{assignment_id}"
+    await client.patch(path, json={"item_ids": [v1["id"]]}, headers=headers)
+    opened = (await client.post(f"/me/assignments/{assignment_id}/items/{v1['id']}/open")).json()
+    for leaf, code in zip(opened["leaves"], ("work a", "work b"), strict=True):
+        await client.patch(f"/me/attempts/{leaf['attempt']['id']}", json={"code": code})
+
+    v2 = (await client.post(f"/items/{v1['id']}/new-version", headers=headers)).json()
+    published_v2 = await client.post(
+        f"/items/{v2['id']}/publish",
+        json={"verified_updated_at": v2["updated_at"]},
+        headers=headers,
+    )
+    assert published_v2.status_code == 200, published_v2.text
+    await client.patch(path, json={"item_ids": [v2["id"]]}, headers=headers)
+
+    carried = (await client.post(f"/me/assignments/{assignment_id}/items/{v2['id']}/open")).json()
+    assert [leaf["attempt"]["code"] for leaf in carried["leaves"]] == ["work a", "work b"]
+
+
+async def test_swapping_versions_never_overwrites_work_on_the_new_one(
+    client, session: AsyncSession, signed_in_student
+) -> None:
+    aria = await signed_in_student()
+    headers = aria["headers"]
+    hw = await homework(client, session, aria)
+    assignment_id = hw["assignment"]["id"]
+    path = f"/assignments/{assignment_id}"
+    v1 = hw["items"][0]
+    old = await open_leaf(client, assignment_id, v1["id"])
+    await client.patch(f"/me/attempts/{old['attempt']['id']}", json={"code": "old work"})
+    v2 = (await client.post(f"/items/{v1['id']}/new-version", headers=headers)).json()
+    await client.post(
+        f"/items/{v2['id']}/publish",
+        json={"verified_updated_at": v2["updated_at"]},
+        headers=headers,
+    )
+    # On v2 already, then back to v1 (allowed: it was on the sheet), then v2 again.
+    await client.patch(path, json={"item_ids": [v2["id"]]}, headers=headers)
+    new = await open_leaf(client, assignment_id, v2["id"])
+    await client.patch(f"/me/attempts/{new['attempt']['id']}", json={"code": "new work"})
+    await client.patch(path, json={"item_ids": [v1["id"], v2["id"]]}, headers=headers)
+    await client.patch(path, json={"item_ids": [v2["id"]]}, headers=headers)
+
+    again = await open_leaf(client, assignment_id, v2["id"])
+    assert again["attempt"]["code"] == "new work"
 
 
 async def test_homework_with_hints_off_offers_none(

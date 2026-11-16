@@ -4,9 +4,14 @@ A homework is a set of published problems given to one class with a due date and
 and a hints switch. It starts as a **draft** the teacher can rearrange, and becomes visible
 to the class the moment they press **Set** — there is no scheduling (Ken's decision).
 
-Once set, the problems are fixed: children have started on them, and changing the sheet
-under them would leave attempts on problems no longer on it. The title, due date and
-hints stay editable — "I'll give you till Friday" is a normal thing to say.
+Once set, the problems can still change (Ken, 16 Nov 2026, reversing "fixed once set"):
+add, remove, reorder, or swap one for its newer version. Nothing a child did is deleted.
+Every reader builds the sheet from its current problems, so a removed problem's attempts
+and hand-ins are hidden, and come back if it is added again. A problem added after a child
+handed in has no hand-in of theirs, so their sheet asks them to hand in again. Swapping in a
+newer version carries their code across (`app.homework.carry_attempts`). A child whose work
+has been returned keeps a locked sheet, and the builder warns about them. The title, due
+date and hints stay editable too: "I'll give you till Friday" is a normal thing to say.
 
 **Close** stops further hand-ins (it does not hide the sheet), and **reopen** undoes it.
 Marking and release live in `routers/marking.py`.
@@ -23,9 +28,9 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.audit import audit_entry
 from app.auth.principal import CurrentTeacher, Principal
-from app.classwork import check_set_items, ladder_items, replace_set_items
+from app.classwork import check_set_items, ladder_items, newest_version, replace_set_items
 from app.db import get_session
-from app.homework import released_students
+from app.homework import carry_attempts, released_students
 from app.models import (
     Assignment,
     AssignmentMode,
@@ -70,6 +75,8 @@ class HomeworkProblemOut(BaseModel):
     title: str
     difficulty: int
     status: ItemStatus
+    # Set when a newer published version exists — the teacher may want to swap it in.
+    newer_version_id: uuid.UUID | None
 
 
 class HomeworkOut(BaseModel):
@@ -132,6 +139,18 @@ async def _out(session: AsyncSession, principal: Principal, assignment: Assignme
         )
     ).one()
     returned = len(await released_students(session, principal, assignment))
+    out_problems = []
+    for p in problems:
+        newer = await newest_version(session, principal, p)
+        out_problems.append(
+            HomeworkProblemOut(
+                id=p.id,
+                title=p.title,
+                difficulty=p.difficulty,
+                status=p.status,
+                newer_version_id=newer.id if newer else None,
+            )
+        )
     return HomeworkOut(
         id=assignment.id,
         class_id=assignment.class_id,
@@ -140,10 +159,7 @@ async def _out(session: AsyncSession, principal: Principal, assignment: Assignme
         due_at=assignment.due_at,
         hints=bool(assignment.settings.get("hints", True)),
         released_at=assignment.released_at,
-        problems=[
-            HomeworkProblemOut(id=p.id, title=p.title, difficulty=p.difficulty, status=p.status)
-            for p in problems
-        ],
+        problems=out_problems,
         students=students,
         handed_in=handed_in,
         marked=marked,
@@ -227,14 +243,31 @@ async def update_homework(
     changed: dict[str, object] = {}
 
     if body.item_ids is not None:
-        if assignment.status != AssignmentStatus.DRAFT:
-            raise _conflict("The problems are fixed once homework is set")
-        already = {p.id for p in await ladder_items(session, principal, assignment.set_id)}
-        await check_set_items(
-            session, principal, body.item_ids, already=already, limit=MAX_HOMEWORK
-        )
-        await replace_set_items(session, assignment.set_id, body.item_ids)
-        changed["item_ids"] = [str(i) for i in body.item_ids]
+        if assignment.status == AssignmentStatus.ARCHIVED:
+            raise _conflict("This homework is archived")
+        current = await ladder_items(session, principal, assignment.set_id)
+        if [p.id for p in current] != body.item_ids:
+            if not body.item_ids and assignment.status != AssignmentStatus.DRAFT:
+                raise _conflict("A set homework needs at least one problem")
+            # What is on it may stay, even if a newer version has been published since.
+            await check_set_items(
+                session,
+                principal,
+                body.item_ids,
+                already={p.id for p in current},
+                limit=MAX_HOMEWORK,
+            )
+            await replace_set_items(session, assignment.set_id, body.item_ids)
+            removed = [p for p in current if p.id not in body.item_ids]
+            added = [i for i in body.item_ids if i not in {p.id for p in current}]
+            if assignment.status != AssignmentStatus.DRAFT:
+                for old in removed:
+                    newer = await newest_version(session, principal, old)
+                    if newer is not None and newer.id in added:
+                        await carry_attempts(session, principal, assignment, old, newer)
+            changed["item_ids"] = [str(i) for i in body.item_ids]
+            changed["added"] = [str(i) for i in added]
+            changed["removed"] = [str(p.id) for p in removed]
     if body.title is not None and body.title.strip() != assignment.title:
         assignment.title = body.title.strip()
         changed["title"] = assignment.title

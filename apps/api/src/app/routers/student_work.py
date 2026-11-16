@@ -63,6 +63,7 @@ from app.models import (
     Mark,
     SetItem,
     StudentDocument,
+    Submission,
     SubmissionSource,
 )
 from app.models.base import utcnow
@@ -667,6 +668,10 @@ class SheetOut(BaseModel):
     returned: bool
     late: bool
     handed_in_at: datetime | None
+    # Handed in, then the teacher added a problem or swapped in a newer version (Ken, 16
+    # Nov 2026): that one has no hand-in of theirs yet, so the sheet asks them to hand in
+    # again. Counts a hand-in on a problem since taken off, so a swap still asks.
+    needs_hand_in_again: bool
     note: str | None
     leaves: list[SheetLeafOut]
 
@@ -704,6 +709,26 @@ def _answer_text(item: Item, choice: int | None) -> str | None:
     if item.kind != ItemKind.MCQ or choice is None or not 0 <= choice < len(item.options):
         return None
     return str(item.options[choice].get("text", ""))
+
+
+async def _ever_handed_in(
+    session: AsyncSession, principal: CurrentStudent, attempts: list[Attempt]
+) -> bool:
+    """Whether the child has handed in any of these attempts, at any time."""
+    if not attempts:
+        return False
+    found = (
+        await session.exec(
+            select(Submission.id)
+            .where(
+                col(Submission.attempt_id).in_([a.id for a in attempts]),
+                Submission.centre_id == principal.centre_id,
+                Submission.source == SubmissionSource.HAND_IN,
+            )
+            .limit(1)
+        )
+    ).first()
+    return found is not None
 
 
 async def _sheet(
@@ -786,6 +811,10 @@ async def _sheet(
         returned=returned,
         late=any(s.late for s in hand_ins),
         handed_in_at=max((s.submitted_at for s in hand_ins), default=None),
+        needs_hand_in_again=assignment.mode == AssignmentMode.HOMEWORK
+        and not returned
+        and any(not leaf.handed_in for leaf in out)
+        and await _ever_handed_in(session, principal, list(attempts.values())),
         note=note,
         leaves=out,
     )
@@ -873,7 +902,8 @@ async def home(principal: CurrentStudent, session: SessionDep) -> HomeOut:
                     problems=len(sheet.leaves),
                     started=sum(1 for leaf in sheet.leaves if leaf.progress != "not_started"),
                     handed_in_at=sheet.handed_in_at,
-                    changed_since_hand_in=any(leaf.changed_since_hand_in for leaf in sheet.leaves),
+                    changed_since_hand_in=sheet.needs_hand_in_again
+                    or any(leaf.changed_since_hand_in for leaf in sheet.leaves),
                     late=sheet.late,
                     returned=sheet.returned,
                 )

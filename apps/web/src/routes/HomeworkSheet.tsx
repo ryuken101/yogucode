@@ -195,7 +195,12 @@ export function HomeworkSheet() {
           {data.closed ? (
             <Notice tone="info">Your teacher has closed this homework, so it can’t be handed in now.</Notice>
           ) : null}
-          {data.handed_in_at ? (
+          {data.needs_hand_in_again ? (
+            <Notice tone="not-yet">
+              Your teacher has changed this homework since you handed it in. Have a look, then
+              hand in again.
+            </Notice>
+          ) : data.handed_in_at ? (
             <Notice tone="good">
               Handed in {formatDue(data.handed_in_at)}
               {data.late ? ', after the due date' : ''}.{' '}
@@ -215,6 +220,9 @@ export function HomeworkSheet() {
                   <span className="ml-auto">
                     {leaf.progress === 'passing' ? <Badge variant="good">All checks pass</Badge> : null}
                     {leaf.progress === 'started' ? <Badge variant="active">Started</Badge> : null}
+                    {data.needs_hand_in_again && !leaf.handed_in ? (
+                      <Badge variant="not-yet">Not handed in yet</Badge>
+                    ) : null}
                   </span>
                 </Link>
               </li>
