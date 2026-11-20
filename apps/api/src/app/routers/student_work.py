@@ -686,6 +686,8 @@ class HomeworkCardOut(BaseModel):
     started: int
     handed_in_at: datetime | None
     changed_since_hand_in: bool
+    # The teacher changed the sheet after they handed in (see `SheetOut`).
+    needs_hand_in_again: bool
     late: bool
     returned: bool
 
@@ -902,8 +904,8 @@ async def home(principal: CurrentStudent, session: SessionDep) -> HomeOut:
                     problems=len(sheet.leaves),
                     started=sum(1 for leaf in sheet.leaves if leaf.progress != "not_started"),
                     handed_in_at=sheet.handed_in_at,
-                    changed_since_hand_in=sheet.needs_hand_in_again
-                    or any(leaf.changed_since_hand_in for leaf in sheet.leaves),
+                    changed_since_hand_in=any(leaf.changed_since_hand_in for leaf in sheet.leaves),
+                    needs_hand_in_again=sheet.needs_hand_in_again,
                     late=sheet.late,
                     returned=sheet.returned,
                 )

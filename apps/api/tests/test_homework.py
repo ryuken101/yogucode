@@ -167,6 +167,7 @@ async def test_set_homework_appears_on_the_childs_home(
         "started": 0,
         "handed_in_at": None,
         "changed_since_hand_in": False,
+        "needs_hand_in_again": False,
         "late": False,
         "returned": False,
     }
@@ -341,7 +342,8 @@ async def test_a_problem_added_after_hand_in_asks_the_child_to_hand_in_again(
     assert [entry["handed_in"] for entry in sheet["leaves"]] == [True, False]
     assert sheet["needs_hand_in_again"] is True
     card = (await client.get("/me/home")).json()["homework"][0]
-    assert card["changed_since_hand_in"] is True
+    assert card["needs_hand_in_again"] is True
+    assert card["changed_since_hand_in"] is False, "the child changed nothing; the teacher did"
 
     sheet = (await client.post(f"/me/homework/{assignment_id}/hand-in", json={})).json()
     assert [entry["handed_in"] for entry in sheet["leaves"]] == [True, True]

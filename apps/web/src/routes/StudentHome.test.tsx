@@ -36,6 +36,7 @@ function card(overrides: Partial<Schemas['HomeworkCardOut']>): Schemas['Homework
     started: 1,
     handed_in_at: null,
     changed_since_hand_in: false,
+    needs_hand_in_again: false,
     late: false,
     returned: false,
     ...overrides,
@@ -88,12 +89,14 @@ test('handed in, changed since, and given back each say so — never in system-e
       card({ assignment_id: 'b', title: 'Two', handed_in_at: '2026-10-07T00:00:00Z', changed_since_hand_in: true }),
       card({ assignment_id: 'c', title: 'Three', returned: true }),
       card({ assignment_id: 'd', title: 'Four', due_at: '2020-01-01T00:00:00Z' }),
+      card({ assignment_id: 'e', title: 'Five', handed_in_at: '2026-10-07T00:00:00Z', needs_hand_in_again: true }),
     ],
   })
   renderScreen(<MyWork />, { route: '/my-work' })
 
   expect(await screen.findByText('Handed in')).toBeInTheDocument()
   expect(screen.getByText('Changed since you handed in')).toBeInTheDocument()
+  expect(screen.getByText('Your teacher changed it').className).toContain('not-yet')
   expect(screen.getByText('Feedback is back')).toBeInTheDocument()
   const late = screen.getByText('Past the due date')
   expect(late.className).toContain('not-yet')

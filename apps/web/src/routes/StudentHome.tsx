@@ -41,7 +41,9 @@ export function HomeworkCard({ card }: { card: Schemas['HomeworkCardOut'] }) {
         {card.returned ? (
           <Badge variant="good">Feedback is back</Badge>
         ) : card.handed_in_at ? (
-          card.changed_since_hand_in ? (
+          card.needs_hand_in_again ? (
+            <Badge variant="not-yet">Your teacher changed it</Badge>
+          ) : card.changed_since_hand_in ? (
             <Badge variant="active">Changed since you handed in</Badge>
           ) : (
             <Badge variant="good">Handed in</Badge>

@@ -2013,6 +2013,10 @@
           "mode": {
             "$ref": "#/components/schemas/AssignmentMode"
           },
+          "needs_hand_in_again": {
+            "title": "Needs Hand In Again",
+            "type": "boolean"
+          },
           "problems": {
             "title": "Problems",
             "type": "integer"
@@ -2040,6 +2044,7 @@
           "started",
           "handed_in_at",
           "changed_since_hand_in",
+          "needs_hand_in_again",
           "late",
           "returned"
         ],
@@ -3600,7 +3605,7 @@
             "items": {
               "$ref": "#/components/schemas/PartDoc"
             },
-            "maxItems": 6,
+            "maxItems": 26,
             "title": "Parts",
             "type": "array"
           },
@@ -3926,7 +3931,7 @@
               "maxItems": 3,
               "type": "array"
             },
-            "maxProperties": 7,
+            "maxProperties": 27,
             "title": "Transcripts",
             "type": "object"
           },

@@ -39,7 +39,7 @@ export type LeafDoc = Pick<
   | 'examples'
 >
 
-export const PART_LABELS = ['a', 'b', 'c', 'd', 'e', 'f'] as const
+export const PART_LABELS = Array.from('abcdefghijklmnopqrstuvwxyz')
 
 export function emptyLeaf(): Required<LeafDoc> {
   return {

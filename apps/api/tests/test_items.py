@@ -251,6 +251,23 @@ async def test_parts_with_the_same_label_are_refused(client, signed_in) -> None:
     assert (await client.post("/items", json=doc, headers=headers)).status_code == 422
 
 
+async def test_a_problem_can_have_parts_a_to_z(client, signed_in) -> None:
+    headers = await signed_in()
+    letters = "abcdefghijklmnopqrstuvwxyz"
+    doc = {"title": "Long", "parts": [{"label": letter} for letter in letters]}
+
+    created = await create(client, headers, doc)
+
+    assert [part["label"] for part in created["parts"]] == list(letters)
+
+
+async def test_part_labels_past_z_are_refused(client, signed_in) -> None:
+    headers = await signed_in()
+    for parts in ([{"label": "aa"}], [{"label": "a"}] * 27):
+        doc = {"title": "Too long", "parts": parts}
+        assert (await client.post("/items", json=doc, headers=headers)).status_code == 422
+
+
 async def test_a_concept_on_a_part_finds_the_problem(
     client, signed_in, session: AsyncSession
 ) -> None:

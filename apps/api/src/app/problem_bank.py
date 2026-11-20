@@ -45,11 +45,11 @@ MAX_PROMPT_CHARS = 20_000
 MAX_CODE_CHARS = 64 * 1024
 MAX_TEST_TEXT = 10_000
 MAX_TESTS = 30
-MAX_PARTS = 6
+MAX_PARTS = 26
 MAX_EXAMPLES = 3
 MAX_EXAMPLE_INPUTS = 20
 MAX_TRANSCRIPT_LINES = 400
-PART_LABEL = re.compile(r"^[a-f]$")
+PART_LABEL = re.compile(r"^[a-z]$")
 
 
 # --- the document -------------------------------------------------------------------
@@ -294,7 +294,7 @@ class PartDoc(LeafDoc):
     def _label_is_a_letter(cls, value: str) -> str:
         value = value.strip().lower()
         if not PART_LABEL.match(value):
-            raise ValueError("Part labels are single letters, a to f")
+            raise ValueError("Part labels are single letters, a to z")
         return value
 
 

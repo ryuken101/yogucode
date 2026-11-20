@@ -3691,6 +3691,8 @@ export interface components {
             /** Late */
             late: boolean;
             mode: components["schemas"]["AssignmentMode"];
+            /** Needs Hand In Again */
+            needs_hand_in_again: boolean;
             /** Problems */
             problems: number;
             /** Returned */
