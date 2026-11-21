@@ -8,7 +8,7 @@
  */
 
 import { ChevronDown, ChevronRight, X } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { Badge } from '../components/Badge'
 import { Card, EmptyState, PageHeader } from '../components/Card'
@@ -163,6 +163,18 @@ export function SkillsChild() {
   const [everything, setEverything] = useState(false)
   const chosen = search.get('concept')
 
+  // A tree wider than the window opens on the child, not on its leftmost concept, which
+  // put the child at the far edge with half the tree out of sight (21 Nov 2026).
+  const treeBox = useRef<HTMLDivElement>(null)
+  const rootNode = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const box = treeBox.current
+    const root = rootNode.current
+    if (!box || !root || box.scrollWidth <= box.clientWidth) return
+    const middle = root.getBoundingClientRect().left - box.getBoundingClientRect().left + box.scrollLeft
+    box.scrollLeft = middle + root.offsetWidth / 2 - box.clientWidth / 2
+  }, [skills.data, view, everything])
+
   if (skills.isPending) return <Spinner />
   if (skills.isError)
     return (
@@ -278,7 +290,7 @@ export function SkillsChild() {
   }
 
   return (
-    <div className="p-6">
+    <div>
       <PageHeader title={skills.data.display_name}>
         <div role="group" aria-label="Show as" className="inline-flex rounded-2xl bg-cream p-1 ring-1 ring-line">
           {(['tree', 'bars'] as const).map((v) => (
@@ -317,25 +329,28 @@ export function SkillsChild() {
       ) : (
         <div className="space-y-4">
           {view === 'tree' ? (
-            <Card className="!p-4 overflow-auto">
-              <div className="skill-tree mx-auto w-max min-w-full">
-                <ul>
-                  <li>
-                    <div
-                      className="flex flex-col items-center gap-1 px-2 py-1"
-                      aria-label={`${skills.data.display_name}’s skill tree`}
-                    >
-                      <span
-                        aria-hidden
-                        className="flex size-14 items-center justify-center rounded-full bg-grape font-display text-lg font-semibold text-surface"
+            <Card className="!p-4">
+              <div ref={treeBox} className="overflow-x-auto pb-2">
+                <div className="skill-tree mx-auto w-max min-w-full">
+                  <ul>
+                    <li>
+                      <div
+                        ref={rootNode}
+                        className="flex flex-col items-center gap-1 px-2 py-1"
+                        aria-label={`${skills.data.display_name}’s skill tree`}
                       >
-                        {initials(skills.data.display_name)}
-                      </span>
-                      <span className="text-sm font-medium text-grape">{skills.data.display_name}</span>
-                    </div>
-                    {shown.length ? <ul>{shown.map(node)}</ul> : null}
-                  </li>
-                </ul>
+                        <span
+                          aria-hidden
+                          className="flex size-14 items-center justify-center rounded-full bg-grape font-display text-lg font-semibold text-surface"
+                        >
+                          {initials(skills.data.display_name)}
+                        </span>
+                        <span className="text-sm font-medium text-grape">{skills.data.display_name}</span>
+                      </div>
+                      {shown.length ? <ul>{shown.map(node)}</ul> : null}
+                    </li>
+                  </ul>
+                </div>
               </div>
               {!shown.length ? (
                 <p className="mt-3 text-center text-sm text-muted">

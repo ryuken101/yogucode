@@ -83,7 +83,7 @@ export function SkillsClass() {
     : skills.data.rows
 
   return (
-    <div className="p-6">
+    <div>
       <PageHeader title="Skills">
         <label className="flex items-center gap-2 text-sm text-grape">
           <input

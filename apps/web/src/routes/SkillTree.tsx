@@ -245,7 +245,7 @@ export function SkillTree() {
   const blocked = moving ? branchIds(all, moving.id) : new Set<string>()
 
   return (
-    <div className="mx-auto max-w-3xl p-6">
+    <div className="mx-auto max-w-3xl">
       <PageHeader title="Skill tree">
         <Button variant="primary" onClick={() => setAdding({ parentId: null, label: '' })}>
           New tag

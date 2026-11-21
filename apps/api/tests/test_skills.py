@@ -19,8 +19,6 @@ from app.models import (
     Concept,
     Event,
     EventType,
-    Item,
-    Mark,
 )
 from app.skills import Evidence, RevisitSettings, _outcome, assess, skill_tree
 
@@ -87,32 +85,14 @@ def test_help_and_hints_count_for_less() -> None:
 
 
 def test_a_mark_overrides_the_checks() -> None:
-    item = Item(centre_id=uuid.uuid4(), title="t")
-    attempt = Attempt(
-        centre_id=item.centre_id,
-        student_id=uuid.uuid4(),
-        assignment_id=uuid.uuid4(),
-        item_id=item.id,
-        last_passed=3,
-        last_total=3,
-    )
-    assert _outcome(attempt, item, None) == 1.0
-    mark = Mark(
-        centre_id=item.centre_id,
-        attempt_id=attempt.id,
-        submission_id=uuid.uuid4(),
-        marker_id=uuid.uuid4(),
-        runs=True,
-        correct=1,
-    )
-    assert _outcome(attempt, item, mark) == 0.5
-    untouched = Attempt(
-        centre_id=item.centre_id,
-        student_id=uuid.uuid4(),
-        assignment_id=uuid.uuid4(),
-        item_id=item.id,
-    )
-    assert _outcome(untouched, item, None) is None, "never checked is not evidence"
+    assert _outcome("code", [], None, 3, 3, None) == 1.0
+    assert _outcome("code", [], None, 3, 3, 1) == 0.5, "the mark wins"
+    assert _outcome("code", [], None, 1, 4, None) == 0.25
+    assert _outcome("code", [], None, None, None, None) is None, "never checked is not evidence"
+    options = [{"correct": False}, {"correct": True}]
+    assert _outcome("mcq", options, 1, None, None, None) == 1.0
+    assert _outcome("mcq", options, 0, None, None, None) == 0.0
+    assert _outcome("mcq", options, None, None, None, None) is None
 
 
 def test_slipping_is_losing_what_was_secure_and_can_be_switched_off() -> None:
@@ -302,3 +282,30 @@ async def test_skills_are_teachers_only_and_never_another_centres(
     client.headers.pop("Authorization", None)
     await signed_in_student("Cleo M")
     assert (await client.get(f"/classes/{built['class_id']}/skills")).status_code == 403
+
+
+async def test_a_quiz_still_running_is_not_read(
+    client, session: AsyncSession, student_on_roster
+) -> None:
+    from app.models import Assignment, AssignmentStatus
+    from app.models.base import utcnow
+    from app.skills import load_evidence
+
+    built = await _class_with_homework(client, session, student_on_roster)
+    await _attempt(session, built, passed=2)
+    quiz = await session.get(Assignment, uuid.UUID(built["assignment"]["id"]))
+    quiz.mode = AssignmentMode.QUIZ
+    quiz.status = AssignmentStatus.OPEN
+    quiz.hand_in_at = utcnow() + timedelta(minutes=5)
+    session.add(quiz)
+    await session.flush()
+    child = uuid.UUID(built["student_id"])
+
+    running = await load_evidence(session, built["centre_id"], [child], utcnow())
+    assert running[child] == []
+
+    quiz.hand_in_at = utcnow() - timedelta(minutes=1)
+    session.add(quiz)
+    await session.flush()
+    (handed_in,) = (await load_evidence(session, built["centre_id"], [child], utcnow()))[child]
+    assert (handed_in.mode, handed_in.weight, handed_in.outcome) == ("quiz", 3.0, 1.0)

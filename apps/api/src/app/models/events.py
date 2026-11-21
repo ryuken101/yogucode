@@ -28,7 +28,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import CheckConstraint, DateTime, Index, String
+from sqlalchemy import CheckConstraint, DateTime, Index, String, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
 
@@ -58,6 +58,13 @@ class Event(SQLModel, table=True):
         CheckConstraint("(attempt_id IS NULL) <> (document_id IS NULL)", name="one_target"),
         Index("ix_events_attempt_seq", "attempt_id", "editor_session_id", "seq"),
         Index("ix_events_document_seq", "document_id", "editor_session_id", "seq"),
+        # "Did a teacher type in this attempt?" (Skills, `app/skills.py`): without it the
+        # question reads every keystroke batch of every attempt in the class.
+        Index(
+            "ix_events_teacher_edit",
+            "attempt_id",
+            postgresql_where=text("type = 'teacher_edit'"),
+        ),
     )
 
     # No default: the browser mints it, which is what makes a retried batch idempotent.

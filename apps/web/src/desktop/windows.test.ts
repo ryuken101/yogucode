@@ -4,7 +4,7 @@
  */
 
 import { describe, expect, test } from 'vitest'
-import { appFor, deskPath, fillsWindow } from './apps'
+import { appFor, deskPath, fillsWindow, wideWindow } from './apps'
 import { ZONES, frontOf, reduce, zoneAt } from './windows'
 import type { Loc, Win } from './windows'
 
@@ -153,5 +153,12 @@ describe('which pages fill their window', () => {
     expect(fillsWindow('/homework/a1')).toBe(false)
     expect(fillsWindow('/quiz/q1')).toBe(false)
     expect(fillsWindow('/my-work')).toBe(false)
+  })
+
+  test('the Skills grid and a child’s tree use the whole width; the tree editor does not', () => {
+    expect(wideWindow('/classes/c1/skills')).toBe(true)
+    expect(wideWindow('/classes/c1/skills/s1')).toBe(true)
+    expect(wideWindow('/skills/tree')).toBe(false)
+    expect(wideWindow('/classes/c1/progress')).toBe(false)
   })
 })

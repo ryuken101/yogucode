@@ -299,6 +299,14 @@ export function fillsWindow(pathname: string): boolean {
   )
 }
 
+/**
+ * Pages wider than the reading column: the Skills grid (a column per concept) and a child's
+ * skill tree (21 Nov 2026). They keep the page's padding but use the window's whole width.
+ */
+export function wideWindow(pathname: string): boolean {
+  return /^\/classes\/[^/]+\/skills(\/[^/]+)?$/.test(pathname)
+}
+
 /** The class a page is about, if it is about one. */
 export function classOf(pathname: string): string | null {
   return /^\/classes\/([^/]+)/.exec(pathname)?.[1] ?? null

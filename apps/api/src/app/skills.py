@@ -37,6 +37,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Literal
 
+from sqlalchemy import exists, func, or_
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -44,6 +45,7 @@ from app.concepts import branch
 from app.models import (
     Assignment,
     AssignmentMode,
+    AssignmentStatus,
     Attempt,
     Concept,
     ConceptStatus,
@@ -55,7 +57,6 @@ from app.models import (
     Mark,
     SetItem,
 )
-from app.quiz import is_running
 
 Level = Literal["not_taught", "not_yet", "learning", "secure"]
 Flag = Literal["slipping", "stuck", "stale"]
@@ -165,16 +166,23 @@ def assess(
     )
 
 
+def branches_of(concepts: Sequence[Concept]) -> dict[uuid.UUID, set[uuid.UUID]]:
+    """Each concept's branch: itself and everything under it. Worked out once per request
+    and shared by every child in it."""
+    return {c.id: branch(concepts, c.id) for c in concepts}
+
+
 def skill_tree(
     concepts: Sequence[Concept],
     evidence: Sequence[Evidence],
     covered: set[uuid.UUID],
     settings: RevisitSettings,
     now: datetime,
+    branches: dict[uuid.UUID, set[uuid.UUID]] | None = None,
 ) -> dict[uuid.UUID, Skill]:
     """Every node of the tree for one child. A node reads its whole branch's evidence, each
     attempt once however many of the branch's tags it carries."""
-    branches = {c.id: branch(concepts, c.id) for c in concepts}
+    branches = branches if branches is not None else branches_of(concepts)
     skills = {
         concept_id: assess(
             [e for e in evidence if e.concept_ids & ids], settings, now, bool(covered & ids)
@@ -189,119 +197,146 @@ def skill_tree(
 
 
 # --- reading it from the database ----------------------------------------------------
+#
+# Few round trips on purpose (21 Nov 2026): production reaches Postgres through a pooler,
+# where every query costs a trip, and the first version's dozen took 2 s cold. Only the
+# columns used are read — never an attempt's code or a problem's solution.
 
 
-def _outcome(attempt: Attempt, item: Item, mark: Mark | None) -> float | None:
-    if mark is not None:
-        return mark.correct / 2
-    if item.kind == ItemKind.MCQ:
-        if attempt.choice is None or not 0 <= attempt.choice < len(item.options):
+def _outcome(
+    kind: str,
+    options: list[dict],
+    choice: int | None,
+    last_passed: int | None,
+    last_total: int | None,
+    correct: int | None,
+) -> float | None:
+    """How well one attempt went, 0–1, or None if it says nothing yet."""
+    if correct is not None:
+        return correct / 2
+    if kind == ItemKind.MCQ:
+        if choice is None or not 0 <= choice < len(options):
             return None
-        return 1.0 if item.options[attempt.choice].get("correct") else 0.0
-    if attempt.last_total:
-        return (attempt.last_passed or 0) / attempt.last_total
+        return 1.0 if options[choice].get("correct") else 0.0
+    if last_total:
+        return (last_passed or 0) / last_total
     return None
 
 
-async def _live_tags(
-    session: AsyncSession, item_ids: Iterable[uuid.UUID]
-) -> dict[uuid.UUID, set[uuid.UUID]]:
-    """Each item's tags, leaving out any in the Trash."""
-    tags: dict[uuid.UUID, set[uuid.UUID]] = {}
-    ids = list(set(item_ids))
-    if not ids:
-        return tags
-    for item_id, concept_id in (
-        await session.exec(
-            select(ItemConcept.item_id, ItemConcept.concept_id)
-            .join(Concept, col(Concept.id) == ItemConcept.concept_id)
-            .where(col(ItemConcept.item_id).in_(ids), Concept.status != ConceptStatus.ARCHIVED)
-        )
-    ).all():
-        tags.setdefault(item_id, set()).add(concept_id)
-    return tags
+def _live_tags_of(items):  # type: ignore[no-untyped-def]
+    """The tags on these items, leaving out any in the Trash, as (item, concept) rows."""
+    return (
+        select(ItemConcept.item_id, ItemConcept.concept_id)
+        .join(Concept, col(Concept.id) == ItemConcept.concept_id)
+        .where(col(ItemConcept.item_id).in_(items), Concept.status != ConceptStatus.ARCHIVED)
+    )
 
 
 async def load_evidence(
     session: AsyncSession, centre_id: uuid.UUID, student_ids: Sequence[uuid.UUID], now: datetime
 ) -> dict[uuid.UUID, list[Evidence]]:
-    """Every child's evidence, from every class they have been in at this centre."""
+    """Every child's evidence, from every class they have been in at this centre. Two
+    queries: the attempts with all they need, then the tags."""
     found: dict[uuid.UUID, list[Evidence]] = {s: [] for s in student_ids}
     if not student_ids:
         return found
+    helped = (
+        exists()
+        .where(Event.attempt_id == Attempt.id, Event.type == EventType.TEACHER_EDIT)
+        .label("helped")
+    )
+    deadline = func.coalesce(Assignment.hand_in_at, Assignment.ends_at)
     rows = (
         await session.exec(
-            select(Attempt, Assignment)
+            select(  # type: ignore[call-overload]
+                Attempt.id,
+                Attempt.student_id,
+                Attempt.item_id,
+                Attempt.choice,
+                Attempt.last_passed,
+                Attempt.last_total,
+                Attempt.hints_unlocked,
+                Attempt.updated_at,
+                Assignment.id,
+                Assignment.title,
+                Assignment.mode,
+                Item.title,
+                Item.kind,
+                Item.options,
+                Item.parent_id,
+                Mark.correct,
+                Mark.updated_at,
+                helped,
+            )
             .join(Assignment, col(Assignment.id) == Attempt.assignment_id)
+            .join(Item, col(Item.id) == Attempt.item_id)
+            .outerjoin(Mark, col(Mark.attempt_id) == Attempt.id)
             .where(
                 col(Attempt.student_id).in_(student_ids),
                 Attempt.centre_id == centre_id,
                 Assignment.centre_id == centre_id,
+                Item.centre_id == centre_id,
                 col(Assignment.deleted_at).is_(None),
+                # A quiz still running is not read (`app.quiz.is_running`, in SQL).
+                or_(
+                    Assignment.mode != AssignmentMode.QUIZ,
+                    Assignment.status != AssignmentStatus.OPEN,
+                    deadline.is_(None),
+                    deadline <= now,
+                ),
             )
         )
     ).all()
-    rows = [(a, assignment) for a, assignment in rows if not is_running(assignment, now)]
     if not rows:
         return found
 
-    attempt_ids = [a.id for a, _ in rows]
-    items = {
-        i.id: i
-        for i in (
-            await session.exec(
-                select(Item).where(
-                    col(Item.id).in_({a.item_id for a, _ in rows}), Item.centre_id == centre_id
-                )
-            )
-        ).all()
-    }
-    tags = await _live_tags(
-        session, [*items, *(i.parent_id for i in items.values() if i.parent_id)]
-    )
-    marks = {
-        m.attempt_id: m
-        for m in (
-            await session.exec(select(Mark).where(col(Mark.attempt_id).in_(attempt_ids)))
-        ).all()
-    }
-    helped = set(
-        (
-            await session.exec(
-                select(Event.attempt_id)
-                .where(col(Event.attempt_id).in_(attempt_ids), Event.type == EventType.TEACHER_EDIT)
-                .distinct()
-            )
-        ).all()
-    )
+    item_ids = {r[2] for r in rows} | {r[14] for r in rows if r[14] is not None}
+    tags: dict[uuid.UUID, set[uuid.UUID]] = {}
+    for item_id, concept_id in (await session.exec(_live_tags_of(item_ids))).all():
+        tags.setdefault(item_id, set()).add(concept_id)
 
-    for attempt, assignment in rows:
-        item = items.get(attempt.item_id)
-        if item is None:
-            continue
-        outcome = _outcome(attempt, item, marks.get(attempt.id))
+    for (
+        attempt_id,
+        student_id,
+        item_id,
+        choice,
+        last_passed,
+        last_total,
+        hints,
+        attempt_at,
+        assignment_id,
+        assignment_title,
+        mode,
+        item_title,
+        kind,
+        options,
+        parent_id,
+        correct,
+        marked_at,
+        was_helped,
+    ) in rows:
+        outcome = _outcome(kind, options or [], choice, last_passed, last_total, correct)
         if outcome is None:
             continue
         # A part with no tags of its own is about what its problem is about.
-        concept_ids = tags.get(item.id) or (tags.get(item.parent_id) if item.parent_id else None)
+        concept_ids = tags.get(item_id) or (tags.get(parent_id) if parent_id else None)
         if not concept_ids:
             continue
-        mark = marks.get(attempt.id)
-        found[attempt.student_id].append(
+        found[student_id].append(
             Evidence(
-                attempt_id=attempt.id,
-                student_id=attempt.student_id,
-                assignment_id=assignment.id,
-                assignment_title=assignment.title,
-                mode=AssignmentMode(assignment.mode),
-                item_id=item.id,
-                item_title=item.title,
+                attempt_id=attempt_id,
+                student_id=student_id,
+                assignment_id=assignment_id,
+                assignment_title=assignment_title,
+                mode=AssignmentMode(mode),
+                item_id=item_id,
+                item_title=item_title,
                 concept_ids=frozenset(concept_ids),
                 outcome=outcome,
-                hints=attempt.hints_unlocked,
-                helped=attempt.id in helped,
-                marked=mark is not None,
-                at=mark.updated_at if mark is not None else attempt.updated_at,
+                hints=hints,
+                helped=bool(was_helped),
+                marked=correct is not None,
+                at=marked_at if correct is not None else attempt_at,
             )
         )
     return found
@@ -311,21 +346,19 @@ async def class_coverage(
     session: AsyncSession, centre_id: uuid.UUID, class_id: uuid.UUID
 ) -> set[uuid.UUID]:
     """The tags on anything set to the class — what it has been taught or asked, so a
-    concept no child has touched yet reads "not yet" there rather than "not taught"."""
-    set_ids = (
-        await session.exec(
-            select(Assignment.set_id).where(
-                Assignment.class_id == class_id,
-                Assignment.centre_id == centre_id,
-                col(Assignment.deleted_at).is_(None),
-            )
+    concept no child has touched yet reads "not yet" there rather than "not taught".
+    One query: the class's problems, their parts, and their live tags."""
+    set_items = (
+        select(SetItem.item_id)
+        .join(Assignment, col(Assignment.set_id) == SetItem.set_id)
+        .where(
+            Assignment.class_id == class_id,
+            Assignment.centre_id == centre_id,
+            col(Assignment.deleted_at).is_(None),
         )
-    ).all()
-    if not set_ids:
-        return set()
-    item_ids = set(
-        (await session.exec(select(SetItem.item_id).where(col(SetItem.set_id).in_(set_ids)))).all()
     )
-    parts = (await session.exec(select(Item.id).where(col(Item.parent_id).in_(item_ids)))).all()
-    tags = await _live_tags(session, [*item_ids, *parts])
-    return set().union(*tags.values()) if tags else set()
+    items = select(Item.id).where(
+        Item.centre_id == centre_id,
+        or_(col(Item.id).in_(set_items), col(Item.parent_id).in_(set_items)),
+    )
+    return {concept_id for _, concept_id in (await session.exec(_live_tags_of(items))).all()}

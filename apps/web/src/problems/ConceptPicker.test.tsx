@@ -4,7 +4,7 @@
  * never red; a delete says what goes with it.
  */
 
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { useState } from 'react'
 import { expect, test } from 'vitest'
@@ -154,4 +154,19 @@ test('tags held from before the centre’s first edit follow their new ids', asy
 
   await waitFor(() => expect(picks.at(-1)).toEqual([['own-lists'], 'own-lists']))
   expect(await screen.findByRole('button', { name: 'Lists!', pressed: true })).toBeInTheDocument()
+})
+
+test('tags without sub-skills share a row; a tag with sub-skills starts its own', async () => {
+  const flat = ['a', 'b', 'c'].map((k, i) => tag({ id: k, key: k, label: k.toUpperCase(), sort_order: i * 10 }))
+  const parent = tag({ id: 'p', key: 'p', label: 'Lists', sort_order: 40 })
+  const child = tag({ id: 'q', key: 'q', label: '.append()', parent_id: 'p' })
+  server.use(http.get('/api/concepts', () => HttpResponse.json([...flat, parent, child])))
+  renderScreen(<Harness />)
+
+  const a = await screen.findByRole('button', { name: 'A' })
+  const row = a.closest('div.flex')!
+  expect(within(row as HTMLElement).getByRole('button', { name: 'C' })).toBeInTheDocument()
+  expect(within(row as HTMLElement).queryByRole('button', { name: 'Lists' })).not.toBeInTheDocument()
+  const lists = screen.getByRole('button', { name: 'Lists' }).closest('div.flex')!
+  expect(within(lists as HTMLElement).getByRole('button', { name: '.append()' })).toBeInTheDocument()
 })

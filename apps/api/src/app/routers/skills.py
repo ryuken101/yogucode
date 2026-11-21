@@ -36,6 +36,7 @@ from app.skills import (
     Level,
     RevisitSettings,
     Skill,
+    branches_of,
     class_coverage,
     load_evidence,
     skill_tree,
@@ -190,9 +191,10 @@ async def class_skills(
     )
     covered = await class_coverage(session, principal.centre_id, klass.id)
     settings = _settings(klass)
+    branches = branches_of(concepts)
     rows = []
     for _, student in roster:
-        tree = skill_tree(concepts, evidence[student.id], covered, settings, now)
+        tree = skill_tree(concepts, evidence[student.id], covered, settings, now, branches)
         rows.append(
             SkillRowOut(
                 student_id=student.id,

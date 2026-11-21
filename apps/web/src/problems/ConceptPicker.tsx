@@ -20,7 +20,7 @@ import { Menu } from '../desktop/Menu'
 import { Notice } from '../components/Notice'
 import { TrashDialog } from '../components/TrashDialog'
 import { api, type Schemas } from '../lib/api'
-import { buildTree, flatten, impactNote, remapByKey, type Concept } from '../lib/conceptTree'
+import { buildTree, flatten, impactNote, remapByKey, type Concept, type ConceptNode } from '../lib/conceptTree'
 import { ApiError, messageFor } from '../lib/errors'
 import { useConceptEdits } from '../lib/queries'
 
@@ -144,7 +144,13 @@ export function ConceptPicker({ concepts, selected, primary, onChange, disabled 
         value={adding?.label ?? ''}
         disabled={edits.create.isPending}
         onChange={(event) => setAdding({ parentId, label: event.target.value })}
-        onKeyDown={(event) => keys(event, () => void add(), () => setAdding(null))}
+        onKeyDown={(event) =>
+          keys(
+            event,
+            () => void add(),
+            () => setAdding(null),
+          )
+        }
         onBlur={() => {
           if (!adding?.label.trim()) setAdding(null)
         }}
@@ -165,7 +171,13 @@ export function ConceptPicker({ concepts, selected, primary, onChange, disabled 
           maxLength={40}
           value={renaming.label}
           onChange={(event) => setRenaming({ id: concept.id, label: event.target.value })}
-          onKeyDown={(event) => keys(event, () => void rename(), () => setRenaming(null))}
+          onKeyDown={(event) =>
+            keys(
+              event,
+              () => void rename(),
+              () => setRenaming(null),
+            )
+          }
           onBlur={() => void rename()}
           className={INPUT}
         />
@@ -218,16 +230,25 @@ export function ConceptPicker({ concepts, selected, primary, onChange, disabled 
     )
   }
 
-  const tree = buildTree(concepts)
+  // Tags with no sub-skills share one wrapping row, as chips always did; a tag with
+  // sub-skills starts its own row so its branch reads together. One row per tag stacked
+  // a flat list of twenty into a column (21 Nov 2026).
+  const rows: ConceptNode[][] = []
+  for (const root of buildTree(concepts)) {
+    const last = rows.at(-1)
+    const flat = (node: ConceptNode) => node.children.length === 0 && adding?.parentId !== node.concept.id
+    if (flat(root) && last?.every(flat)) last.push(root)
+    else rows.push([root])
+  }
 
   return (
     <fieldset disabled={disabled}>
       <legend className="mb-1.5 text-sm font-medium text-grape">Concepts</legend>
       <div className="space-y-1.5">
-        {tree.map((root) => {
-          const nodes = flatten([root])
+        {rows.map((row) => {
+          const nodes = flatten(row)
           return (
-            <div key={root.concept.id} className="flex flex-wrap items-center gap-1.5">
+            <div key={row[0].concept.id} className="flex flex-wrap items-center gap-1.5">
               {nodes.flatMap((node) => {
                 const shown = [chip(node.concept, node.depth)]
                 if (adding?.parentId === node.concept.id) {

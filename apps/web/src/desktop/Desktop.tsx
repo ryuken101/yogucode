@@ -24,7 +24,7 @@
  */
 
 import './desktop.css'
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Routes, useLocation, useNavigate } from 'react-router'
 import { Search as SearchIcon } from 'lucide-react'
@@ -34,7 +34,7 @@ import { Spinner } from '../components/Spinner'
 import type { Schemas } from '../lib/api'
 import { api } from '../lib/api'
 import { useClasses, useSavedDesktop } from '../lib/queries'
-import { appDef, appFor, appsFor, classOf, deskPath, fillsWindow } from './apps'
+import { appDef, appFor, appsFor, classOf, deskPath, fillsWindow, wideWindow } from './apps'
 import type { AppId, Ctx, Role } from './apps'
 import { DeskContext } from './context'
 import { Menu } from './Menu'
@@ -507,12 +507,25 @@ function DesktopCore({ role, pages, name, subtitle, isOwner, classes, saved, loc
 /**
  * One window's page. Memoised on its location, so dragging a window, or a change in
  * another one, never re-renders the page — an open editor least of all.
+ *
+ * A new page starts at the top. The window's scroll area outlives its pages, so a tab
+ * switch used to open the next page as far down as the last one was scrolled (21 Nov
+ * 2026). Only the path counts: a page changing its own `?query` keeps its place.
  */
 const Page = memo(function Page({ loc, pages }: { loc: Loc; pages: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    ref.current?.parentElement?.scrollTo?.({ top: 0, left: 0 })
+  }, [loc.pathname])
   return (
     <div
+      ref={ref}
       className={
-        fillsWindow(loc.pathname) ? 'flex min-h-0 flex-1 flex-col' : 'mx-auto w-full max-w-5xl px-6 py-8'
+        fillsWindow(loc.pathname)
+          ? 'flex min-h-0 flex-1 flex-col'
+          : wideWindow(loc.pathname)
+            ? 'w-full px-6 py-8'
+            : 'mx-auto w-full max-w-5xl px-6 py-8'
       }
     >
       <Routes location={{ pathname: loc.pathname, search: loc.search, hash: loc.hash, state: loc.state }}>
