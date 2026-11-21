@@ -47,8 +47,11 @@ not a way to make a failure go away.
   student cookie) and attaches a teacher bearer token when there is a session, read fresh
   each request because supabase-js rotates it.
 - `src/lib/queries.ts` owns the TanStack Query keys. Mutations invalidate the key they
-  affect and no more. The one exception is the Trash (`useTrashAction`, `useRestoreMine`):
-  a class, a child or a problem can appear on any page, so they refetch everything.
+  affect and no more. The exceptions are the Trash (`useTrashAction`, `useRestoreMine`):
+  a class, a child or a problem can appear on any page, so they refetch everything; and
+  concept edits (`useConceptEdits`), because the centre's first one gives every built-in
+  tag a new id, which problems and lessons on other pages hold. `ConceptPicker` carries a
+  problem's tags across by key (`lib/conceptTree.ts`, `remapByKey`).
 
 **Closing the tab signs you out** (Ken's decision, 10 Oct 2026). Teachers: supabase-js
 uses `sessionStorage`. Students: `markStudentTab()` on sign-in (`Join.tsx`), and

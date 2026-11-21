@@ -16,6 +16,7 @@ import {
   Code2,
   FolderOpen,
   GraduationCap,
+  Network,
   Radio,
   Users,
 } from 'lucide-react'
@@ -30,6 +31,7 @@ export type AppId =
   | 'work'
   | 'marking'
   | 'progress'
+  | 'skills'
   | 'library'
   | 'lessons'
 
@@ -108,6 +110,30 @@ const TEACHER: AppDef[] = [
     tile: 'bg-grape-pale text-grape',
     owns: [new RegExp(`^${CLASS}/progress$`)],
     home: (c) => (c.classId ? `/classes/${c.classId}/progress` : '/classes'),
+    classScoped: true,
+  },
+  {
+    // Per-concept progress (Ken, 21 Nov 2026): the centre's skill tree, and how each child
+    // stands on it. Separate from Progress, which is about assignments.
+    id: 'skills',
+    label: 'Skills',
+    hint: 'The skill tree, and each child on it',
+    icon: Network,
+    tile: 'bg-grape text-lemon',
+    owns: [new RegExp(`^${CLASS}/skills(/[^/]+)?$`), /^\/skills\/tree$/],
+    home: (c) => (c.classId ? `/classes/${c.classId}/skills` : '/skills/tree'),
+    tabs: (c) => [
+      ...(c.classId
+        ? [
+            {
+              label: 'Class',
+              to: `/classes/${c.classId}/skills`,
+              active: (p: string) => /^\/classes\/[^/]+\/skills(\/|$)/.test(p),
+            },
+          ]
+        : []),
+      { label: 'Tree', to: '/skills/tree', active: (p) => p === '/skills/tree' },
+    ],
     classScoped: true,
   },
   {
@@ -236,7 +262,7 @@ const STUDENT: AppDef[] = [
   },
 ]
 
-const TEACHER_DOCK: AppId[] = ['live', 'classes', 'files', 'code', 'work', 'marking', 'progress', 'library']
+const TEACHER_DOCK: AppId[] = ['live', 'classes', 'files', 'code', 'work', 'marking', 'progress', 'skills', 'library']
 const TEACHER_IN_ORDER = TEACHER_DOCK.map((id) => TEACHER.find((a) => a.id === id)!)
 
 /** The dock, in order. The apps' page patterns are disjoint, so order never decides a match. */

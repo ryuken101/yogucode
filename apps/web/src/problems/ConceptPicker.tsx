@@ -6,30 +6,33 @@
  * main one. Picking the first tag makes it main automatically — the common case is a
  * problem about one thing.
  *
- * Teachers add the centre's own tags here too (Ken, 14 Nov 2026): "+ New tag" creates one
- * and puts it on this problem. The centre's own tags have a ⋯ menu to rename or remove; the
- * built-in ones are edited only as YAML and have none. Removing a tag something still uses
- * is refused by the server, and the refusal is shown in words, never in the error colour.
+ * The tags are the centre's tree (Ken, 21 Nov 2026): each top-level tag starts a row, with
+ * its sub-skills after it, and a problem can be tagged at any depth. Every tag has a ⋯
+ * menu — rename, add a sub-skill, delete (with its sub-skills, to the Trash) — built-ins
+ * too: the first edit copies them into the centre, and the ids this screen holds are
+ * mapped across by key. "+ New tag" adds one at the top and puts it on this problem.
+ * A refusal is shown in words, never in the error colour.
  */
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import { Menu } from '../desktop/Menu'
-import { Dialog } from '../components/Dialog'
 import { Notice } from '../components/Notice'
-import type { Schemas } from '../lib/api'
+import { TrashDialog } from '../components/TrashDialog'
+import { api, type Schemas } from '../lib/api'
+import { buildTree, flatten, impactNote, remapByKey, type Concept } from '../lib/conceptTree'
 import { ApiError, messageFor } from '../lib/errors'
 import { useConceptEdits } from '../lib/queries'
 
 interface Props {
-  concepts: Schemas['ConceptOut'][]
+  concepts: Concept[]
   selected: string[]
   primary: string | null
   onChange: (selected: string[], primary: string | null) => void
   disabled?: boolean
 }
 
-/** A refusal (a name in use, a tag still on a problem) is "not yet"; anything else is ours. */
+/** A refusal (a name in use, a tag that can't go there) is "not yet"; anything else is ours. */
 function Problem({ error }: { error: unknown }) {
   const refused = error instanceof ApiError && (error.status === 409 || error.status === 422)
   return (
@@ -41,12 +44,29 @@ function Problem({ error }: { error: unknown }) {
 
 const INPUT = 'w-36 rounded-full bg-surface px-2.5 py-1 text-xs text-grape ring-1 ring-grape outline-none'
 
+type Adding = { parentId: string | null; label: string }
+
 export function ConceptPicker({ concepts, selected, primary, onChange, disabled }: Props) {
   const edits = useConceptEdits()
-  const [adding, setAdding] = useState<string | null>(null)
+  const [adding, setAdding] = useState<Adding | null>(null)
   const [renaming, setRenaming] = useState<{ id: string; label: string } | null>(null)
-  const [removing, setRemoving] = useState<Schemas['ConceptOut'] | null>(null)
+  const [removing, setRemoving] = useState<Concept | null>(null)
+  const [impact, setImpact] = useState<Schemas['ConceptImpactOut'] | null>(null)
   const [error, setError] = useState<unknown>(null)
+
+  // After the first edit the built-ins come back with the centre's ids: carry the
+  // problem's tags across, or they would silently drop off the chips.
+  const before = useRef(concepts)
+  useEffect(() => {
+    const previous = before.current
+    before.current = concepts
+    if (previous === concepts || !selected.length) return
+    const next = remapByKey(selected, previous, concepts)
+    if (next.some((id, i) => id !== selected[i])) {
+      const main = primary ? remapByKey([primary], previous, concepts)[0] : null
+      onChange(next, main)
+    }
+  }, [concepts, selected, primary, onChange])
 
   function toggle(id: string) {
     if (selected.includes(id)) {
@@ -58,11 +78,12 @@ export function ConceptPicker({ concepts, selected, primary, onChange, disabled 
   }
 
   async function add() {
-    const label = adding?.trim()
+    if (!adding) return
+    const label = adding.label.trim()
     if (!label) return setAdding(null)
     try {
       setError(null)
-      const made = await edits.create.mutateAsync(label)
+      const made = await edits.create.mutateAsync({ label, parentId: adding.parentId })
       setAdding(null)
       onChange([...selected, made.id], primary ?? made.id)
     } catch (caught) {
@@ -73,18 +94,25 @@ export function ConceptPicker({ concepts, selected, primary, onChange, disabled 
   async function rename() {
     if (!renaming) return
     const label = renaming.label.trim()
-    const before = concepts.find((c) => c.id === renaming.id)?.label
-    if (!label || label === before) return setRenaming(null)
+    const was = concepts.find((c) => c.id === renaming.id)?.label
+    if (!label || label === was) return setRenaming(null)
     try {
       setError(null)
-      await edits.rename.mutateAsync({ id: renaming.id, label })
+      await edits.update.mutateAsync({ id: renaming.id, label })
       setRenaming(null)
     } catch (caught) {
       setError(caught)
     }
   }
 
-  async function remove(concept: Schemas['ConceptOut']) {
+  function askToRemove(concept: Concept) {
+    setError(null)
+    setImpact(null)
+    setRemoving(concept)
+    api.conceptImpact(concept.id).then(setImpact, () => setImpact(null))
+  }
+
+  async function remove(concept: Concept) {
     setRemoving(null)
     try {
       setError(null)
@@ -106,117 +134,137 @@ export function ConceptPicker({ concepts, selected, primary, onChange, disabled 
     }
   }
 
+  function newTagField(parentId: string | null) {
+    return (
+      <input
+        aria-label={parentId ? 'New sub-skill name' : 'New tag name'}
+        placeholder={parentId ? 'New sub-skill' : 'New tag name'}
+        autoFocus
+        maxLength={40}
+        value={adding?.label ?? ''}
+        disabled={edits.create.isPending}
+        onChange={(event) => setAdding({ parentId, label: event.target.value })}
+        onKeyDown={(event) => keys(event, () => void add(), () => setAdding(null))}
+        onBlur={() => {
+          if (!adding?.label.trim()) setAdding(null)
+        }}
+        className={INPUT}
+      />
+    )
+  }
+
+  function chip(concept: Concept, depth: number) {
+    const on = selected.includes(concept.id)
+    const main = primary === concept.id
+    if (renaming?.id === concept.id) {
+      return (
+        <input
+          key={concept.id}
+          aria-label={`New name for ${concept.label}`}
+          autoFocus
+          maxLength={40}
+          value={renaming.label}
+          onChange={(event) => setRenaming({ id: concept.id, label: event.target.value })}
+          onKeyDown={(event) => keys(event, () => void rename(), () => setRenaming(null))}
+          onBlur={() => void rename()}
+          className={INPUT}
+        />
+      )
+    }
+    return (
+      <span
+        key={concept.id}
+        className={`inline-flex items-center rounded-full text-xs ring-1 ${
+          on ? 'bg-grape-pale ring-grape' : depth ? 'bg-cream ring-grape/15' : 'bg-surface ring-grape/20'
+        }`}
+      >
+        {depth ? (
+          <span aria-hidden className="pl-2 text-muted">
+            {'›'.repeat(depth)}
+          </span>
+        ) : null}
+        <button type="button" aria-pressed={on} onClick={() => toggle(concept.id)} className="px-2.5 py-1 text-grape">
+          {concept.label}
+        </button>
+        {on ? (
+          <button
+            type="button"
+            aria-label={`Make ${concept.label} the main concept`}
+            aria-pressed={main}
+            onClick={() => onChange(selected, concept.id)}
+            className={`pr-2 ${main ? 'text-grape-deep' : 'text-muted/50 hover:text-muted'}`}
+          >
+            ★
+          </button>
+        ) : null}
+        {!disabled ? (
+          <Menu
+            label={`${concept.label} options`}
+            bare
+            align="right"
+            width="w-44"
+            items={[
+              { label: 'Rename', onSelect: () => setRenaming({ id: concept.id, label: concept.label }) },
+              { label: 'Add a sub-skill', onSelect: () => setAdding({ parentId: concept.id, label: '' }) },
+              { label: 'Delete', onSelect: () => askToRemove(concept) },
+            ]}
+          >
+            <span aria-hidden className="pr-2 text-muted">
+              ⋯
+            </span>
+          </Menu>
+        ) : null}
+      </span>
+    )
+  }
+
+  const tree = buildTree(concepts)
+
   return (
     <fieldset disabled={disabled}>
       <legend className="mb-1.5 text-sm font-medium text-grape">Concepts</legend>
-      <div className="flex flex-wrap gap-1.5">
-        {concepts.map((concept) => {
-          const on = selected.includes(concept.id)
-          const main = primary === concept.id
-          if (renaming?.id === concept.id) {
-            return (
-              <input
-                key={concept.id}
-                aria-label={`New name for ${concept.label}`}
-                autoFocus
-                maxLength={40}
-                value={renaming.label}
-                onChange={(event) => setRenaming({ id: concept.id, label: event.target.value })}
-                onKeyDown={(event) => keys(event, () => void rename(), () => setRenaming(null))}
-                onBlur={() => void rename()}
-                className={INPUT}
-              />
-            )
-          }
+      <div className="space-y-1.5">
+        {tree.map((root) => {
+          const nodes = flatten([root])
           return (
-            <span
-              key={concept.id}
-              className={`inline-flex items-center rounded-full text-xs ring-1 ${
-                on ? 'bg-grape-pale ring-grape' : 'bg-surface ring-grape/20'
-              }`}
-            >
-              <button
-                type="button"
-                aria-pressed={on}
-                onClick={() => toggle(concept.id)}
-                className="px-2.5 py-1 text-grape"
-              >
-                {concept.label}
-              </button>
-              {on ? (
-                <button
-                  type="button"
-                  aria-label={`Make ${concept.label} the main concept`}
-                  aria-pressed={main}
-                  onClick={() => onChange(selected, concept.id)}
-                  className={`pr-2 ${main ? 'text-grape-deep' : 'text-muted/50 hover:text-muted'}`}
-                >
-                  ★
-                </button>
-              ) : null}
-              {concept.own && !disabled ? (
-                <Menu
-                  label={`${concept.label} options`}
-                  bare
-                  align="right"
-                  width="w-40"
-                  items={[
-                    { label: 'Rename', onSelect: () => setRenaming({ id: concept.id, label: concept.label }) },
-                    { label: 'Remove', onSelect: () => setRemoving(concept) },
-                  ]}
-                >
-                  <span aria-hidden className="pr-2 text-muted">
-                    ⋯
-                  </span>
-                </Menu>
-              ) : null}
-            </span>
+            <div key={root.concept.id} className="flex flex-wrap items-center gap-1.5">
+              {nodes.flatMap((node) => {
+                const shown = [chip(node.concept, node.depth)]
+                if (adding?.parentId === node.concept.id) {
+                  shown.push(<span key={`${node.concept.id}-new`}>{newTagField(node.concept.id)}</span>)
+                }
+                return shown
+              })}
+            </div>
           )
         })}
-        {adding === null ? (
-          <button
-            type="button"
-            onClick={() => {
-              setError(null)
-              setAdding('')
-            }}
-            className="rounded-full px-2.5 py-1 text-xs font-medium text-grape-deep ring-1 ring-grape/30 hover:bg-cream"
-          >
-            + New tag
-          </button>
-        ) : (
-          <input
-            aria-label="New tag name"
-            placeholder="New tag name"
-            autoFocus
-            maxLength={40}
-            value={adding}
-            disabled={edits.create.isPending}
-            onChange={(event) => setAdding(event.target.value)}
-            onKeyDown={(event) => keys(event, () => void add(), () => setAdding(null))}
-            onBlur={() => {
-              if (!adding.trim()) setAdding(null)
-            }}
-            className={INPUT}
-          />
-        )}
+        <div>
+          {adding !== null && adding.parentId === null ? (
+            newTagField(null)
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setError(null)
+                setAdding({ parentId: null, label: '' })
+              }}
+              className="rounded-full px-2.5 py-1 text-xs font-medium text-grape-deep ring-1 ring-grape/30 hover:bg-cream"
+            >
+              + New tag
+            </button>
+          )}
+        </div>
       </div>
       {error ? <Problem error={error} /> : null}
-      {selected.length > 0 ? (
-        <p className="mt-1.5 text-xs text-muted">★ marks the main concept.</p>
-      ) : null}
+      {selected.length > 0 ? <p className="mt-1.5 text-xs text-muted">★ marks the main concept.</p> : null}
 
-      <Dialog
+      <TrashDialog
         open={removing !== null}
-        title={`Remove the tag “${removing?.label ?? ''}”?`}
+        name={`the tag “${removing?.label ?? ''}”`}
+        note={impactNote(impact)}
         onClose={() => setRemoving(null)}
-        confirm={{ label: 'Remove tag', onConfirm: () => removing && void remove(removing) }}
-      >
-        <p className="text-sm">
-          It disappears from the tag list for every teacher at the centre. A tag that a problem or lesson still uses
-          can’t be removed. Take it off them first.
-        </p>
-      </Dialog>
+        onConfirm={() => removing && void remove(removing)}
+      />
     </fieldset>
   )
 }

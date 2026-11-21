@@ -11,13 +11,13 @@ query that already shows only active rows therefore hides it; the getters and th
 "show archived too" lists also check `deleted_at` (`app.scoping`).
 
 **Groups.** A folder goes with everything inside it, a unit with its lessons, a course with
-its units and lessons. They share one `deleted_at`, which is how Restore and Purge find the
-group again, and only the top of a group is listed.
+its units and lessons, a concept tag with its sub-skills. They share one `deleted_at`, which
+is how Restore and Purge find the group again, and only the top of a group is listed.
 
 **Who may do what:**
 
 - any teacher may trash and restore the centre's classes, children, problems, curriculum,
-  homework and quizzes, and their own files; a child, their own files;
+  concept tags, homework and quizzes, and their own files; a child, their own files;
 - deleting for good: a class or a child, the owner only, with the name typed (as Delete
   entirely); anything else, the owner, whoever put it in the Trash, or whoever made it;
   a child, never.
@@ -43,10 +43,12 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.audit import audit_entry
 from app.auth.principal import Principal
 from app.auth.student_session import revoke_live_sessions
+from app.concepts import branch
 from app.erase import (
     Erased,
     erase_assignment,
     erase_class,
+    erase_concepts,
     erase_course,
     erase_item,
     erase_lessons,
@@ -65,6 +67,7 @@ from app.models import (
     AuditLog,
     Class,
     ClassJoinCode,
+    Concept,
     Course,
     DocumentStatus,
     Enrolment,
@@ -103,6 +106,7 @@ TEACHER_KINDS = (
     "lesson",
     "homework",
     "problem_folder",
+    "concept",
 )
 FILE_KINDS = ("file", "folder")
 NAMED_PURGE = ("class", "student")
@@ -126,10 +130,13 @@ def _model(kind: str, principal: Principal) -> Any:
         "lesson": Lesson,
         "homework": Assignment,
         "problem_folder": ProblemFolder,
+        "concept": Concept,
     }[kind]
 
 
 def name_of(kind: str, row: Any) -> str:
+    if kind == "concept":
+        return row.label
     if kind == "student":
         return row.display_name
     if kind in ("class", "course", "unit", "lesson", "folder", "problem_folder"):
@@ -170,6 +177,11 @@ async def _row(session: AsyncSession, principal: Principal, kind: str, row_id: u
     if kind == "problem" and row.parent_id is not None:
         raise _not_found()  # a part goes with its problem
     return row
+
+
+async def _centre_concepts(session: AsyncSession, centre_id: uuid.UUID) -> list[Concept]:
+    """Every tag the centre has, in the Trash or not: a branch is found across both."""
+    return list((await session.exec(select(Concept).where(Concept.centre_id == centre_id))).all())
 
 
 # --- putting things in -----------------------------------------------------------------
@@ -287,6 +299,10 @@ async def trash(session: AsyncSession, principal: Principal, kind: str, row_id: 
                     select(Lesson).where(col(Lesson.unit_id).in_([u.id for u in units]))
                 )
             ).all()
+    elif kind == "concept":
+        tree = await _centre_concepts(session, principal.centre_id)
+        ids = branch(tree, row.id)
+        group = [c for c in tree if c.id in ids]
     for member in group:
         # Anything already in the Trash on its own stays its own group.
         if member.deleted_at is None:
@@ -333,6 +349,10 @@ async def restore(session: AsyncSession, principal: Principal, kind: str, row_id
         course = await session.get(Course, row.course_id)
         if course is not None and course.deleted_at is not None:
             raise _conflict("Its course is in the Trash too. Restore the course.")
+    if kind == "concept" and row.parent_id is not None:
+        parent = await session.get(Concept, row.parent_id)
+        if parent is not None and parent.deleted_at is not None:
+            raise _conflict("The tag it was under is in the Trash too. Restore that one.")
 
     group: list[Any] = [row]
     if kind == "folder":
@@ -359,6 +379,11 @@ async def restore(session: AsyncSession, principal: Principal, kind: str, row_id
                     )
                 )
             ).all()
+
+    elif kind == "concept":
+        tree = await _centre_concepts(session, principal.centre_id)
+        ids = branch(tree, row.id)
+        group = [c for c in tree if c.id in ids and c.deleted_at == when]
 
     if kind == "homework":
         # Its problems come back with it. One may have followed it into the Trash, which
@@ -419,6 +444,11 @@ async def _erase(session: AsyncSession, kind: str, row: Any) -> Erased:
         return await erase_assignment(session, row.id)
     if kind == "problem_folder":
         return await erase_problem_folder(session, row.id)
+    if kind == "concept":
+        # The whole branch, whenever each went in: nothing can be left under a tag that is
+        # gone, and a sub-skill can't be live under a trashed tag (Restore refuses it).
+        tree = await _centre_concepts(session, row.centre_id)
+        return await erase_concepts(session, list(branch(tree, row.id)))
     if kind == "lesson":
         return await erase_lessons(session, [row.id])
     if kind == "unit":
@@ -552,6 +582,8 @@ async def list_trash(session: AsyncSession, principal: Principal) -> list[Entry]
             for r in await trashed("homework", Assignment.mode != AssignmentMode.CLASSWORK)
         ]
         rows += [("problem_folder", r) for r in await trashed("problem_folder")]
+        concepts = await trashed("concept")
+        rows += [("concept", r) for r in concepts if not _same_group(r, concepts, "parent_id")]
         owner_column = TeacherDocument.user_id
         folder_owner = TeacherFolder.user_id
     else:
@@ -624,6 +656,7 @@ _EXPIRY_ORDER: list[tuple[str, Any, str]] = [
     ("course", Course, "teacher"),
     ("problem", Item, "teacher"),
     ("problem_folder", ProblemFolder, "teacher"),
+    ("concept", Concept, "teacher"),
     ("student", Student, "teacher"),
     ("class", Class, "teacher"),
 ]

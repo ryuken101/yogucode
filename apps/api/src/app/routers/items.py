@@ -26,7 +26,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.audit import audit_entry
 from app.auth.principal import CurrentTeacher, Principal
 from app.db import get_session
-from app.models import Item, ItemConcept, ItemKind, ItemStatus, TestCase
+from app.models import Concept, ConceptStatus, Item, ItemConcept, ItemKind, ItemStatus, TestCase
 from app.problem_bank import (
     MAX_EXAMPLES,
     MAX_PARTS,
@@ -272,7 +272,13 @@ async def list_problems(
     concepts: dict[uuid.UUID, set[uuid.UUID]] = {i: set() for i in item_ids}
     primary: dict[uuid.UUID, uuid.UUID] = {}
     for tag in (
-        await session.exec(select(ItemConcept).where(col(ItemConcept.item_id).in_(list(owner))))
+        await session.exec(
+            select(ItemConcept)
+            .join(Concept, col(Concept.id) == ItemConcept.concept_id)
+            .where(
+                col(ItemConcept.item_id).in_(list(owner)), Concept.status != ConceptStatus.ARCHIVED
+            )
+        )
     ).all():
         concepts[owner[tag.item_id]].add(tag.concept_id)
         if tag.is_primary and tag.item_id in labels:

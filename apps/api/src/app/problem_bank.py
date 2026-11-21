@@ -35,9 +35,20 @@ from sqlmodel import col, delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.auth.principal import Principal
-from app.models import Hint, Item, ItemConcept, ItemKind, ItemStatus, TestCase, TestKind
+from app.concepts import current_ids
+from app.models import (
+    Concept,
+    ConceptStatus,
+    Hint,
+    Item,
+    ItemConcept,
+    ItemKind,
+    ItemStatus,
+    TestCase,
+    TestKind,
+)
 from app.models.base import utcnow
-from app.scoping import list_item_parts, list_visible_concepts
+from app.scoping import list_item_parts
 
 MAX_TITLE_LENGTH = 120
 MAX_PROMPT_CHARS = 20_000
@@ -375,8 +386,14 @@ async def _leaf_children(
         )
     ).all():
         hints[row.item_id].append(row)
+    # A tag in the Trash is off the problem while it is there (Ken, 21 Nov 2026). Its row
+    # stays, so Restore puts it back; the next save of the problem drops it for good.
     for row in (
-        await session.exec(select(ItemConcept).where(col(ItemConcept.item_id).in_(item_ids)))
+        await session.exec(
+            select(ItemConcept)
+            .join(Concept, col(Concept.id) == ItemConcept.concept_id)
+            .where(col(ItemConcept.item_id).in_(item_ids), Concept.status != ConceptStatus.ARCHIVED)
+        )
     ).all():
         tags[row.item_id].append(row)
     return tests, hints, tags
@@ -436,10 +453,16 @@ class UnavailableConcept(ValueError):
 
 
 async def check_concepts(session: AsyncSession, principal: Principal, doc: ProblemDoc) -> None:
+    """Every tag must be one the centre can see. A global id from before the centre's first
+    tree edit is swapped, in the document, for the centre's copy (`app.concepts`)."""
     wanted = set(doc.concept_ids).union(*(part.concept_ids for part in doc.parts))
-    visible = {c.id for c in await list_visible_concepts(session, principal)}
-    if not wanted <= visible:
+    now = await current_ids(session, principal, list(wanted))
+    if now is None:
         raise UnavailableConcept
+    for leaf in (doc, *doc.parts):
+        leaf.concept_ids = list(dict.fromkeys(now[i] for i in leaf.concept_ids))
+        if leaf.primary_concept_id is not None:
+            leaf.primary_concept_id = now.get(leaf.primary_concept_id, leaf.primary_concept_id)
 
 
 async def _replace_leaf(

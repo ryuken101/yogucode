@@ -773,6 +773,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/classes/{class_id}/skill-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Skill Settings
+         * @description Which signs put a concept on the class's revisit lists. Any teacher at the centre,
+         *     as any teacher may open any class.
+         */
+        patch: operations["update_skill_settings_classes__class_id__skill_settings_patch"];
+        trace?: never;
+    };
+    "/classes/{class_id}/skills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Class Skills */
+        get: operations["class_skills_classes__class_id__skills_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/classes/{class_id}/students": {
         parameters: {
             query?: never;
@@ -789,6 +827,43 @@ export interface paths {
          *     Returns the slip (name, username, PIN) to print; Show PIN reveals it again later.
          */
         post: operations["add_new_student_classes__class_id__students_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classes/{class_id}/students/{student_id}/skills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Student Skills */
+        get: operations["student_skills_classes__class_id__students__student_id__skills_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classes/{class_id}/students/{student_id}/skills/{concept_id}/evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Skill Evidence
+         * @description What a node's level is built from, newest first: the concept and everything under it.
+         */
+        get: operations["skill_evidence_classes__class_id__students__student_id__skills__concept_id__evidence_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -944,14 +1019,16 @@ export interface paths {
         };
         /**
          * List Concepts
-         * @description The taxonomy a teacher can tag with: the global one (edited as YAML) and the centre's own.
+         * @description The centre's concept tree, flat: each tag names its parent. Before the centre's
+         *     first edit it is the global taxonomy (edited as YAML) plus the centre's own tags.
          */
         get: operations["list_concepts_concepts_get"];
         put?: never;
         /**
          * Create Concept
-         * @description A tag of the centre's own (Ken, 14 Nov 2026): any teacher may add one, and every
-         *     teacher at the centre sees it, as they see the whole bank. It goes after the others.
+         * @description A tag of the centre's own (Ken, 14 Nov 2026), or a sub-skill under any tag (21 Nov
+         *     2026). Any teacher may add one, and every teacher at the centre sees it, as they see the
+         *     whole bank. It goes after its siblings.
          */
         post: operations["create_concept_concepts_post"];
         delete?: never;
@@ -970,34 +1047,41 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Concept
+         * @description Delete a tag and every sub-skill under it, to the Trash (Ken, 21 Nov 2026).
+         *
+         *     Problems and lessons using them lose the tag while it is in the Trash (the readers skip
+         *     a trashed tag) and get it back on Restore. A problem whose main tag went has no main
+         *     tag until a teacher picks one, which publishing asks for. Attempts and marks are never
+         *     touched, so no child's work goes with a tag.
+         */
+        delete: operations["delete_concept_concepts__concept_id__delete"];
         options?: never;
         head?: never;
         /**
-         * Rename Concept
-         * @description Rename one of the centre's tags. The key stays, so problem files naming it still work.
+         * Update Concept
+         * @description Rename a tag, move it under another (or to the top), or reorder it among its
+         *     siblings. The key stays, so problem files naming it still work.
          */
-        patch: operations["rename_concept_concepts__concept_id__patch"];
+        patch: operations["update_concept_concepts__concept_id__patch"];
         trace?: never;
     };
-    "/concepts/{concept_id}/archive": {
+    "/concepts/{concept_id}/impact": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
-        put?: never;
         /**
-         * Archive Concept
-         * @description Remove one of the centre's tags — refused while a problem or lesson still uses it.
-         *
-         *     Stripping it instead would leave a problem without its main concept, which publishing
-         *     needs, and `check_concepts` refuses an archived tag, so the problem could not be saved
-         *     as it stands. The row is archived, never deleted: old versions keep their reference.
+         * Concept Impact
+         * @description What deleting this tag would take with it: its sub-skills, and how many problems and
+         *     lessons would lose a tag. Read-only — the centre's copy is made by the delete itself.
          */
-        post: operations["archive_concept_concepts__concept_id__archive_post"];
+        get: operations["concept_impact_concepts__concept_id__impact_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3132,6 +3216,14 @@ export interface components {
             /** Term Label */
             term_label?: string | null;
         };
+        /** ClassSkillsOut */
+        ClassSkillsOut: {
+            /** Columns */
+            columns: components["schemas"]["SkillColumnOut"][];
+            /** Rows */
+            rows: components["schemas"]["SkillRowOut"][];
+            settings: components["schemas"]["RevisitSettingsOut"];
+        };
         /**
          * ClassStatus
          * @enum {string}
@@ -3209,10 +3301,24 @@ export interface components {
             /** Reference */
             reference?: string | null;
         };
+        /**
+         * ConceptImpactOut
+         * @description What deleting a tag takes with it, for the confirmation.
+         */
+        ConceptImpactOut: {
+            /** Lessons */
+            lessons: number;
+            /** Problems */
+            problems: number;
+            /** Subskills */
+            subskills: number;
+        };
         /** ConceptIn */
         ConceptIn: {
             /** Label */
             label: string;
+            /** Parent Id */
+            parent_id?: string | null;
         };
         /** ConceptOut */
         ConceptOut: {
@@ -3227,8 +3333,25 @@ export interface components {
             label: string;
             /** Own */
             own: boolean;
+            /** Parent Id */
+            parent_id: string | null;
+            /** Sort Order */
+            sort_order: number;
             /** Status */
             status: string;
+        };
+        /**
+         * ConceptPatch
+         * @description Every field optional. `parent_id` sent as null moves the tag to the top of the tree;
+         *     left out, it stays where it is.
+         */
+        ConceptPatch: {
+            /** Label */
+            label?: string | null;
+            /** Parent Id */
+            parent_id?: string | null;
+            /** Sort Order */
+            sort_order?: number | null;
         };
         /** CourseOut */
         CourseOut: {
@@ -3440,6 +3563,45 @@ export interface components {
          * @enum {string}
          */
         EventType: "edit" | "run" | "check" | "error" | "paste" | "hint" | "submit" | "teacher_edit";
+        /** EvidenceOut */
+        EvidenceOut: {
+            /**
+             * Assignment Id
+             * Format: uuid
+             */
+            assignment_id: string;
+            /** Assignment Title */
+            assignment_title: string;
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /**
+             * Attempt Id
+             * Format: uuid
+             */
+            attempt_id: string;
+            /** Helped */
+            helped: boolean;
+            /** Hints */
+            hints: number;
+            /**
+             * Item Id
+             * Format: uuid
+             */
+            item_id: string;
+            /** Item Title */
+            item_title: string;
+            /** Marked */
+            marked: boolean;
+            /** Mode */
+            mode: string;
+            /** Outcome */
+            outcome: number;
+            /** Weight */
+            weight: number;
+        };
         /**
          * ExampleDoc
          * @description A sample run a child can watch. `inputs` are typed in order, one per `input()`.
@@ -4632,6 +4794,24 @@ export interface components {
             /** Notes Released */
             notes_released: number;
         };
+        /** RevisitSettingsOut */
+        RevisitSettingsOut: {
+            /** Slipping */
+            slipping: boolean;
+            /** Stale */
+            stale: boolean;
+            /** Stuck */
+            stuck: boolean;
+        };
+        /** RevisitSettingsPatch */
+        RevisitSettingsPatch: {
+            /** Slipping */
+            slipping?: boolean | null;
+            /** Stale */
+            stale?: boolean | null;
+            /** Stuck */
+            stuck?: boolean | null;
+        };
         /**
          * RosterEntryOut
          * @description A student as seen from inside a class: who they are, plus how they got there.
@@ -4816,6 +4996,75 @@ export interface components {
             away_seconds: number;
             /** Finished At */
             finished_at: string | null;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /** SkillColumnOut */
+        SkillColumnOut: {
+            /**
+             * Concept Id
+             * Format: uuid
+             */
+            concept_id: string;
+            /** Label */
+            label: string;
+        };
+        /** SkillNodeOut */
+        SkillNodeOut: {
+            /** Below */
+            below: boolean;
+            /**
+             * Concept Id
+             * Format: uuid
+             */
+            concept_id: string;
+            /** Confident */
+            confident: boolean;
+            /** Evidence */
+            evidence: number;
+            /** Label */
+            label: string;
+            /** Last Seen */
+            last_seen: string | null;
+            /**
+             * Level
+             * @enum {string}
+             */
+            level: "not_taught" | "not_yet" | "learning" | "secure";
+            /** Parent Id */
+            parent_id: string | null;
+            /** Revisit */
+            revisit: ("slipping" | "stuck" | "stale")[];
+            /** Sort Order */
+            sort_order: number;
+        };
+        /** SkillOut */
+        SkillOut: {
+            /** Below */
+            below: boolean;
+            /** Confident */
+            confident: boolean;
+            /** Evidence */
+            evidence: number;
+            /** Last Seen */
+            last_seen: string | null;
+            /**
+             * Level
+             * @enum {string}
+             */
+            level: "not_taught" | "not_yet" | "learning" | "secure";
+            /** Revisit */
+            revisit: ("slipping" | "stuck" | "stale")[];
+        };
+        /** SkillRowOut */
+        SkillRowOut: {
+            /** Cells */
+            cells: components["schemas"]["SkillOut"][];
+            /** Display Name */
+            display_name: string;
             /**
              * Student Id
              * Format: uuid
@@ -5133,6 +5382,19 @@ export interface components {
             /** Username */
             username: string;
         };
+        /** StudentSkillsOut */
+        StudentSkillsOut: {
+            /** Display Name */
+            display_name: string;
+            /** Nodes */
+            nodes: components["schemas"]["SkillNodeOut"][];
+            settings: components["schemas"]["RevisitSettingsOut"];
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
         /**
          * StudentStatus
          * @enum {string}
@@ -5249,7 +5511,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "class" | "student" | "problem" | "course" | "unit" | "lesson" | "homework" | "file" | "folder" | "problem_folder";
+            kind: "class" | "student" | "problem" | "course" | "unit" | "lesson" | "homework" | "file" | "folder" | "problem_folder" | "concept";
             /** Name */
             name: string;
             /** Needs Name */
@@ -6738,6 +7000,76 @@ export interface operations {
             };
         };
     };
+    update_skill_settings_classes__class_id__skill_settings_patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                class_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RevisitSettingsPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisitSettingsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    class_skills_classes__class_id__skills_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                class_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassSkillsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     add_new_student_classes__class_id__students_post: {
         parameters: {
             query?: never;
@@ -6762,6 +7094,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PinSlipOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    student_skills_classes__class_id__students__student_id__skills_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                class_id: string;
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentSkillsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    skill_evidence_classes__class_id__students__student_id__skills__concept_id__evidence_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                class_id: string;
+                student_id: string;
+                concept_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvidenceOut"][];
                 };
             };
             /** @description Validation Error */
@@ -7078,7 +7479,38 @@ export interface operations {
             };
         };
     };
-    rename_concept_concepts__concept_id__patch: {
+    delete_concept_concepts__concept_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                concept_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_concept_concepts__concept_id__patch: {
         parameters: {
             query?: never;
             header?: {
@@ -7091,7 +7523,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ConceptIn"];
+                "application/json": components["schemas"]["ConceptPatch"];
             };
         };
         responses: {
@@ -7115,7 +7547,7 @@ export interface operations {
             };
         };
     };
-    archive_concept_concepts__concept_id__archive_post: {
+    concept_impact_concepts__concept_id__impact_get: {
         parameters: {
             query?: never;
             header?: {
@@ -7134,7 +7566,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ConceptOut"];
+                    "application/json": components["schemas"]["ConceptImpactOut"];
                 };
             };
             /** @description Validation Error */
@@ -10791,7 +11223,7 @@ export interface operations {
                 authorization?: string | null;
             };
             path: {
-                kind: "class" | "student" | "problem" | "course" | "unit" | "lesson" | "homework" | "file" | "folder" | "problem_folder";
+                kind: "class" | "student" | "problem" | "course" | "unit" | "lesson" | "homework" | "file" | "folder" | "problem_folder" | "concept";
                 item_id: string;
             };
             cookie?: never;
@@ -10823,7 +11255,7 @@ export interface operations {
                 authorization?: string | null;
             };
             path: {
-                kind: "class" | "student" | "problem" | "course" | "unit" | "lesson" | "homework" | "file" | "folder" | "problem_folder";
+                kind: "class" | "student" | "problem" | "course" | "unit" | "lesson" | "homework" | "file" | "folder" | "problem_folder" | "concept";
                 item_id: string;
             };
             cookie?: never;
@@ -10859,7 +11291,7 @@ export interface operations {
                 authorization?: string | null;
             };
             path: {
-                kind: "class" | "student" | "problem" | "course" | "unit" | "lesson" | "homework" | "file" | "folder" | "problem_folder";
+                kind: "class" | "student" | "problem" | "course" | "unit" | "lesson" | "homework" | "file" | "folder" | "problem_folder" | "concept";
                 item_id: string;
             };
             cookie?: never;

@@ -44,9 +44,11 @@ from app.models import (
     Class,
     ClassJoinCode,
     ClassTeacher,
+    Concept,
     Course,
     Enrolment,
     Event,
+    FeedbackSnippet,
     Hint,
     Item,
     ItemConcept,
@@ -257,6 +259,35 @@ async def erase_problem_folder(session: AsyncSession, folder_id: uuid.UUID) -> E
         "problem_folders",
         delete(ProblemFolder).where(ProblemFolder.id == folder_id),  # type: ignore[arg-type]
     )
+    return Erased(counts)
+
+
+async def erase_concepts(session: AsyncSession, concept_ids: list[uuid.UUID]) -> Erased:
+    """Concept tags (a branch of the centre's tree). Problems and lessons lose the tag; a
+    snippet filed under one stays, unfiled. Attempts and marks are untouched, so a child's
+    work is never lost with a tag."""
+    counts: dict[str, int] = {}
+    if not concept_ids:
+        return Erased(counts)
+    await _delete(
+        session,
+        counts,
+        "item_concepts",
+        delete(ItemConcept).where(ItemConcept.concept_id.in_(concept_ids)),  # type: ignore[attr-defined]
+    )
+    await _delete(
+        session,
+        counts,
+        "lesson_concepts",
+        delete(LessonConcept).where(LessonConcept.concept_id.in_(concept_ids)),  # type: ignore[attr-defined]
+    )
+    await session.exec(
+        update(FeedbackSnippet)
+        .where(FeedbackSnippet.concept_id.in_(concept_ids))  # type: ignore[union-attr]
+        .values(concept_id=None)
+    )
+    # One statement for the whole branch: Postgres checks `parent_id` at its end.
+    await _delete(session, counts, "concepts", delete(Concept).where(Concept.id.in_(concept_ids)))  # type: ignore[attr-defined]
     return Erased(counts)
 
 

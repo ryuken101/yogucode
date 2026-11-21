@@ -187,6 +187,17 @@ A new version is a new `items` row, so membership follows the version family: ad
 removing either version covers both, and `copy_folder_memberships` runs wherever a new
 version is made. Deleting one goes to the Trash (kind `problem_folder`); its problems stay.
 
+**The concept tree is the centre's** (Ken, 21 Nov 2026; `app/concepts.py`, the Skills
+app's Tree tab). Sub-skills under any tag, any depth (`concepts.parent_id`); any teacher or
+the owner adds, renames, moves, reorders or deletes, built-ins included. Global rows are
+never edited: the centre's first edit copies the global taxonomy into the centre
+(`own_taxonomy`, same keys, so the override rule in `list_visible_concepts` hides the
+globals) and moves its problem tags, lesson links and snippets across. A centre row hides
+the global with its key even while trashed, or a deleted built-in would come back. Deleting
+a tag trashes its branch (Trash kind `concept`); readers skip a trashed tag's links, which
+stay for Restore, and `erase_concepts` drops them on purge. A screen holding a global id
+from before the copy still saves (`concepts.current_ids` maps it by key).
+
 **`teacher_documents`** are a teacher's private "My code" files, scoped to the centre and
 `user_id` (`scoping.get_own_teacher_document`): another teacher at the same centre gets a
 404. A separate table from `student_documents` for the same reason `users` is separate from

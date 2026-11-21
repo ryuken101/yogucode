@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import CheckConstraint, DateTime, String, UniqueConstraint
+from sqlalchemy import CheckConstraint, DateTime, String, UniqueConstraint, text
 from sqlmodel import Field, SQLModel
 
 from app.models.base import TimestampMixin, TrashMixin, new_uuid, utcnow
@@ -40,6 +40,12 @@ class Class(TimestampMixin, TrashMixin, table=True):
     # since a CHECK cannot see across tables.
     course_id: uuid.UUID | None = Field(default=None, foreign_key="courses.id")
     current_lesson_id: uuid.UUID | None = Field(default=None, foreign_key="lessons.id")
+    # Which signs put a concept on a child's "revisit" list in the Skills app (Ken, 21 Nov
+    # 2026; `app/skills.py`): had it and lost it, still not passing after several tries,
+    # not practised for weeks. Per class, as classes move at different speeds.
+    revisit_slipping: bool = Field(default=True, sa_column_kwargs={"server_default": text("true")})
+    revisit_stuck: bool = Field(default=True, sa_column_kwargs={"server_default": text("true")})
+    revisit_stale: bool = Field(default=True, sa_column_kwargs={"server_default": text("true")})
 
 
 class ClassTeacher(TimestampMixin, table=True):

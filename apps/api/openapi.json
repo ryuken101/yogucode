@@ -675,6 +675,34 @@
         "title": "ClassPatch",
         "type": "object"
       },
+      "ClassSkillsOut": {
+        "properties": {
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/SkillColumnOut"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/SkillRowOut"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/RevisitSettingsOut"
+          }
+        },
+        "required": [
+          "columns",
+          "rows",
+          "settings"
+        ],
+        "title": "ClassSkillsOut",
+        "type": "object"
+      },
       "ClassStatus": {
         "enum": [
           "active",
@@ -841,6 +869,30 @@
         "title": "CompareTest",
         "type": "object"
       },
+      "ConceptImpactOut": {
+        "description": "What deleting a tag takes with it, for the confirmation.",
+        "properties": {
+          "lessons": {
+            "title": "Lessons",
+            "type": "integer"
+          },
+          "problems": {
+            "title": "Problems",
+            "type": "integer"
+          },
+          "subskills": {
+            "title": "Subskills",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "subskills",
+          "problems",
+          "lessons"
+        ],
+        "title": "ConceptImpactOut",
+        "type": "object"
+      },
       "ConceptIn": {
         "properties": {
           "label": {
@@ -848,6 +900,18 @@
             "minLength": 1,
             "title": "Label",
             "type": "string"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
           }
         },
         "required": [
@@ -875,6 +939,22 @@
             "title": "Own",
             "type": "boolean"
           },
+          "parent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "sort_order": {
+            "title": "Sort Order",
+            "type": "integer"
+          },
           "status": {
             "title": "Status",
             "type": "string"
@@ -885,9 +965,54 @@
           "key",
           "label",
           "status",
-          "own"
+          "own",
+          "parent_id",
+          "sort_order"
         ],
         "title": "ConceptOut",
+        "type": "object"
+      },
+      "ConceptPatch": {
+        "description": "Every field optional. `parent_id` sent as null moves the tag to the top of the tree;\nleft out, it stays where it is.",
+        "properties": {
+          "label": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "sort_order": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort Order"
+          }
+        },
+        "title": "ConceptPatch",
         "type": "object"
       },
       "CourseOut": {
@@ -1377,6 +1502,78 @@
         ],
         "title": "EventType",
         "type": "string"
+      },
+      "EvidenceOut": {
+        "properties": {
+          "assignment_id": {
+            "format": "uuid",
+            "title": "Assignment Id",
+            "type": "string"
+          },
+          "assignment_title": {
+            "title": "Assignment Title",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "attempt_id": {
+            "format": "uuid",
+            "title": "Attempt Id",
+            "type": "string"
+          },
+          "helped": {
+            "title": "Helped",
+            "type": "boolean"
+          },
+          "hints": {
+            "title": "Hints",
+            "type": "integer"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "item_title": {
+            "title": "Item Title",
+            "type": "string"
+          },
+          "marked": {
+            "title": "Marked",
+            "type": "boolean"
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "number"
+          },
+          "weight": {
+            "title": "Weight",
+            "type": "number"
+          }
+        },
+        "required": [
+          "attempt_id",
+          "assignment_id",
+          "assignment_title",
+          "mode",
+          "item_id",
+          "item_title",
+          "outcome",
+          "weight",
+          "hints",
+          "helped",
+          "marked",
+          "at"
+        ],
+        "title": "EvidenceOut",
+        "type": "object"
       },
       "ExampleDoc": {
         "description": "A sample run a child can watch. `inputs` are typed in order, one per `input()`.\n\n`transcript` is what the reference solution's run looked like, filled at publish; on a\ndraft it is always None.",
@@ -4484,6 +4681,68 @@
         "title": "ReleaseOut",
         "type": "object"
       },
+      "RevisitSettingsOut": {
+        "properties": {
+          "slipping": {
+            "title": "Slipping",
+            "type": "boolean"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "stuck": {
+            "title": "Stuck",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "slipping",
+          "stuck",
+          "stale"
+        ],
+        "title": "RevisitSettingsOut",
+        "type": "object"
+      },
+      "RevisitSettingsPatch": {
+        "properties": {
+          "slipping": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slipping"
+          },
+          "stale": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stale"
+          },
+          "stuck": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stuck"
+          }
+        },
+        "title": "RevisitSettingsPatch",
+        "type": "object"
+      },
       "RosterEntryOut": {
         "description": "A student as seen from inside a class: who they are, plus how they got there.",
         "properties": {
@@ -4914,6 +5173,201 @@
           "away_now"
         ],
         "title": "SittingOut",
+        "type": "object"
+      },
+      "SkillColumnOut": {
+        "properties": {
+          "concept_id": {
+            "format": "uuid",
+            "title": "Concept Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "concept_id",
+          "label"
+        ],
+        "title": "SkillColumnOut",
+        "type": "object"
+      },
+      "SkillNodeOut": {
+        "properties": {
+          "below": {
+            "title": "Below",
+            "type": "boolean"
+          },
+          "concept_id": {
+            "format": "uuid",
+            "title": "Concept Id",
+            "type": "string"
+          },
+          "confident": {
+            "title": "Confident",
+            "type": "boolean"
+          },
+          "evidence": {
+            "title": "Evidence",
+            "type": "integer"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "last_seen": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Seen"
+          },
+          "level": {
+            "enum": [
+              "not_taught",
+              "not_yet",
+              "learning",
+              "secure"
+            ],
+            "title": "Level",
+            "type": "string"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "revisit": {
+            "items": {
+              "enum": [
+                "slipping",
+                "stuck",
+                "stale"
+              ],
+              "type": "string"
+            },
+            "title": "Revisit",
+            "type": "array"
+          },
+          "sort_order": {
+            "title": "Sort Order",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "level",
+          "confident",
+          "revisit",
+          "below",
+          "evidence",
+          "last_seen",
+          "concept_id",
+          "label",
+          "parent_id",
+          "sort_order"
+        ],
+        "title": "SkillNodeOut",
+        "type": "object"
+      },
+      "SkillOut": {
+        "properties": {
+          "below": {
+            "title": "Below",
+            "type": "boolean"
+          },
+          "confident": {
+            "title": "Confident",
+            "type": "boolean"
+          },
+          "evidence": {
+            "title": "Evidence",
+            "type": "integer"
+          },
+          "last_seen": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Seen"
+          },
+          "level": {
+            "enum": [
+              "not_taught",
+              "not_yet",
+              "learning",
+              "secure"
+            ],
+            "title": "Level",
+            "type": "string"
+          },
+          "revisit": {
+            "items": {
+              "enum": [
+                "slipping",
+                "stuck",
+                "stale"
+              ],
+              "type": "string"
+            },
+            "title": "Revisit",
+            "type": "array"
+          }
+        },
+        "required": [
+          "level",
+          "confident",
+          "revisit",
+          "below",
+          "evidence",
+          "last_seen"
+        ],
+        "title": "SkillOut",
+        "type": "object"
+      },
+      "SkillRowOut": {
+        "properties": {
+          "cells": {
+            "items": {
+              "$ref": "#/components/schemas/SkillOut"
+            },
+            "title": "Cells",
+            "type": "array"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "display_name",
+          "cells"
+        ],
+        "title": "SkillRowOut",
         "type": "object"
       },
       "SnippetIn": {
@@ -5690,6 +6144,37 @@
         "title": "StudentSignInIn",
         "type": "object"
       },
+      "StudentSkillsOut": {
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/SkillNodeOut"
+            },
+            "title": "Nodes",
+            "type": "array"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/RevisitSettingsOut"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "display_name",
+          "nodes",
+          "settings"
+        ],
+        "title": "StudentSkillsOut",
+        "type": "object"
+      },
       "StudentStatus": {
         "enum": [
           "active",
@@ -5973,7 +6458,8 @@
               "homework",
               "file",
               "folder",
-              "problem_folder"
+              "problem_folder",
+              "concept"
             ],
             "title": "Kind",
             "type": "string"
@@ -8770,6 +9256,135 @@
         ]
       }
     },
+    "/classes/{class_id}/skill-settings": {
+      "patch": {
+        "description": "Which signs put a concept on the class's revisit lists. Any teacher at the centre,\nas any teacher may open any class.",
+        "operationId": "update_skill_settings_classes__class_id__skill_settings_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "class_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Class Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevisitSettingsPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisitSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Skill Settings",
+        "tags": [
+          "skills"
+        ]
+      }
+    },
+    "/classes/{class_id}/skills": {
+      "get": {
+        "operationId": "class_skills_classes__class_id__skills_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "class_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Class Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassSkillsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Class Skills",
+        "tags": [
+          "skills"
+        ]
+      }
+    },
     "/classes/{class_id}/students": {
       "post": {
         "description": "Create a child's account and put them in this class \u2014 the class page's Add student.\n\nReturns the slip (name, username, PIN) to print; Show PIN reveals it again later.",
@@ -8837,6 +9452,159 @@
         "summary": "Add New Student",
         "tags": [
           "roster"
+        ]
+      }
+    },
+    "/classes/{class_id}/students/{student_id}/skills": {
+      "get": {
+        "operationId": "student_skills_classes__class_id__students__student_id__skills_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "class_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Class Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentSkillsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Student Skills",
+        "tags": [
+          "skills"
+        ]
+      }
+    },
+    "/classes/{class_id}/students/{student_id}/skills/{concept_id}/evidence": {
+      "get": {
+        "description": "What a node's level is built from, newest first: the concept and everything under it.",
+        "operationId": "skill_evidence_classes__class_id__students__student_id__skills__concept_id__evidence_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "class_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Class Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "concept_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Concept Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EvidenceOut"
+                  },
+                  "title": "Response Skill Evidence Classes  Class Id  Students  Student Id  Skills  Concept Id  Evidence Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Skill Evidence",
+        "tags": [
+          "skills"
         ]
       }
     },
@@ -9307,7 +10075,7 @@
     },
     "/concepts": {
       "get": {
-        "description": "The taxonomy a teacher can tag with: the global one (edited as YAML) and the centre's own.",
+        "description": "The centre's concept tree, flat: each tag names its parent. Before the centre's\nfirst edit it is the global taxonomy (edited as YAML) plus the centre's own tags.",
         "operationId": "list_concepts_concepts_get",
         "parameters": [
           {
@@ -9359,7 +10127,7 @@
         ]
       },
       "post": {
-        "description": "A tag of the centre's own (Ken, 14 Nov 2026): any teacher may add one, and every\nteacher at the centre sees it, as they see the whole bank. It goes after the others.",
+        "description": "A tag of the centre's own (Ken, 14 Nov 2026), or a sub-skill under any tag (21 Nov\n2026). Any teacher may add one, and every teacher at the centre sees it, as they see the\nwhole bank. It goes after its siblings.",
         "operationId": "create_concept_concepts_post",
         "parameters": [
           {
@@ -9418,9 +10186,60 @@
       }
     },
     "/concepts/{concept_id}": {
+      "delete": {
+        "description": "Delete a tag and every sub-skill under it, to the Trash (Ken, 21 Nov 2026).\n\nProblems and lessons using them lose the tag while it is in the Trash (the readers skip\na trashed tag) and get it back on Restore. A problem whose main tag went has no main\ntag until a teacher picks one, which publishing asks for. Attempts and marks are never\ntouched, so no child's work goes with a tag.",
+        "operationId": "delete_concept_concepts__concept_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "concept_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Concept Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Concept",
+        "tags": [
+          "curriculum"
+        ]
+      },
       "patch": {
-        "description": "Rename one of the centre's tags. The key stays, so problem files naming it still work.",
-        "operationId": "rename_concept_concepts__concept_id__patch",
+        "description": "Rename a tag, move it under another (or to the top), or reorder it among its\nsiblings. The key stays, so problem files naming it still work.",
+        "operationId": "update_concept_concepts__concept_id__patch",
         "parameters": [
           {
             "in": "path",
@@ -9453,7 +10272,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ConceptIn"
+                "$ref": "#/components/schemas/ConceptPatch"
               }
             }
           },
@@ -9481,16 +10300,16 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Rename Concept",
+        "summary": "Update Concept",
         "tags": [
           "curriculum"
         ]
       }
     },
-    "/concepts/{concept_id}/archive": {
-      "post": {
-        "description": "Remove one of the centre's tags \u2014 refused while a problem or lesson still uses it.\n\nStripping it instead would leave a problem without its main concept, which publishing\nneeds, and `check_concepts` refuses an archived tag, so the problem could not be saved\nas it stands. The row is archived, never deleted: old versions keep their reference.",
-        "operationId": "archive_concept_concepts__concept_id__archive_post",
+    "/concepts/{concept_id}/impact": {
+      "get": {
+        "description": "What deleting this tag would take with it: its sub-skills, and how many problems and\nlessons would lose a tag. Read-only \u2014 the centre's copy is made by the delete itself.",
+        "operationId": "concept_impact_concepts__concept_id__impact_get",
         "parameters": [
           {
             "in": "path",
@@ -9524,7 +10343,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ConceptOut"
+                  "$ref": "#/components/schemas/ConceptImpactOut"
                 }
               }
             },
@@ -9541,7 +10360,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Archive Concept",
+        "summary": "Concept Impact",
         "tags": [
           "curriculum"
         ]
@@ -16226,7 +17045,8 @@
                 "homework",
                 "file",
                 "folder",
-                "problem_folder"
+                "problem_folder",
+                "concept"
               ],
               "title": "Kind",
               "type": "string"
@@ -16299,7 +17119,8 @@
                 "homework",
                 "file",
                 "folder",
-                "problem_folder"
+                "problem_folder",
+                "concept"
               ],
               "title": "Kind",
               "type": "string"
@@ -16382,7 +17203,8 @@
                 "homework",
                 "file",
                 "folder",
-                "problem_folder"
+                "problem_folder",
+                "concept"
               ],
               "title": "Kind",
               "type": "string"

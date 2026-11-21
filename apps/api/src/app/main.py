@@ -23,6 +23,7 @@ from app.routers import (
     progress,
     quiz,
     roster,
+    skills,
     student_files,
     student_work,
     teacher_documents,
@@ -52,6 +53,7 @@ app.include_router(events.router)
 app.include_router(homework.router)
 app.include_router(marking.router)
 app.include_router(progress.router)
+app.include_router(skills.router)
 app.include_router(live.router)
 app.include_router(problem_folders.router)
 app.include_router(quiz.router)

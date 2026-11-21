@@ -27,6 +27,7 @@ from app.audit import audit_entry
 from app.auth.principal import CurrentTeacher
 from app.classwork import get_ladder as get_lesson_ladder
 from app.classwork import ladder_items, newest_version, open_classwork_for_lesson, set_ladder
+from app.concepts import branch, current_ids, own_taxonomy
 from app.db import get_session
 from app.models import (
     Concept,
@@ -50,6 +51,7 @@ from app.scoping import (
     list_owned_courses,
     list_visible_concepts,
 )
+from app.trash import trash
 
 router = APIRouter(tags=["curriculum"])
 
@@ -79,9 +81,12 @@ class ConceptOut(BaseModel):
     key: str
     label: str
     status: str
-    # The centre made it (Ken, 14 Nov 2026), so a teacher may rename or remove it. The
-    # global taxonomy is never edited here.
+    # The centre's own row rather than the global one. Since 21 Nov 2026 every tag can be
+    # edited either way: the first edit copies the globals into the centre (`app.concepts`).
     own: bool
+    # The tag this is a sub-skill of; None at the top of the tree.
+    parent_id: uuid.UUID | None
+    sort_order: int
 
     @classmethod
     def build(cls, record: Concept) -> "ConceptOut":
@@ -91,11 +96,32 @@ class ConceptOut(BaseModel):
             label=record.label,
             status=record.status,
             own=record.centre_id is not None,
+            parent_id=record.parent_id,
+            sort_order=record.sort_order,
         )
 
 
 class ConceptIn(BaseModel):
     label: str = Field(min_length=1, max_length=40)
+    # A sub-skill of this tag; absent or None for one at the top of the tree.
+    parent_id: uuid.UUID | None = None
+
+
+class ConceptPatch(BaseModel):
+    """Every field optional. `parent_id` sent as null moves the tag to the top of the tree;
+    left out, it stays where it is."""
+
+    label: str | None = Field(default=None, min_length=1, max_length=40)
+    parent_id: uuid.UUID | None = None
+    sort_order: int | None = None
+
+
+class ConceptImpactOut(BaseModel):
+    """What deleting a tag takes with it, for the confirmation."""
+
+    subskills: int
+    problems: int
+    lessons: int
 
 
 class CourseOut(BaseModel):
@@ -171,7 +197,8 @@ class LessonConceptsIn(BaseModel):
 
 @router.get("/concepts", response_model=list[ConceptOut])
 async def list_concepts(principal: CurrentTeacher, session: SessionDep) -> list[ConceptOut]:
-    """The taxonomy a teacher can tag with: the global one (edited as YAML) and the centre's own."""
+    """The centre's concept tree, flat: each tag names its parent. Before the centre's
+    first edit it is the global taxonomy (edited as YAML) plus the centre's own tags."""
     return [ConceptOut.build(c) for c in await list_visible_concepts(session, principal)]
 
 
@@ -185,13 +212,23 @@ def _label(raw: str) -> str:
 
 
 async def _refuse_duplicate(
-    session: AsyncSession, principal: CurrentTeacher, label: str, besides: uuid.UUID | None = None
+    session: AsyncSession,
+    principal: CurrentTeacher,
+    label: str,
+    parent_id: uuid.UUID | None,
+    besides: uuid.UUID | None = None,
 ) -> None:
+    """Two tags side by side can't share a name. In different places they may: "Looping"
+    under both Lists and Dictionaries is two different skills."""
     for concept in await list_visible_concepts(session, principal):
-        if concept.id != besides and concept.label.casefold() == label.casefold():
+        if (
+            concept.id != besides
+            and concept.parent_id == parent_id
+            and concept.label.casefold() == label.casefold()
+        ):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"There’s already a tag called {concept.label}",
+                detail=f"There’s already a tag called {concept.label} there",
             )
 
 
@@ -215,66 +252,128 @@ async def _free_key(session: AsyncSession, principal: CurrentTeacher, label: str
     return key
 
 
+async def _editable(
+    session: AsyncSession, principal: CurrentTeacher, concept_id: uuid.UUID
+) -> Concept:
+    """The centre's own row for this tag, copying the global taxonomy in first if this is
+    the centre's first edit of it (`app.concepts.own_taxonomy`)."""
+    mapping = await own_taxonomy(session, principal.centre_id)
+    return await get_own_concept(session, principal, mapping.get(concept_id, concept_id))
+
+
+def _after(siblings: list[Concept]) -> int:
+    return max((c.sort_order for c in siblings), default=0) + SORT_STEP
+
+
 @router.post("/concepts", response_model=ConceptOut, status_code=status.HTTP_201_CREATED)
 async def create_concept(
     body: ConceptIn, principal: CurrentTeacher, session: SessionDep
 ) -> ConceptOut:
-    """A tag of the centre's own (Ken, 14 Nov 2026): any teacher may add one, and every
-    teacher at the centre sees it, as they see the whole bank. It goes after the others."""
+    """A tag of the centre's own (Ken, 14 Nov 2026), or a sub-skill under any tag (21 Nov
+    2026). Any teacher may add one, and every teacher at the centre sees it, as they see the
+    whole bank. It goes after its siblings."""
     label = _label(body.label)
-    await _refuse_duplicate(session, principal, label)
+    parent_id = None
+    if body.parent_id is not None:
+        parent_id = (await _editable(session, principal, body.parent_id)).id
+    await _refuse_duplicate(session, principal, label, parent_id)
     visible = await list_visible_concepts(session, principal)
     record = Concept(
         centre_id=principal.centre_id,
         key=await _free_key(session, principal, label),
         label=label,
-        sort_order=max((c.sort_order for c in visible), default=0) + SORT_STEP,
+        parent_id=parent_id,
+        sort_order=_after([c for c in visible if c.parent_id == parent_id]),
         status=ConceptStatus.ACTIVE,
     )
     session.add(record)
     await session.flush()
-    session.add(audit_entry(principal, "concept.created", "concept", record.id, label=label))
+    session.add(
+        audit_entry(
+            principal,
+            "concept.created",
+            "concept",
+            record.id,
+            label=label,
+            parent_id=str(parent_id) if parent_id else None,
+        )
+    )
     await session.commit()
     await session.refresh(record)
     return ConceptOut.build(record)
 
 
 @router.patch("/concepts/{concept_id}", response_model=ConceptOut)
-async def rename_concept(
-    concept_id: uuid.UUID, body: ConceptIn, principal: CurrentTeacher, session: SessionDep
+async def update_concept(
+    concept_id: uuid.UUID, body: ConceptPatch, principal: CurrentTeacher, session: SessionDep
 ) -> ConceptOut:
-    """Rename one of the centre's tags. The key stays, so problem files naming it still work."""
-    record = await get_own_concept(session, principal, concept_id)
-    label = _label(body.label)
+    """Rename a tag, move it under another (or to the top), or reorder it among its
+    siblings. The key stays, so problem files naming it still work."""
+    record = await _editable(session, principal, concept_id)
+    changed: dict[str, object] = {}
+
+    parent_id = record.parent_id
+    if "parent_id" in body.model_fields_set:
+        parent_id = None
+        if body.parent_id is not None:
+            parent = await _editable(session, principal, body.parent_id)
+            tree = await list_visible_concepts(session, principal)
+            if parent.id in branch(tree, record.id):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="A tag can’t go inside itself or one of its own sub-skills.",
+                )
+            parent_id = parent.id
+
+    label = _label(body.label) if body.label is not None else record.label
+    if label != record.label or parent_id != record.parent_id:
+        await _refuse_duplicate(session, principal, label, parent_id, besides=record.id)
     if label != record.label:
-        await _refuse_duplicate(session, principal, label, besides=record.id)
         record.label = label
+        changed["label"] = label
+    if parent_id != record.parent_id:
+        record.parent_id = parent_id
+        changed["parent_id"] = str(parent_id) if parent_id else None
+        if body.sort_order is None:
+            siblings = [
+                c
+                for c in await list_visible_concepts(session, principal)
+                if c.parent_id == parent_id and c.id != record.id
+            ]
+            record.sort_order = _after(siblings)
+    if body.sort_order is not None and body.sort_order != record.sort_order:
+        record.sort_order = body.sort_order
+        changed["sort_order"] = body.sort_order
+
+    if changed:
         record.updated_at = utcnow()
         session.add(record)
-        session.add(audit_entry(principal, "concept.renamed", "concept", record.id, label=label))
-        await session.commit()
-        await session.refresh(record)
+        action = "concept.moved" if "parent_id" in changed else "concept.renamed"
+        if set(changed) == {"sort_order"}:
+            action = "concept.reordered"
+        session.add(audit_entry(principal, action, "concept", record.id, **changed))
+    await session.commit()
+    await session.refresh(record)
     return ConceptOut.build(record)
 
 
-@router.post("/concepts/{concept_id}/archive", response_model=ConceptOut)
-async def archive_concept(
+@router.get("/concepts/{concept_id}/impact", response_model=ConceptImpactOut)
+async def concept_impact(
     concept_id: uuid.UUID, principal: CurrentTeacher, session: SessionDep
-) -> ConceptOut:
-    """Remove one of the centre's tags — refused while a problem or lesson still uses it.
-
-    Stripping it instead would leave a problem without its main concept, which publishing
-    needs, and `check_concepts` refuses an archived tag, so the problem could not be saved
-    as it stands. The row is archived, never deleted: old versions keep their reference.
-    """
-    record = await get_own_concept(session, principal, concept_id)
+) -> ConceptImpactOut:
+    """What deleting this tag would take with it: its sub-skills, and how many problems and
+    lessons would lose a tag. Read-only — the centre's copy is made by the delete itself."""
+    tree = await list_visible_concepts(session, principal)
+    if concept_id not in {c.id for c in tree}:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="concept not found")
+    ids = branch(tree, concept_id)
     problems = (
         await session.exec(
             select(func.count(func.distinct(func.coalesce(Item.parent_id, Item.id))))
             .select_from(ItemConcept)
             .join(Item, Item.id == ItemConcept.item_id)  # type: ignore[arg-type]
             .where(
-                ItemConcept.concept_id == record.id,
+                col(ItemConcept.concept_id).in_(ids),
                 Item.centre_id == principal.centre_id,
                 col(Item.status).in_([ItemStatus.DRAFT, ItemStatus.PUBLISHED]),
             )
@@ -282,33 +381,31 @@ async def archive_concept(
     ).one()
     lessons = (
         await session.exec(
-            select(func.count())
-            .select_from(LessonConcept)
+            select(func.count(func.distinct(LessonConcept.lesson_id)))
             .join(Lesson, Lesson.id == LessonConcept.lesson_id)  # type: ignore[arg-type]
             .where(
-                LessonConcept.concept_id == record.id,
+                col(LessonConcept.concept_id).in_(ids),
                 Lesson.centre_id == principal.centre_id,
                 Lesson.status != CurriculumStatus.ARCHIVED,
             )
         )
     ).one()
-    if problems or lessons:
-        uses = [
-            f"{n} {word}{'' if n == 1 else 's'}"
-            for n, word in ((problems, "problem"), (lessons, "lesson"))
-            if n
-        ]
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Used by {' and '.join(uses)}. Take the tag off them first.",
-        )
-    record.status = ConceptStatus.ARCHIVED
-    record.updated_at = utcnow()
-    session.add(record)
-    session.add(audit_entry(principal, "concept.archived", "concept", record.id))
-    await session.commit()
-    await session.refresh(record)
-    return ConceptOut.build(record)
+    return ConceptImpactOut(subskills=len(ids) - 1, problems=problems, lessons=lessons)
+
+
+@router.delete("/concepts/{concept_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_concept(
+    concept_id: uuid.UUID, principal: CurrentTeacher, session: SessionDep
+) -> None:
+    """Delete a tag and every sub-skill under it, to the Trash (Ken, 21 Nov 2026).
+
+    Problems and lessons using them lose the tag while it is in the Trash (the readers skip
+    a trashed tag) and get it back on Restore. A problem whose main tag went has no main
+    tag until a teacher picks one, which publishing asks for. Attempts and marks are never
+    touched, so no child's work goes with a tag.
+    """
+    record = await _editable(session, principal, concept_id)
+    await trash(session, principal, "concept", record.id)
 
 
 # --- courses ------------------------------------------------------------------------
@@ -523,7 +620,11 @@ async def _lesson_concept_ids(session: AsyncSession, lesson_id: uuid.UUID) -> li
     return sorted(
         (
             await session.exec(
-                select(LessonConcept.concept_id).where(LessonConcept.lesson_id == lesson_id)
+                select(LessonConcept.concept_id)
+                .join(Concept, col(Concept.id) == LessonConcept.concept_id)
+                .where(
+                    LessonConcept.lesson_id == lesson_id, Concept.status != ConceptStatus.ARCHIVED
+                )
             )
         ).all()
     )
@@ -623,17 +724,23 @@ async def set_lesson_concepts(
     unknown id is a 422 naming nothing, the same as a missing one would be.
     """
     record = await get_owned_lesson(session, principal, lesson_id)
-    wanted = set(body.concept_ids)
-    visible = {c.id for c in await list_visible_concepts(session, principal)}
-    if not wanted <= visible:
+    now = await current_ids(session, principal, body.concept_ids)
+    if now is None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="One or more concepts are not available",
         )
+    wanted = set(now.values())
 
     current = set(await _lesson_concept_ids(session, record.id))
     if wanted != current:
-        await session.exec(delete(LessonConcept).where(LessonConcept.lesson_id == record.id))  # type: ignore[arg-type]
+        # Only the live links: one to a tag in the Trash stays, for Restore.
+        await session.exec(
+            delete(LessonConcept).where(
+                LessonConcept.lesson_id == record.id,  # type: ignore[arg-type]
+                col(LessonConcept.concept_id).in_(current),
+            )
+        )
         session.add_all(LessonConcept(lesson_id=record.id, concept_id=cid) for cid in wanted)
         session.add(
             audit_entry(

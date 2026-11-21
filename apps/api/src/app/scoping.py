@@ -26,7 +26,7 @@ import uuid
 from collections.abc import Sequence
 
 from fastapi import HTTPException, status
-from sqlmodel import func, select
+from sqlmodel import col, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.auth.principal import Principal
@@ -528,7 +528,12 @@ async def list_course_outline(
         return units, lessons, []
     links = (
         await session.exec(
-            select(LessonConcept).where(LessonConcept.lesson_id.in_(lesson_ids))  # type: ignore[attr-defined]
+            select(LessonConcept)
+            .join(Concept, col(Concept.id) == LessonConcept.concept_id)
+            .where(
+                LessonConcept.lesson_id.in_(lesson_ids),  # type: ignore[attr-defined]
+                Concept.status != ConceptStatus.ARCHIVED,
+            )
         )
     ).all()
     return units, lessons, links
@@ -537,8 +542,8 @@ async def list_course_outline(
 async def get_own_concept(
     session: AsyncSession, principal: Principal, concept_id: uuid.UUID
 ) -> Concept:
-    """A concept this centre made itself (Ken, 14 Nov 2026), not archived, or 404. The global
-    taxonomy is visible to every centre but edited only as YAML, so it is a 404 here too."""
+    """A concept tag of this centre's own, not archived or in the Trash, or 404. A global
+    row is a 404 here too: a teacher edits the centre's copy (`app.concepts`)."""
     found = (
         await session.exec(
             select(Concept).where(
@@ -556,24 +561,28 @@ async def get_own_concept(
 async def list_visible_concepts(session: AsyncSession, principal: Principal) -> list[Concept]:
     """The taxonomy as this centre sees it: global concepts, with the centre's own on top.
 
-    A centre concept whose key matches a global one *replaces* it — that is what "override"
-    in `models/concepts.py` means — so the result has one row per key. Archived concepts
-    are left out; provisional ones are not, because the whole taxonomy is provisional
-    until next term's scope and sequence is confirmed.
+    A centre row whose key matches a global one *replaces* it — that is what "override"
+    in `models/concepts.py` means, and how the centre's copy of the taxonomy
+    (`app.concepts.own_taxonomy`) hides the global rows. It does so even while archived or
+    in the Trash: a tag the centre deleted must not come back as the global it was copied
+    from. Archived rows are then left out; provisional ones are not, because the whole
+    taxonomy is provisional until next term's scope and sequence is confirmed.
     """
     rows = (
         await session.exec(
             select(Concept).where(
                 (Concept.centre_id == principal.centre_id) | (Concept.centre_id.is_(None)),  # type: ignore[union-attr]
-                Concept.status != ConceptStatus.ARCHIVED,
             )
         )
     ).all()
-    by_key: dict[str, Concept] = {}
-    for concept in rows:
-        if concept.key not in by_key or concept.centre_id is not None:
-            by_key[concept.key] = concept
-    return sorted(by_key.values(), key=lambda c: (c.sort_order, c.key))
+    centre_keys = {c.key for c in rows if c.centre_id is not None}
+    visible = [
+        c
+        for c in rows
+        if c.status != ConceptStatus.ARCHIVED
+        and (c.centre_id is not None or c.key not in centre_keys)
+    ]
+    return sorted(visible, key=lambda c: (c.sort_order, c.key))
 
 
 # --- problem bank -----------------------------------------------------------------------

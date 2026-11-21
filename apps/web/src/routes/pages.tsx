@@ -22,6 +22,9 @@ import { StudentHome } from './StudentHome'
  * download on centre wifi. Lazy, so the entry chunk stays what a child needs.
  */
 const Curriculum = lazy(() => import('./Curriculum').then((m) => ({ default: m.Curriculum })))
+const SkillTree = lazy(() => import('./SkillTree').then((m) => ({ default: m.SkillTree })))
+const SkillsClass = lazy(() => import('./SkillsClass').then((m) => ({ default: m.SkillsClass })))
+const SkillsChild = lazy(() => import('./SkillsChild').then((m) => ({ default: m.SkillsChild })))
 const ProblemBank = lazy(() =>
   import('./ProblemBank').then((m) => ({ default: m.ProblemBank })),
 )
@@ -120,6 +123,8 @@ export const teacherPages = (
     />
     <Route path="/classes/:classId/live" element={<Loading><Live /></Loading>} />
     <Route path="/classes/:classId/progress" element={<Loading><Progress /></Loading>} />
+    <Route path="/classes/:classId/skills" element={<Loading><SkillsClass /></Loading>} />
+    <Route path="/classes/:classId/skills/:studentId" element={<Loading><SkillsChild /></Loading>} />
     <Route path="/assignments/:assignmentId/mark" element={<Loading><MarkingStart /></Loading>} />
     <Route
       path="/assignments/:assignmentId/mark/:itemId"
@@ -127,6 +132,7 @@ export const teacherPages = (
     />
     <Route path="/students/:studentId" element={<Loading><StudentHistory /></Loading>} />
     <Route path="/curriculum" element={<Loading><Curriculum /></Loading>} />
+    <Route path="/skills/tree" element={<Loading><SkillTree /></Loading>} />
     <Route path="/teachers" element={<Loading><Teachers /></Loading>} />
     <Route path="/my-code" element={<Loading><MyCode /></Loading>} />
     <Route path="/trash" element={<Loading><Trash /></Loading>} />

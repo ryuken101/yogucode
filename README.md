@@ -209,6 +209,12 @@ the taxonomy must be a config edit, not a migration.
 now; Phase 4 is built; Phase 5 steps 7–10 are built.** Phases 4–5 are planned in
 `~/Documents/Ken Nguyen/Startup/phase-4-5-plan.md`.
 
+**Phase 8 (mastery) has started** (21 Nov 2026). The concept tags are now a tree the
+centre shapes itself: sub-skills under any tag, at any depth. A new **Skills** app shows
+each child's level on every concept, worked out when the page is read from their
+attempts and marks (`app/skills.py`), and flags what to revisit. Teachers see a class
+grid and one child's tree. The child's and parent's views are still to come.
+
 Phase 1's plan lives in `~/Documents/Ken Nguyen/Startup/phase-1-plan.md` and runs as eleven
 steps: backend is 1–8, frontend is 9, and 10–11 ship it. Steps 10 and 11 are **deliberately
 deferred** to after Phase 3 or 4 and before Phase 5. Deploying earlier bought nothing —

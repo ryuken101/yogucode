@@ -28,6 +28,8 @@ export const keys = {
   folders: (scope: FolderScope) => ['folders', scope] as const,
   teacherDocument: (documentId: string) => ['teacher-document', documentId] as const,
   classes: ['classes'] as const,
+  /** Everything Skills shows for one class: the grid, each child's tree, their evidence. */
+  skills: (classId: string) => ['skills', classId] as const,
   /** Under `classes`, so invalidating the list refreshes this too. */
   classesWithArchived: ['classes', 'all'] as const,
   class: (classId: string) => ['class', classId] as const,
@@ -584,17 +586,26 @@ export function useConcepts() {
   return useQuery({ queryKey: keys.concepts, queryFn: api.listConcepts, staleTime: Infinity })
 }
 
-/** The centre's own tags (Ken, 14 Nov 2026): add, rename, remove. Built-ins are YAML only. */
+/**
+ * The centre's tag tree (Ken, 14 and 21 Nov 2026): add a tag or a sub-skill, rename, move,
+ * reorder, delete with its branch. Any tag, built-ins included: the first edit copies the
+ * built-ins into the centre, so their ids change — hence the whole cache refreshes, as the
+ * problems and lessons holding them refresh too.
+ */
 export function useConceptEdits() {
   const client = useQueryClient()
-  const refresh = () => client.invalidateQueries({ queryKey: keys.concepts })
-  const create = useMutation({ mutationFn: api.createConcept, onSuccess: refresh })
-  const rename = useMutation({
-    mutationFn: ({ id, label }: { id: string; label: string }) => api.renameConcept(id, label),
+  const refresh = () => client.invalidateQueries()
+  const create = useMutation({
+    mutationFn: ({ label, parentId = null }: { label: string; parentId?: string | null }) =>
+      api.createConcept(label, parentId),
     onSuccess: refresh,
   })
-  const remove = useMutation({ mutationFn: api.archiveConcept, onSuccess: refresh })
-  return { create, rename, remove }
+  const update = useMutation({
+    mutationFn: ({ id, ...body }: { id: string } & Schemas['ConceptPatch']) => api.updateConcept(id, body),
+    onSuccess: refresh,
+  })
+  const remove = useMutation({ mutationFn: api.deleteConcept, onSuccess: refresh })
+  return { create, update, remove }
 }
 
 export function useCourses() {
@@ -830,6 +841,36 @@ export function useTodayGrid(classId: string) {
 
 export function useStudentHistory(studentId: string) {
   return useQuery({ queryKey: keys.history(studentId), queryFn: () => api.studentHistory(studentId) })
+}
+
+/* --- skills (21 Nov 2026) ------------------------------------------------------------ */
+
+export function useClassSkills(classId: string) {
+  return useQuery({ queryKey: keys.skills(classId), queryFn: () => api.classSkills(classId) })
+}
+
+export function useStudentSkills(classId: string, studentId: string) {
+  return useQuery({
+    queryKey: [...keys.skills(classId), 'student', studentId],
+    queryFn: () => api.studentSkills(classId, studentId),
+  })
+}
+
+export function useSkillEvidence(classId: string, studentId: string, conceptId: string | null) {
+  return useQuery({
+    queryKey: [...keys.skills(classId), 'evidence', studentId, conceptId],
+    queryFn: () => api.skillEvidence(classId, studentId, conceptId!),
+    enabled: conceptId !== null,
+  })
+}
+
+/** A class's revisit switches. Every flag on its Skills pages can change, so they refetch. */
+export function useSkillSettings(classId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (body: Schemas['RevisitSettingsPatch']) => api.updateSkillSettings(classId, body),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.skills(classId) }),
+  })
 }
 
 /* --- quizzes ------------------------------------------------------------------------ */

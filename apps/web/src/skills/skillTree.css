@@ -1,0 +1,81 @@
+/*
+ * The child's skill tree as a game-style tree (Ken, 21 Nov 2026): each top-level concept is
+ * a small top-down tree, its sub-skills hanging from it by hairlines. Plain nested lists;
+ * the connectors are borders on each item's ::before/::after.
+ */
+
+.skill-tree ul {
+  display: flex;
+  justify-content: center;
+  position: relative;
+  margin: 0;
+  padding: 1.25rem 0 0;
+}
+
+.skill-tree > ul {
+  padding-top: 0;
+}
+
+.skill-tree li {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  padding: 1.25rem 0.4rem 0;
+}
+
+.skill-tree > ul > li {
+  padding-top: 0;
+}
+
+.skill-tree li::before,
+.skill-tree li::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 50%;
+  height: 1.25rem;
+  border-top: 2px solid var(--color-line);
+}
+
+.skill-tree li::before {
+  right: 50%;
+}
+
+.skill-tree li::after {
+  left: 50%;
+  border-left: 2px solid var(--color-line);
+}
+
+.skill-tree li:only-child::before,
+.skill-tree > ul > li::after {
+  display: none;
+}
+
+.skill-tree li:only-child::after {
+  border-top: 0;
+}
+
+.skill-tree li:first-child::before,
+.skill-tree li:last-child::after {
+  border: 0 none;
+}
+
+.skill-tree li:last-child::before {
+  border-right: 2px solid var(--color-line);
+  border-radius: 0 0.6rem 0 0;
+}
+
+.skill-tree li:first-child::after {
+  border-radius: 0.6rem 0 0 0;
+}
+
+.skill-tree ul ul::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  height: 1.25rem;
+  border-left: 2px solid var(--color-line);
+}

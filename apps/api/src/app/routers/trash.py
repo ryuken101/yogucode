@@ -32,6 +32,7 @@ TeacherKind = Literal[
     "file",
     "folder",
     "problem_folder",
+    "concept",
 ]
 ChildKind = Literal["file", "folder"]
 

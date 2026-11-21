@@ -9,6 +9,11 @@ configured for a different course without changing code?
 is a centre's own override or addition. Teachers add, rename and remove the centre's own
 from the problem editor's tag picker (Ken, 14 Nov 2026; `routers/curriculum.py`). Those get
 a key no global concept has, so they sit beside the taxonomy rather than override it.
+
+**The centre's tree** (Ken, 21 Nov 2026): teachers shape it — sub-skills under any tag, as
+deep as they like, and any tag deleted with its branch (to the Trash, hence `TrashMixin`).
+The first edit copies the global taxonomy into the centre (`app.concepts.own_taxonomy`), so
+the global rows are never changed by a teacher: they stay the template the YAML edits.
 """
 
 import uuid
@@ -17,7 +22,7 @@ from enum import StrEnum
 from sqlalchemy import CheckConstraint, Index, String, UniqueConstraint, text
 from sqlmodel import Field
 
-from app.models.base import TimestampMixin, new_uuid
+from app.models.base import TimestampMixin, TrashMixin, new_uuid
 
 
 class ConceptStatus(StrEnum):
@@ -26,7 +31,7 @@ class ConceptStatus(StrEnum):
     ARCHIVED = "archived"
 
 
-class Concept(TimestampMixin, table=True):
+class Concept(TimestampMixin, TrashMixin, table=True):
     __tablename__ = "concepts"
     __table_args__ = (
         UniqueConstraint("centre_id", "key", name="uq_concepts_centre_key"),

@@ -155,15 +155,27 @@ export const api = {
   /* --- teacher: curriculum ------------------------------------------------------- */
 
   listConcepts: () => request<Schemas['ConceptOut'][]>('/concepts'),
-  createConcept: (label: string) =>
-    request<Schemas['ConceptOut']>('/concepts', { method: 'POST', body: { label } satisfies Schemas['ConceptIn'] }),
-  renameConcept: (conceptId: string, label: string) =>
-    request<Schemas['ConceptOut']>(`/concepts/${conceptId}`, {
-      method: 'PATCH',
-      body: { label } satisfies Schemas['ConceptIn'],
+  createConcept: (label: string, parentId: string | null = null) =>
+    request<Schemas['ConceptOut']>('/concepts', {
+      method: 'POST',
+      body: { label, parent_id: parentId } satisfies Schemas['ConceptIn'],
     }),
-  archiveConcept: (conceptId: string) =>
-    request<Schemas['ConceptOut']>(`/concepts/${conceptId}/archive`, { method: 'POST' }),
+  /** Rename, move (`parent_id: null` is the top of the tree) or reorder a tag. */
+  updateConcept: (conceptId: string, body: Schemas['ConceptPatch']) =>
+    request<Schemas['ConceptOut']>(`/concepts/${conceptId}`, { method: 'PATCH', body }),
+  conceptImpact: (conceptId: string) =>
+    request<Schemas['ConceptImpactOut']>(`/concepts/${conceptId}/impact`),
+  deleteConcept: (conceptId: string) => request<void>(`/concepts/${conceptId}`, { method: 'DELETE' }),
+
+  /* --- teacher: skills (21 Nov 2026) --------------------------------------------- */
+
+  classSkills: (classId: string) => request<Schemas['ClassSkillsOut']>(`/classes/${classId}/skills`),
+  studentSkills: (classId: string, studentId: string) =>
+    request<Schemas['StudentSkillsOut']>(`/classes/${classId}/students/${studentId}/skills`),
+  skillEvidence: (classId: string, studentId: string, conceptId: string) =>
+    request<Schemas['EvidenceOut'][]>(`/classes/${classId}/students/${studentId}/skills/${conceptId}/evidence`),
+  updateSkillSettings: (classId: string, body: Schemas['RevisitSettingsPatch']) =>
+    request<Schemas['RevisitSettingsOut']>(`/classes/${classId}/skill-settings`, { method: 'PATCH', body }),
   listCourses: () => request<Schemas['CourseOut'][]>('/courses'),
   readCourse: (courseId: string) => request<Schemas['CourseTreeOut']>(`/courses/${courseId}`),
   createCourse: (title: string) =>

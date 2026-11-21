@@ -369,26 +369,21 @@ async def test_a_tag_is_renamed_but_keeps_its_key(client, signed_in, session: As
     assert clash.status_code == 409
 
 
-async def test_only_the_centres_own_tags_can_be_changed(
+async def test_another_centres_tags_cannot_be_changed(
     client, signed_in, session: AsyncSession, foreign_centre
 ) -> None:
     headers = await signed_in()
-    (built_in,) = await make_concepts(session, "lists")
     (theirs,) = await make_concepts(session, "vex", centre_id=foreign_centre["centre"].id)
 
-    for concept in (built_in, theirs):
-        rename = await client.patch(
-            f"/concepts/{concept.id}", json={"label": "Mine now"}, headers=headers
-        )
-        assert rename.status_code == 404
-        assert (
-            await client.post(f"/concepts/{concept.id}/archive", headers=headers)
-        ).status_code == 404
-    assert (built_in.label, built_in.status, theirs.status) == (
-        "Lists",
-        "provisional",
-        "provisional",
+    rename = await client.patch(f"/concepts/{theirs.id}", json={"label": "Mine"}, headers=headers)
+    assert rename.status_code == 404
+    assert (await client.delete(f"/concepts/{theirs.id}", headers=headers)).status_code == 404
+    assert (await client.get(f"/concepts/{theirs.id}/impact", headers=headers)).status_code == 404
+    under = await client.post(
+        "/concepts", json={"label": "Sub", "parent_id": str(theirs.id)}, headers=headers
     )
+    assert under.status_code == 404
+    assert (theirs.label, theirs.status, theirs.deleted_at) == ("Vex", "provisional", None)
 
 
 async def test_a_student_cannot_change_tags(client, signed_in_student) -> None:
@@ -396,37 +391,206 @@ async def test_a_student_cannot_change_tags(client, signed_in_student) -> None:
     some = uuid.uuid4()
     assert (await client.post("/concepts", json={"label": "x"})).status_code == 403
     assert (await client.patch(f"/concepts/{some}", json={"label": "x"})).status_code == 403
-    assert (await client.post(f"/concepts/{some}/archive")).status_code == 403
+    assert (await client.delete(f"/concepts/{some}")).status_code == 403
+    assert (await client.get(f"/concepts/{some}/impact")).status_code == 403
 
 
-async def test_a_tag_in_use_cannot_be_removed(client, signed_in, session: AsyncSession) -> None:
+# --- the centre's tree (Ken, 21 Nov 2026) ---------------------------------------------
+
+
+async def test_editing_a_built_in_tag_copies_the_taxonomy_into_the_centre(
+    client, signed_in, session: AsyncSession
+) -> None:
     from work_builders import problem_doc
 
     headers = await signed_in()
-    tag = (await client.post("/concepts", json={"label": "Turtle"}, headers=headers)).json()
-    item = (await client.post("/items", json=problem_doc(tag["id"]), headers=headers)).json()
+    lists, dicts = await make_concepts(session, "lists", "dicts")
+    item = (await client.post("/items", json=problem_doc(str(lists.id)), headers=headers)).json()
     tree = await build_course(client, headers)
+    lesson_id = tree["lessons"][0]["id"]
     await client.put(
-        f"/lessons/{tree['lessons'][0]['id']}/concepts",
-        json={"concept_ids": [tag["id"]]},
-        headers=headers,
+        f"/lessons/{lesson_id}/concepts", json={"concept_ids": [str(dicts.id)]}, headers=headers
     )
 
-    refused = await client.post(f"/concepts/{tag['id']}/archive", headers=headers)
-    assert refused.status_code == 409
-    assert (
-        refused.json()["detail"] == "Used by 1 problem and 1 lesson. Take the tag off them first."
+    renamed = await client.patch(
+        f"/concepts/{lists.id}", json={"label": "Lists and loops"}, headers=headers
+    )
+    assert renamed.status_code == 200, renamed.text
+    ours = renamed.json()
+    assert ours["id"] != str(lists.id) and ours["key"] == "lists" and ours["own"] is True
+
+    # The global rows are never changed; the centre now sees only its own copies.
+    assert (lists.label, lists.centre_id) == ("Lists", None)
+    concepts = (await client.get("/concepts", headers=headers)).json()
+    assert [(c["key"], c["own"]) for c in concepts] == [("lists", True), ("dicts", True)]
+    our_dicts = concepts[1]["id"]
+
+    # The problem's and the lesson's tags moved with it.
+    doc = (await client.get(f"/items/{item['id']}", headers=headers)).json()["document"]
+    assert (doc["concept_ids"], doc["primary_concept_id"]) == ([ours["id"]], ours["id"])
+    course = (await client.get(f"/courses/{tree['course']['id']}", headers=headers)).json()
+    assert course["units"][0]["lessons"][0]["concept_ids"] == [our_dicts]
+
+    # An editor opened before the copy still saves with the global id it was holding.
+    saved = await client.put(
+        f"/items/{item['id']}", json=problem_doc(str(lists.id)), headers=headers
+    )
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["document"]["concept_ids"] == [ours["id"]]
+
+
+async def test_sub_skills_nest_as_deep_as_a_teacher_likes(
+    client, signed_in, session: AsyncSession
+) -> None:
+    headers = await signed_in()
+    (dicts,) = await make_concepts(session, "dicts")
+
+    values = await client.post(
+        "/concepts", json={"label": ".values()", "parent_id": str(dicts.id)}, headers=headers
+    )
+    assert values.status_code == 201, values.text
+    values = values.json()
+    our_dicts = values["parent_id"]
+    assert our_dicts != str(dicts.id), "made under the centre's copy"
+    deeper = (
+        await client.post(
+            "/concepts", json={"label": "in a loop", "parent_id": values["id"]}, headers=headers
+        )
+    ).json()
+    assert deeper["parent_id"] == values["id"]
+
+    # The same name may sit in two places, never twice side by side.
+    elsewhere = await client.post("/concepts", json={"label": "in a loop"}, headers=headers)
+    assert elsewhere.status_code == 201
+    twice = await client.post(
+        "/concepts", json={"label": "In a loop", "parent_id": values["id"]}, headers=headers
+    )
+    assert twice.status_code == 409
+
+
+async def test_a_tag_moves_but_never_inside_itself(
+    client, signed_in, session: AsyncSession
+) -> None:
+    headers = await signed_in()
+    top = (await client.post("/concepts", json={"label": "Loops"}, headers=headers)).json()
+    child = (
+        await client.post(
+            "/concepts", json={"label": "for", "parent_id": top["id"]}, headers=headers
+        )
+    ).json()
+    other = (await client.post("/concepts", json={"label": "Lists"}, headers=headers)).json()
+
+    inside = await client.patch(
+        f"/concepts/{top['id']}", json={"parent_id": child["id"]}, headers=headers
+    )
+    assert inside.status_code == 409
+    itself = await client.patch(
+        f"/concepts/{top['id']}", json={"parent_id": top["id"]}, headers=headers
+    )
+    assert itself.status_code == 409
+
+    moved = await client.patch(
+        f"/concepts/{child['id']}", json={"parent_id": other["id"]}, headers=headers
+    )
+    assert moved.json()["parent_id"] == other["id"]
+    # Sending null moves it to the top; leaving parent_id out leaves it where it is.
+    renamed = await client.patch(f"/concepts/{child['id']}", json={"label": "For"}, headers=headers)
+    assert renamed.json()["parent_id"] == other["id"]
+    to_top = await client.patch(
+        f"/concepts/{child['id']}", json={"parent_id": None}, headers=headers
+    )
+    assert to_top.json()["parent_id"] is None
+    actions = (await session.exec(select(AuditLog.action))).all()
+    assert "concept.moved" in actions and "concept.renamed" in actions
+
+
+async def test_deleting_a_tag_takes_its_branch_to_the_trash_and_restore_brings_it_back(
+    client, signed_in, session: AsyncSession
+) -> None:
+    from work_builders import problem_doc
+
+    headers = await signed_in()
+    (dicts,) = await make_concepts(session, "dicts")
+    values = (
+        await client.post(
+            "/concepts", json={"label": ".values()", "parent_id": str(dicts.id)}, headers=headers
+        )
+    ).json()
+    our_dicts = values["parent_id"]
+    loop = (
+        await client.post(
+            "/concepts", json={"label": "in a loop", "parent_id": values["id"]}, headers=headers
+        )
+    ).json()
+    item = (await client.post("/items", json=problem_doc(values["id"]), headers=headers)).json()
+    tree = await build_course(client, headers)
+    lesson_id = tree["lessons"][0]["id"]
+    await client.put(
+        f"/lessons/{lesson_id}/concepts", json={"concept_ids": [loop["id"]]}, headers=headers
     )
 
-    await client.post(f"/items/{item['id']}/archive", headers=headers)
-    await client.put(
-        f"/lessons/{tree['lessons'][0]['id']}/concepts", json={"concept_ids": []}, headers=headers
-    )
-    removed = await client.post(f"/concepts/{tag['id']}/archive", headers=headers)
-    assert removed.status_code == 200
-    assert all(
-        c["id"] != tag["id"] for c in (await client.get("/concepts", headers=headers)).json()
-    )
-    # Its row stays, archived; the same name can be used again, with a fresh key.
-    again = (await client.post("/concepts", json={"label": "Turtle"}, headers=headers)).json()
-    assert again["key"] == "turtle_2"
+    impact = (await client.get(f"/concepts/{values['id']}/impact", headers=headers)).json()
+    assert impact == {"subskills": 1, "problems": 1, "lessons": 1}
+
+    assert (await client.delete(f"/concepts/{values['id']}", headers=headers)).status_code == 204
+    ids = {c["id"] for c in (await client.get("/concepts", headers=headers)).json()}
+    assert ids == {our_dicts}
+    doc = (await client.get(f"/items/{item['id']}", headers=headers)).json()["document"]
+    assert (doc["concept_ids"], doc["primary_concept_id"]) == ([], None)
+    course = (await client.get(f"/courses/{tree['course']['id']}", headers=headers)).json()
+    assert course["units"][0]["lessons"][0]["concept_ids"] == []
+
+    # One entry in the Trash for the branch; a sub-skill can't come back on its own.
+    listed = [
+        e for e in (await client.get("/trash", headers=headers)).json() if e["kind"] == "concept"
+    ]
+    assert [(e["id"], e["name"]) for e in listed] == [(values["id"], ".values()")]
+    alone = await client.post(f"/trash/concept/{loop['id']}/restore", headers=headers)
+    assert alone.status_code == 409
+
+    restored = await client.post(f"/trash/concept/{values['id']}/restore", headers=headers)
+    assert restored.status_code == 204
+    ids = {c["id"] for c in (await client.get("/concepts", headers=headers)).json()}
+    assert ids == {our_dicts, values["id"], loop["id"]}
+    doc = (await client.get(f"/items/{item['id']}", headers=headers)).json()["document"]
+    assert doc["primary_concept_id"] == values["id"]
+    course = (await client.get(f"/courses/{tree['course']['id']}", headers=headers)).json()
+    assert course["units"][0]["lessons"][0]["concept_ids"] == [loop["id"]]
+
+
+async def test_a_deleted_built_in_tag_stays_deleted(
+    client, signed_in, session: AsyncSession
+) -> None:
+    headers = await signed_in()
+    lists, _ = await make_concepts(session, "lists", "range")
+
+    assert (await client.delete(f"/concepts/{lists.id}", headers=headers)).status_code == 204
+    keys = [c["key"] for c in (await client.get("/concepts", headers=headers)).json()]
+    assert keys == ["range"], "the global row must not show through"
+    assert lists.status == "provisional" and lists.deleted_at is None
+
+
+async def test_purging_a_tag_erases_its_branch_but_no_problem(
+    client, signed_in, session: AsyncSession
+) -> None:
+    from work_builders import problem_doc
+
+    headers = await signed_in()
+    top = (await client.post("/concepts", json={"label": "Turtle"}, headers=headers)).json()
+    child = (
+        await client.post(
+            "/concepts", json={"label": "pen", "parent_id": top["id"]}, headers=headers
+        )
+    ).json()
+    item = (await client.post("/items", json=problem_doc(child["id"]), headers=headers)).json()
+
+    await client.delete(f"/concepts/{top['id']}", headers=headers)
+    purged = await client.post(f"/trash/concept/{top['id']}/purge", json={}, headers=headers)
+    assert purged.status_code == 204, purged.text
+    remaining = (
+        await session.exec(
+            select(Concept).where(Concept.id.in_([uuid.UUID(top["id"]), uuid.UUID(child["id"])]))  # type: ignore[attr-defined]
+        )
+    ).all()
+    assert remaining == []
+    assert (await client.get(f"/items/{item['id']}", headers=headers)).status_code == 200
